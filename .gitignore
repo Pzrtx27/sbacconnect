@@ -24,3 +24,25 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Firebase Admin SDK service account key — full database access, never commit
+import-tool/serviceAccountKey.json
+serviceAccountKey.json
+
+# Env files with secrets (.env.local already caught by *.local above, .env explicit here)
+.env
+
+# ข้อมูลนักเรียนจริง (ชื่อ-นามสกุล + รหัสนักเรียน) ห้าม push ขึ้น GitHub
+# ใช้ไฟล์ .example เป็นตัวอย่างใน repo แทน
+supabase/migrations/06_seed_real.sql
+
+# รายชื่อสำหรับ import — มีชื่อจริงและรหัสผ่าน (เลขบัตร/รหัสนักเรียน)
+# repo นี้เป็น public ถ้าหลุดคือใครก็ล็อกอินแทนนักเรียนได้
+import-tool/students.csv
+import-tool/staff.csv
+
+# ไฟล์รวมที่สร้างไว้รันครั้งเดียว — มีเนื้อหาของ 06_seed_real.sql (ชื่อจริง) อยู่ข้างใน
+supabase/migrations/RUN_ME_ALL.sql
+
+# บัญชีบุคลากรจริง — มีชื่อผู้ใช้ที่ใช้ล็อกอินจริง ไม่ควรขึ้น repo สาธารณะ
+supabase/migrations/08_seed_staff.sql

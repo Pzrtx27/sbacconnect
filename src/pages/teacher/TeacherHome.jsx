@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { showToast } from '../../components/ui/Toast';
 import Modal from '../../components/ui/Modal';
 import GlassCard from '../../components/layout/GlassCard';
+import { readJSON, writeJSON } from '../../utils/storage';
 import { 
   Calendar, 
   Coffee, 
@@ -21,10 +22,13 @@ import {
   XCircle
 } from 'lucide-react';
 
+/* รายชื่อตัวอย่างสำหรับหน้าครู — เป็นข้อมูลสมมติทั้งหมด
+   ห้ามใส่ชื่อ-นามสกุลจริงของนักเรียนตรงนี้ เพราะ repo นี้เป็น public
+   ของจริงต้องดึงจากตาราง student_profiles ผ่าน Supabase (ยังไม่ได้ทำ) */
 const STUDENTS = [
-  { id: '66001', name: 'นายสิรวิชญ์ รัศมีเจริญ', branch: 'เทคโนโลยีสารสนเทศ', role: 'student' },
-  { id: '66002', name: 'นางสาวสมหญิง ใจดี', branch: 'คอมพิวเตอร์ธุรกิจ', role: 'student' },
-  { id: '66003', name: 'นายวิชัย เก่งมาก', branch: 'ดิจิทัลมีเดีย', role: 'student' },
+  { id: 'student01', name: 'นักเรียนตัวอย่าง 1', class: 'ปวช.3/6', branch: 'เทคโนโลยีสารสนเทศ', role: 'student' },
+  { id: 'student02', name: 'นักเรียนตัวอย่าง 2', class: 'ปวช.3/6', branch: 'เทคโนโลยีสารสนเทศ', role: 'student' },
+  { id: 'student03', name: 'นักเรียนตัวอย่าง 3', class: 'ปวช.3/4', branch: 'เทคโนโลยีสารสนเทศ', role: 'student' },
 ];
 
 export default function TeacherHome() {
@@ -81,16 +85,16 @@ export default function TeacherHome() {
 
   useEffect(() => {
     // Load student leaves from local storage
-    const storedLeaves = JSON.parse(localStorage.getItem('sbac_leave_requests') || '[]');
+    const storedLeaves = readJSON('sbac_leave_requests', []);
     setLeaveRequests(storedLeaves);
 
     // Load homeroom status
-    const storedHomeroom = JSON.parse(localStorage.getItem('sbac_homeroom_attendance') || '{}');
+    const storedHomeroom = readJSON('sbac_homeroom_attendance', {});
     setHomeroomStatus(storedHomeroom.status || {});
     setIsHomeroomSubmitted(storedHomeroom.submitted || false);
 
     // Load behavior logs
-    const storedLogs = JSON.parse(localStorage.getItem('sbac_behavior_logs') || '[]');
+    const storedLogs = readJSON('sbac_behavior_logs', []);
     setBehaviorLogs(storedLogs);
   }, [activeModal]);
 
@@ -106,7 +110,7 @@ export default function TeacherHome() {
       status: homeroomStatus,
       date: new Date().toLocaleDateString()
     };
-    localStorage.setItem('sbac_homeroom_attendance', JSON.stringify(data));
+    writeJSON('sbac_homeroom_attendance', data);
     setIsHomeroomSubmitted(true);
     showToast('บันทึกการเช็คชื่อโฮมรูมสำเร็จ', 'success');
     setActiveModal(null);
@@ -120,7 +124,7 @@ export default function TeacherHome() {
       }
       return req;
     });
-    localStorage.setItem('sbac_leave_requests', JSON.stringify(updated));
+    writeJSON('sbac_leave_requests', updated);
     setLeaveRequests(updated);
     showToast(status === 'approved' ? 'อนุมัติใบลาเรียบร้อยแล้ว' : 'ปฏิเสธใบลาเรียบร้อยแล้ว', 'success');
   };
@@ -150,9 +154,9 @@ export default function TeacherHome() {
       timestamp: new Date().toISOString()
     };
 
-    const existingLogs = JSON.parse(localStorage.getItem('sbac_behavior_logs') || '[]');
+    const existingLogs = readJSON('sbac_behavior_logs', []);
     existingLogs.push(newLog);
-    localStorage.setItem('sbac_behavior_logs', JSON.stringify(existingLogs));
+    writeJSON('sbac_behavior_logs', existingLogs);
     setBehaviorLogs(existingLogs);
 
     showToast(`อัปเดตพฤติกรรม ${selectedStudent.name} ${scoreOffset > 0 ? `+${scoreOffset}` : scoreOffset} คะแนนสำเร็จ`, 'success');
@@ -164,7 +168,7 @@ export default function TeacherHome() {
   };
 
   const getStudentBehaviorScore = (studentId) => {
-    const logs = JSON.parse(localStorage.getItem('sbac_behavior_logs') || '[]');
+    const logs = readJSON('sbac_behavior_logs', []);
     const studentLogs = logs.filter(log => log.studentId === studentId);
     const totalDeductions = studentLogs.reduce((acc, log) => acc + Number(log.score), 0);
     return Math.max(0, Math.min(100, 100 + totalDeductions));
@@ -172,11 +176,11 @@ export default function TeacherHome() {
 
   // Helper colors
   const textPrimary = isDark ? 'text-white' : 'text-sbac-navy';
-  const textSecondary = isDark ? 'text-slate-300' : 'text-ink-secondary';
-  const textMuted = isDark ? 'text-slate-400' : 'text-ink-muted';
-  const bgSubtle = isDark ? 'bg-white/[0.04]' : 'bg-slate-50/50';
-  const borderSubtle = isDark ? 'border-white/5' : 'border-slate-100';
-  const bgInput = isDark ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50' : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue';
+  const textSecondary = isDark ? 'text-slate-200' : 'text-ink-secondary';
+  const textMuted = isDark ? 'text-content-secondary' : 'text-ink-muted';
+  const bgSubtle = isDark ? 'bg-neutral-900/60' : 'bg-slate-50/50';
+  const borderSubtle = isDark ? 'border-white/10' : 'border-slate-100';
+  const bgInput = isDark ? 'bg-neutral-900 border-white/15 text-white focus:border-sbac-blue-light/50' : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue';
 
   const pendingLeavesCount = leaveRequests.filter(req => req.status === 'pending').length;
 
@@ -213,20 +217,20 @@ export default function TeacherHome() {
                   : 'bg-rose-50 border-rose-100'
               }`}
             >
-              <div className={`p-2.5 rounded-xl shrink-0 ${isDark ? 'bg-rose-900/40 text-rose-400' : 'bg-rose-100 text-rose-700'}`}>
+              <div className={`p-2.5 rounded-xl shrink-0 ${isDark ? 'bg-rose-900/40 text-accent-rose' : 'bg-rose-100 text-accent-rose'}`}>
                 <Clock size={20} />
               </div>
               <div className="flex-1 space-y-1 min-w-0">
-                <div className={`text-[10px] font-extrabold uppercase tracking-wider ${isDark ? 'text-rose-400' : 'text-rose-800'}`}>
+                <div className={`text-[10px] font-extrabold uppercase tracking-wider ${isDark ? 'text-accent-rose' : 'text-accent-rose'}`}>
                   คาบที่ {sub.period} • {sub.day}
                 </div>
                 <div className={`text-sm font-extrabold truncate ${textPrimary}`}>
                   สอนแทน: {sub.subject}
                 </div>
-                <p className={`text-[10px] font-semibold ${isDark ? 'text-slate-300' : 'text-ink-secondary'}`}>
+                <p className={`text-[10px] font-semibold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
                   ระดับชั้น ปวช. 3/6 • {sub.room}
                 </p>
-                <div className={`text-[9px] font-bold pt-1 ${isDark ? 'text-rose-400' : 'text-rose-600'}`}>
+                <div className={`text-[9px] font-bold pt-1 ${isDark ? 'text-accent-rose' : 'text-accent-rose'}`}>
                   * ครูประจำวิชาเดิม: {sub.original_teacher}
                 </div>
               </div>
@@ -244,17 +248,17 @@ export default function TeacherHome() {
           <GlassCard onClick={() => setActiveModal('homeroom')}>
             <div className="flex flex-col h-full justify-between min-h-[115px]">
               <div>
-                <UserCheck className="text-emerald-500 mb-2" size={24} />
-                <div className={`text-sm font-extrabold ${textPrimary}`}>เช็คชื่อโฮมรูม</div>
-                <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ลงเวลาเข้าแถวนักเรียน ม.3/6</div>
+                <UserCheck className="text-accent-emerald mb-2" size={24} />
+                <div className={`text-sm font-extrabold ${textPrimary}`}>เช็คเข้าแถว</div>
+                <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ลงเวลาเช็คชื่อเข้าแถวหน้าเสาธง</div>
               </div>
               <div className="mt-2.5 flex items-center justify-between">
                 <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
                   isHomeroomSubmitted
-                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                    : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                    ? 'bg-emerald-500/10 text-accent-emerald border border-emerald-500/20'
+                    : 'bg-amber-500/10 text-accent-amber border border-amber-500/20'
                 }`}>
-                  {isHomeroomSubmitted ? 'เช็คชื่อเสร็จแล้ว' : 'ค้างการเช็คชื่อ'}
+                  {isHomeroomSubmitted ? 'เช็คชื่อเข้าแถวแล้ว' : 'ค้างการเช็คชื่อเข้าแถว'}
                 </span>
                 <ChevronRight size={14} className={textMuted} />
               </div>
@@ -265,7 +269,7 @@ export default function TeacherHome() {
           <GlassCard onClick={() => setActiveModal('leaves')}>
             <div className="flex flex-col h-full justify-between min-h-[115px]">
               <div>
-                <ClipboardCheck className="text-sbac-blue-light mb-2" size={24} />
+                <ClipboardCheck className="text-brand mb-2" size={24} />
                 <div className={`text-sm font-extrabold ${textPrimary}`}>อนุมัติใบลาเรียน</div>
                 <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>พิจารณาใบลาป่วย/ลากิจของเด็ก</div>
               </div>
@@ -275,7 +279,7 @@ export default function TeacherHome() {
                     รออนุมัติ {pendingLeavesCount} ใบ
                   </span>
                 ) : (
-                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-400`}>
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-500/10 text-content-muted`}>
                     ไม่มีคำขอค้างอยู่
                   </span>
                 )}
@@ -288,13 +292,13 @@ export default function TeacherHome() {
           <GlassCard onClick={() => setActiveModal('behavior')}>
             <div className="flex flex-col h-full justify-between min-h-[115px]">
               <div>
-                <Award className="text-amber-500 mb-2" size={24} />
-                <div className={`text-sm font-extrabold ${textPrimary}`}>จัดการพฤติกรรม</div>
-                <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ตัดแต้ม/เพิ่มคะแนนความประพฤติ</div>
+                <Award className="text-accent-amber mb-2" size={24} />
+                <div className={`text-sm font-extrabold ${textPrimary}`}>เช็คคะแนนพฤติกรรม</div>
+                <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>เช็คและตัด/เพิ่มคะแนนพฤติกรรม (พร้อมคอมเมนต์)</div>
               </div>
               <div className="mt-2.5 flex items-center justify-between">
-                <span className={`text-[9px] font-semibold text-amber-500`}>
-                  จัดการแต้มวินัย
+                <span className={`text-[9px] font-semibold text-accent-amber`}>
+                  จัดการแต้มวินัย & คอมเมนต์
                 </span>
                 <ChevronRight size={14} className={textMuted} />
               </div>
@@ -305,12 +309,12 @@ export default function TeacherHome() {
           <GlassCard onClick={() => navigate('/timetable')}>
             <div className="flex flex-col h-full justify-between min-h-[115px]">
               <div>
-                <Calendar className="text-indigo-600 mb-2" size={24} />
+                <Calendar className="text-brand mb-2" size={24} />
                 <div className={`text-sm font-extrabold ${textPrimary}`}>ตารางสอนของฉัน</div>
                 <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ดูตารางคาบสอนรายวัน</div>
               </div>
               <div className="mt-2.5 flex items-center justify-between">
-                <span className={`text-[9px] text-indigo-500 font-semibold`}>
+                <span className={`text-[9px] text-brand font-semibold`}>
                   เปิดดู
                 </span>
                 <ChevronRight size={14} className={textMuted} />
@@ -322,7 +326,7 @@ export default function TeacherHome() {
           <GlassCard className="col-span-2" onClick={() => navigate('/coffee')}>
             <div className="flex items-center justify-between w-full p-1.5">
               <div className="flex items-center gap-3">
-                <div className={`p-2.5 rounded-xl ${isDark ? 'bg-amber-950/40 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>
+                <div className={`p-2.5 rounded-xl ${isDark ? 'bg-amber-950/40 text-accent-amber' : 'bg-amber-50 text-accent-amber'}`}>
                   <Coffee size={24} />
                 </div>
                 <div>
@@ -340,31 +344,31 @@ export default function TeacherHome() {
       <div className={`rounded-3xl border p-5 space-y-4 transition-colors duration-300 ${bgSubtle} ${borderSubtle}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <TrendingUp size={16} className="text-emerald-500" />
+            <TrendingUp size={16} className="text-accent-emerald" />
             <span className={`text-xs font-extrabold uppercase tracking-wider ${textPrimary}`}>
               รายงานสถานะห้องเรียน ปวช. 3/6 วันนี้
             </span>
           </div>
-          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/5 text-slate-400' : 'bg-slate-200/50 text-slate-500'}`}>
+          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/5 text-content-muted' : 'bg-slate-200/50 text-content-muted'}`}>
             ข้อมูลเรียลไทม์
           </span>
         </div>
 
         <div className="grid grid-cols-3 gap-3">
-          <div className={`p-3 rounded-2xl border text-center transition-all ${isDark ? 'bg-slate-900/40 border-white/5' : 'bg-white border-slate-100 shadow-sm'}`}>
-            <span className="text-lg font-extrabold text-emerald-500">
+          <div className={`p-3 rounded-2xl border text-center transition-all ${isDark ? 'bg-neutral-900/60 border-white/10' : 'bg-white border-slate-100 shadow-sm'}`}>
+            <span className="text-lg font-extrabold text-accent-emerald">
               {STUDENTS.filter(s => homeroomStatus[s.id] === 'present').length} / {STUDENTS.length}
             </span>
             <span className={`text-[9px] font-bold block mt-1 ${textMuted}`}>มาเรียน</span>
           </div>
-          <div className={`p-3 rounded-2xl border text-center transition-all ${isDark ? 'bg-slate-900/40 border-white/5' : 'bg-white border-slate-100 shadow-sm'}`}>
-            <span className="text-lg font-extrabold text-rose-500">
+          <div className={`p-3 rounded-2xl border text-center transition-all ${isDark ? 'bg-neutral-900/60 border-white/10' : 'bg-white border-slate-100 shadow-sm'}`}>
+            <span className="text-lg font-extrabold text-accent-rose">
               {STUDENTS.filter(s => homeroomStatus[s.id] === 'absent').length}
             </span>
             <span className={`text-[9px] font-bold block mt-1 ${textMuted}`}>ขาดเรียน</span>
           </div>
-          <div className={`p-3 rounded-2xl border text-center transition-all ${isDark ? 'bg-slate-900/40 border-white/5' : 'bg-white border-slate-100 shadow-sm'}`}>
-            <span className="text-lg font-extrabold text-sbac-blue-light">
+          <div className={`p-3 rounded-2xl border text-center transition-all ${isDark ? 'bg-neutral-900/60 border-white/10' : 'bg-white border-slate-100 shadow-sm'}`}>
+            <span className="text-lg font-extrabold text-brand">
               {Math.round(STUDENTS.reduce((acc, s) => acc + getStudentBehaviorScore(s.id), 0) / STUDENTS.length)}
             </span>
             <span className={`text-[9px] font-bold block mt-1 ${textMuted}`}>คะแนนวินัยเฉลี่ย</span>
@@ -398,10 +402,10 @@ export default function TeacherHome() {
 
                 <div className="grid grid-cols-4 gap-1.5">
                   {[
-                    { id: 'present', label: 'มา', color: 'peer-checked:bg-emerald-500 peer-checked:text-white text-emerald-600 bg-emerald-500/5' },
-                    { id: 'late', label: 'สาย', color: 'peer-checked:bg-amber-500 peer-checked:text-white text-amber-600 bg-amber-500/5' },
-                    { id: 'absent', label: 'ขาด', color: 'peer-checked:bg-rose-500 peer-checked:text-white text-rose-600 bg-rose-500/5' },
-                    { id: 'sick', label: 'ลา', color: 'peer-checked:bg-indigo-500 peer-checked:text-white text-indigo-600 bg-indigo-500/5' }
+                    { id: 'present', label: 'มา', color: 'peer-checked:bg-emerald-500 peer-checked:text-white text-accent-emerald bg-emerald-500/5' },
+                    { id: 'late', label: 'สาย', color: 'peer-checked:bg-amber-500 peer-checked:text-white text-accent-amber bg-amber-500/5' },
+                    { id: 'absent', label: 'ขาด', color: 'peer-checked:bg-rose-500 peer-checked:text-white text-accent-rose bg-rose-500/5' },
+                    { id: 'sick', label: 'ลา', color: 'peer-checked:bg-indigo-500 peer-checked:text-white text-brand bg-indigo-500/5' }
                   ].map(opt => (
                     <label key={opt.id} className="cursor-pointer select-none">
                       <input 
@@ -447,7 +451,7 @@ export default function TeacherHome() {
             <div className={`rounded-2xl p-8 border text-center transition-all ${
               isDark ? 'bg-white/[0.02] border-white/5' : 'bg-slate-50 border-slate-100'
             }`}>
-              <CheckCircle2 size={36} className="text-emerald-500 mx-auto mb-2" />
+              <CheckCircle2 size={36} className="text-accent-emerald mx-auto mb-2" />
               <p className={`text-sm font-extrabold ${textPrimary}`}>ไม่มีคำขอลาที่ค้างอยู่</p>
               <p className={`text-xs mt-1 ${textMuted}`}>นักเรียนในความดูแลของคุณไม่มีการยื่นใบลาในขณะนี้</p>
             </div>
@@ -466,7 +470,7 @@ export default function TeacherHome() {
                       <span className={`text-[9px] font-semibold block ${textMuted}`}>สาขา {req.branch} • ID: {req.studentId}</span>
                     </div>
                     <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                      req.type === 'sick' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-indigo-500/10 text-indigo-500'
+                      req.type === 'sick' ? 'bg-emerald-500/10 text-accent-emerald' : 'bg-indigo-500/10 text-brand'
                     }`}>
                       {req.type === 'sick' ? '🏥 ลาป่วย' : '📋 ลากิจ'}
                     </span>
@@ -494,7 +498,7 @@ export default function TeacherHome() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleLeaveDecision(req.id, 'rejected')}
-                          className="bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1 border border-rose-500/20"
+                          className="bg-rose-500/10 text-accent-rose hover:bg-rose-500 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1 border border-rose-500/20"
                         >
                           <UserX size={12} /> ปฏิเสธ
                         </button>
@@ -507,7 +511,7 @@ export default function TeacherHome() {
                       </div>
                     ) : (
                       <span className={`text-xs font-extrabold flex items-center gap-1 ${
-                        req.status === 'approved' ? 'text-emerald-500' : 'text-rose-500'
+                        req.status === 'approved' ? 'text-accent-emerald' : 'text-accent-rose'
                       }`}>
                         {req.status === 'approved' ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
                         {req.status === 'approved' ? 'อนุมัติแล้ว' : 'ไม่อนุมัติ'}
@@ -552,8 +556,8 @@ export default function TeacherHome() {
                 behaviorActionType === 'deduct'
                   ? 'bg-rose-500 text-white border-rose-500 shadow-sm'
                   : isDark
-                  ? 'bg-white/5 border-white/10 text-rose-400 hover:bg-white/10'
-                  : 'bg-rose-50 border-rose-100 text-rose-600 hover:bg-rose-100/50'
+                  ? 'bg-white/5 border-white/10 text-accent-rose hover:bg-white/10'
+                  : 'bg-rose-50 border-rose-100 text-accent-rose hover:bg-rose-100/50'
               }`}
             >
               ⚠️ ตัดคะแนนความประพฤติ
@@ -564,8 +568,8 @@ export default function TeacherHome() {
                 behaviorActionType === 'add'
                   ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
                   : isDark
-                  ? 'bg-white/5 border-white/10 text-emerald-400 hover:bg-white/10'
-                  : 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-100/50'
+                  ? 'bg-white/5 border-white/10 text-accent-emerald hover:bg-white/10'
+                  : 'bg-emerald-50 border-emerald-100 text-accent-emerald hover:bg-emerald-100/50'
               }`}
             >
               ⭐ เพิ่มคะแนนความดี
@@ -585,14 +589,14 @@ export default function TeacherHome() {
                   }}
                   className={`p-2.5 rounded-xl border text-[10px] font-bold text-left transition-all ${
                     behaviorReason === preset.reason
-                      ? 'border-sbac-blue bg-sbac-blue-50/20 text-sbac-blue-light'
+                      ? 'border-sbac-blue bg-sbac-blue-50/20 text-brand'
                       : isDark
-                      ? 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] text-slate-300'
+                      ? 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] text-content-secondary'
                       : 'border-slate-100 bg-white hover:bg-slate-50 text-slate-600 shadow-sm'
                   }`}
                 >
                   <div className="truncate">{preset.reason}</div>
-                  <div className={`text-[9px] mt-0.5 font-extrabold ${behaviorActionType === 'add' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  <div className={`text-[9px] mt-0.5 font-extrabold ${behaviorActionType === 'add' ? 'text-accent-emerald' : 'text-accent-rose'}`}>
                     {preset.score > 0 ? `+${preset.score}` : preset.score} คะแนน
                   </div>
                 </button>

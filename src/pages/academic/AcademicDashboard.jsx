@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { db } from '../../config/firebase';
+import { db } from '../../config/firebase.js';
 import { doc, getDoc, setDoc, updateDoc, collection, addDoc, onSnapshot } from 'firebase/firestore';
 import { showToast } from '../../components/ui/Toast';
-import { 
-  Calendar, 
-  Settings, 
-  Bell, 
-  Send, 
-  RefreshCw, 
+import {
+  Calendar,
+  Settings,
+  Bell,
+  Send,
+  RefreshCw,
   Undo,
   FileSpreadsheet,
   Upload,
@@ -23,10 +23,10 @@ import { sha256, encryptAES, decryptAES } from '../../utils/crypto';
 
 export default function AcademicDashboard() {
   const { user } = useAuth();
-  
+
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  
+
   // Substitution Form State
   const [day, setDay] = useState('Monday');
   const [period, setPeriod] = useState(3);
@@ -76,15 +76,15 @@ export default function AcademicDashboard() {
   const parseCSVData = (text) => {
     const lines = text.split(/\r?\n/);
     if (lines.length === 0) return [];
-    
+
     // Headers are in the first line
     const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
     const list = [];
-    
+
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
-      
+
       const values = [];
       let current = '';
       let inQuotes = false;
@@ -100,7 +100,7 @@ export default function AcademicDashboard() {
         }
       }
       values.push(current.trim().replace(/^["']|["']$/g, ''));
-      
+
       const row = {};
       headers.forEach((header, index) => {
         row[header] = values[index] || '';
@@ -170,9 +170,10 @@ export default function AcademicDashboard() {
   // Excel template generator
   const downloadTemplate = () => {
     const headers = 'student_id,full_name,national_id,email,branch,year,room,session,class_id\n';
-    const sample1 = '66001,นายสิรวิชญ์ รัศมีเจริญ,1100100001000,student66001@example.com,เทคโนโลยีสารสนเทศ,3,6,เช้า,m3_6\n';
-    const sample2 = '66002,นางสาวสมหญิง ใจดี,1234567890123,student66002@example.com,เทคโนโลยีสารสนเทศ,3,6,เช้า,m3_6\n';
-    
+    // ข้อมูลสมมติล้วน — ห้ามใส่ชื่อ/เลขบัตรจริงของนักเรียน เพราะ repo นี้เป็น public
+    const sample1 = '66001,นายสมชาย ใจดี,1100100001000,student66001@example.com,เทคโนโลยีสารสนเทศ,3,6,เช้า,m3_6\n';
+    const sample2 = '66002,นางสาวสมหญิง เรียนดี,1234567890123,student66002@example.com,เทคโนโลยีสารสนเทศ,3,6,เช้า,m3_6\n';
+
     const blob = new Blob([headers + sample1 + sample2], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -206,7 +207,7 @@ export default function AcademicDashboard() {
         }
 
         const hash = await sha256(norm.national_id);
-        
+
         const studentPayload = {
           full_name: norm.full_name,
           email: norm.email,
@@ -268,17 +269,17 @@ export default function AcademicDashboard() {
       showToast('กรุณากรอกคีย์หลักเพื่อถอดรหัสข้อมูลก่อนส่งออก', 'error');
       return;
     }
-    
+
     setIsProcessing(true);
     try {
       const { collection, getDocs } = await import('firebase/firestore');
       const querySnapshot = await getDocs(collection(db, 'students'));
       const rows = [];
-      
+
       for (const docSnap of querySnapshot.docs) {
         const data = docSnap.data();
         let decryptedNationalId = 'ถอดรหัสไม่ได้ (ไม่มีคีย์)';
-        
+
         if (data.national_id) {
           decryptedNationalId = data.national_id;
         } else if (data.national_id_encrypted && secretKey) {
@@ -289,7 +290,7 @@ export default function AcademicDashboard() {
         } else if (data.national_id_hash) {
           decryptedNationalId = `[เข้ารหัสแบบ HASH: ${data.national_id_hash.substring(0, 8)}...]`;
         }
-        
+
         rows.push({
           student_id: docSnap.id,
           full_name: data.full_name || '',
@@ -302,18 +303,18 @@ export default function AcademicDashboard() {
           class_id: data.class_id || ''
         });
       }
-      
+
       if (rows.length === 0) {
         showToast('ไม่มีข้อมูลนักเรียนในระบบ', 'warning');
         setIsProcessing(false);
         return;
       }
-      
+
       const headers = 'student_id,full_name,national_id,email,branch,year,room,session,class_id\n';
-      const csvContent = rows.map(r => 
+      const csvContent = rows.map(r =>
         `"${r.student_id}","${r.full_name}","${r.national_id}","${r.email}","${r.branch}","${r.year}","${r.room}","${r.session}","${r.class_id}"`
       ).join('\n');
-      
+
       const blob = new Blob(["\ufeff" + headers + csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -439,40 +440,35 @@ export default function AcademicDashboard() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className={`text-xl font-extrabold flex items-center gap-2 transition-colors duration-300 ${
-          isDark ? 'text-white' : 'text-sbac-navy'
-        }`}>
-          <Settings size={24} className="text-sbac-blue-light" />
+        <h2 className={`text-xl font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
+          }`}>
+          <Settings size={24} className="text-brand" />
           Academic Panel
         </h2>
-        <span className={`text-xs font-bold px-3 py-1 rounded-lg transition-colors duration-300 ${
-          isDark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-ink-secondary'
-        }`}>
+        <span className={`text-xs font-bold px-3 py-1 rounded-lg transition-colors duration-300 ${isDark ? 'bg-white/10 text-content-secondary' : 'bg-slate-100 text-ink-secondary'
+          }`}>
           ห้อง {selectedClassId.replace('m', 'ม.').replace('_', '/')} ({selectedBranch})
         </span>
       </div>
 
       {/* Select Branch and Class Room */}
-      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${
-        isDark ? 'bg-white/[0.04] border-white/5' : 'bg-white border-slate-100'
-      }`}>
-        <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${
-          isDark ? 'text-white' : 'text-sbac-navy'
+      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-white border-slate-100'
         }`}>
-          <Settings size={18} className="text-sbac-blue-light" />
+        <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
+          }`}>
+          <Settings size={18} className="text-brand" />
           เลือกห้องเรียนและสาขาวิชาที่จะจัดการ
         </h3>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-slate-300' : 'text-ink-secondary'}`}>สาขาวิชา (12 สาขา)</label>
+            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>สาขาวิชา (12 สาขา)</label>
             <select
               value={selectedBranch}
               onChange={e => setSelectedBranch(e.target.value)}
-              className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${
-                isDark 
-                  ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900' 
-                  : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-white'
-              }`}
+              className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
+                ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-white'
+                }`}
             >
               <option value="เทคโนโลยีสารสนเทศ">เทคโนโลยีสารสนเทศ (IT)</option>
               <option value="คอมพิวเตอร์ธุรกิจ">คอมพิวเตอร์ธุรกิจ</option>
@@ -489,15 +485,14 @@ export default function AcademicDashboard() {
             </select>
           </div>
           <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-slate-300' : 'text-ink-secondary'}`}>ห้องเรียน (20 ห้อง)</label>
+            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>ห้องเรียน (20 ห้อง)</label>
             <select
               value={selectedClassId}
               onChange={e => setSelectedClassId(e.target.value)}
-              className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${
-                isDark 
-                  ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900' 
-                  : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-white'
-              }`}
+              className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
+                ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-white'
+                }`}
             >
               <optgroup label="มัธยมศึกษาปีที่ 1">
                 <option value="m1_1">ม.1/1</option>
@@ -531,27 +526,24 @@ export default function AcademicDashboard() {
       </div>
 
       {/* Timetable modification form */}
-      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${
-        isDark ? 'bg-white/[0.04] border-white/5' : 'bg-white border-slate-100'
-      }`}>
-        <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${
-          isDark ? 'text-white' : 'text-sbac-navy'
+      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-white border-slate-100'
         }`}>
-          <Calendar size={18} className="text-sbac-blue-light" />
+        <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
+          }`}>
+          <Calendar size={18} className="text-brand" />
           แก้ไขตารางสอน (Real-time)
         </h3>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-slate-300' : 'text-ink-secondary'}`}>วัน</label>
-            <select 
-              value={day} 
+            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>วัน</label>
+            <select
+              value={day}
               onChange={e => setDay(e.target.value)}
-              className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${
-                isDark 
-                  ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900' 
-                  : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-white'
-              }`}
+              className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
+                ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-white'
+                }`}
             >
               <option value="Monday">จันทร์</option>
               <option value="Tuesday">อังคาร</option>
@@ -561,106 +553,99 @@ export default function AcademicDashboard() {
             </select>
           </div>
           <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-slate-300' : 'text-ink-secondary'}`}>คาบที่ (1–6)</label>
-            <input 
-              type="number" 
+            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>คาบที่ (1–6)</label>
+            <input
+              type="number"
               value={period}
               onChange={e => setPeriod(Number(e.target.value))}
-              min={1} 
+              min={1}
               max={6}
-              className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${
-                isDark 
-                  ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900' 
-                  : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-white'
-              }`}
+              className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
+                ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-white'
+                }`}
             />
           </div>
         </div>
 
         <div className="space-y-3">
           <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-slate-300' : 'text-ink-secondary'}`}>ชื่อวิชา</label>
-            <input 
-              type="text" 
+            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>ชื่อวิชา</label>
+            <input
+              type="text"
               value={subject}
               onChange={e => setSubject(e.target.value)}
-              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${
-                isDark 
-                  ? 'bg-slate-900 border-white/10 text-white placeholder:text-slate-500 focus:border-sbac-blue-light/50 focus:bg-slate-900' 
-                  : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
-              }`}
+              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
+                ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
+                }`}
               placeholder="ระบุวิชาเรียน"
             />
           </div>
 
           <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-slate-300' : 'text-ink-secondary'}`}>ครูประจำวิชา (เดิม)</label>
-            <input 
-              type="text" 
+            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>ครูประจำวิชา (เดิม)</label>
+            <input
+              type="text"
               value={origTeacher}
               onChange={e => setOrigTeacher(e.target.value)}
-              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${
-                isDark 
-                  ? 'bg-slate-900 border-white/10 text-white placeholder:text-slate-500 focus:border-sbac-blue-light/50 focus:bg-slate-900' 
-                  : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
-              }`}
+              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
+                ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
+                }`}
               placeholder="ระบุครูผู้สอนเดิม"
             />
           </div>
 
           <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-slate-300' : 'text-ink-secondary'}`}>ครูสอนแทน</label>
-            <input 
-              type="text" 
+            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>ครูสอนแทน</label>
+            <input
+              type="text"
               value={subTeacher}
               onChange={e => setSubTeacher(e.target.value)}
-              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${
-                isDark 
-                  ? 'bg-slate-900 border-white/10 text-white placeholder:text-slate-500 focus:border-sbac-blue-light/50 focus:bg-slate-900' 
-                  : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
-              }`}
+              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
+                ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
+                }`}
               placeholder="ระบุชื่อครูสอนแทน"
             />
           </div>
 
           <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-slate-300' : 'text-ink-secondary'}`}>ห้องเรียน</label>
+            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>ห้องเรียน</label>
             <div className="flex gap-2 mb-2">
-              <button 
+              <button
                 onClick={() => setRoomMode('same')}
-                className={`flex-1 py-2 rounded-xl text-xs font-extrabold border transition-all ${
-                  roomMode === 'same' 
-                    ? 'bg-sbac-blue text-white border-sbac-blue shadow-sm' 
-                    : isDark
-                    ? 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                className={`flex-1 py-2 rounded-xl text-xs font-extrabold border transition-all ${roomMode === 'same'
+                  ? 'bg-sbac-blue text-white border-sbac-blue shadow-sm'
+                  : isDark
+                    ? 'bg-white/5 text-content-secondary border-white/10 hover:bg-white/10'
                     : 'bg-slate-50 text-ink-secondary border-slate-200 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 ห้องเดิมตามตาราง
               </button>
-              <button 
+              <button
                 onClick={() => setRoomMode('new')}
-                className={`flex-1 py-2 rounded-xl text-xs font-extrabold border transition-all ${
-                  roomMode === 'new' 
-                    ? 'bg-sbac-blue text-white border-sbac-blue shadow-sm' 
-                    : isDark
-                    ? 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                className={`flex-1 py-2 rounded-xl text-xs font-extrabold border transition-all ${roomMode === 'new'
+                  ? 'bg-sbac-blue text-white border-sbac-blue shadow-sm'
+                  : isDark
+                    ? 'bg-white/5 text-content-secondary border-white/10 hover:bg-white/10'
                     : 'bg-slate-50 text-ink-secondary border-slate-200 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 เปลี่ยนห้องใหม่
               </button>
             </div>
             {roomMode === 'new' && (
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={room}
                 onChange={e => setRoom(e.target.value)}
-                className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${
-                  isDark 
-                    ? 'bg-slate-900 border-white/10 text-white placeholder:text-slate-500 focus:border-sbac-blue-light/50 focus:bg-slate-900' 
-                    : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
-                }`}
+                className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
+                  ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
+                  : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
+                  }`}
                 placeholder="ระบุเลขห้องเรียนใหม่"
               />
             )}
@@ -668,20 +653,19 @@ export default function AcademicDashboard() {
         </div>
 
         <div className="flex gap-2 pt-2">
-          <button 
+          <button
             onClick={saveSubstitute}
             className="flex-1 bg-sbac-blue hover:bg-sbac-navy text-white font-extrabold py-3 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-1.5"
           >
             <RefreshCw size={14} />
             อัปเดตตาราง
           </button>
-          <button 
+          <button
             onClick={resetSubstitute}
-            className={`flex-1 border-2 font-extrabold py-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 ${
-              isDark 
-                ? 'border-white/10 text-slate-300 hover:bg-white/5' 
-                : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
-            }`}
+            className={`flex-1 border-2 font-extrabold py-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 ${isDark
+              ? 'border-white/10 text-content-secondary hover:bg-white/5'
+              : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
+              }`}
           >
             <Undo size={14} />
             คืนค่าคาบนี้
@@ -690,78 +674,72 @@ export default function AcademicDashboard() {
       </div>
 
       {/* Announcement panel */}
-      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${
-        isDark ? 'bg-white/[0.04] border-white/5' : 'bg-white border-slate-100'
-      }`}>
-        <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${
-          isDark ? 'text-white' : 'text-sbac-navy'
+      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-white border-slate-100'
         }`}>
-          <Bell size={18} className="text-sbac-blue-light" />
+        <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
+          }`}>
+          <Bell size={18} className="text-brand" />
           ประกาศกิจกรรม + แจ้งเตือนอีเมล
         </h3>
 
         <div className="space-y-3">
           <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-slate-300' : 'text-ink-secondary'}`}>หัวข้อประกาศ (ไทย)</label>
-            <input 
-              type="text" 
+            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>หัวข้อประกาศ (ไทย)</label>
+            <input
+              type="text"
               value={evtTitle}
               onChange={e => setEvtTitle(e.target.value)}
-              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${
-                isDark 
-                  ? 'bg-slate-900 border-white/10 text-white placeholder:text-slate-500 focus:border-sbac-blue-light/50 focus:bg-slate-900' 
-                  : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
-              }`}
+              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
+                ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
+                }`}
               placeholder="ระบุหัวข้อ เช่น วันไหว้ครู"
             />
           </div>
 
           <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-slate-300' : 'text-ink-secondary'}`}>รายละเอียดกิจกรรม</label>
-            <textarea 
+            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>รายละเอียดกิจกรรม</label>
+            <textarea
               value={evtDesc}
               onChange={e => setEvtDesc(e.target.value)}
               rows={3}
-              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${
-                isDark 
-                  ? 'bg-slate-900 border-white/10 text-white placeholder:text-slate-500 focus:border-sbac-blue-light/50 focus:bg-slate-900' 
-                  : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
-              }`}
+              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
+                ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
+                }`}
               placeholder="ระบุรายละเอียด หรือขั้นตอนปฏิบัติ"
             />
           </div>
 
           <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-slate-300' : 'text-ink-secondary'}`}>วันที่จัดกิจกรรม</label>
-            <input 
-              type="date" 
+            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>วันที่จัดกิจกรรม</label>
+            <input
+              type="date"
               value={evtDate}
               onChange={e => setEvtDate(e.target.value)}
-              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${
-                isDark 
-                  ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900' 
-                  : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-white'
-              }`}
+              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
+                ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-white'
+                }`}
             />
           </div>
 
           <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-slate-300' : 'text-ink-secondary'}`}>ลิงก์ Google Form การลา</label>
-            <input 
-              type="text" 
+            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>ลิงก์ Google Form การลา</label>
+            <input
+              type="text"
               value={leaveUrl}
               onChange={e => setLeaveUrl(e.target.value)}
-              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${
-                isDark 
-                  ? 'bg-slate-900 border-white/10 text-white placeholder:text-slate-500 focus:border-sbac-blue-light/50 focus:bg-slate-900' 
-                  : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
-              }`}
+              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
+                ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
+                }`}
               placeholder="ใส่ลิงก์สำหรับการลาเรียน"
             />
           </div>
         </div>
 
-        <button 
+        <button
           onClick={publishEvent}
           className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold py-3.5 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-2"
         >
@@ -771,43 +749,38 @@ export default function AcademicDashboard() {
       </div>
 
       {/* Excel sync panel */}
-      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${
-        isDark ? 'bg-white/[0.04] border-white/5' : 'bg-white border-slate-100'
-      }`}>
-        <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${
-          isDark ? 'text-white' : 'text-sbac-navy'
+      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-white border-slate-100'
         }`}>
-          <FileSpreadsheet size={18} className="text-sbac-blue-light" />
+        <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
+          }`}>
+          <FileSpreadsheet size={18} className="text-brand" />
           นำเข้าข้อมูลด้วย Excel / CSV + เข้ารหัสข้อมูล
         </h3>
-        
-        <p className={`text-xs leading-relaxed transition-colors duration-300 ${
-          isDark ? 'text-slate-400' : 'text-slate-500'
-        }`}>
+
+        <p className={`text-xs leading-relaxed transition-colors duration-300 ${isDark ? 'text-content-muted' : 'text-content-muted'
+          }`}>
           เชื่อมต่อข้อมูลรายชื่อนักเรียนจากระบบทะเบียน Excel พร้อมตัวเลือกเข้ารหัสเลขบัตรประชาชน (National ID) ด้วย SHA-256 Hashing หรือ AES-256
         </p>
 
         {/* Action Buttons for Template / Database Export */}
         <div className="flex gap-2">
-          <button 
+          <button
             onClick={downloadTemplate}
-            className={`flex-1 border font-extrabold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 ${
-              isDark 
-                ? 'border-white/10 text-slate-300 hover:bg-white/5' 
-                : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
-            }`}
+            className={`flex-1 border font-extrabold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 ${isDark
+              ? 'border-white/10 text-content-secondary hover:bg-white/5'
+              : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
+              }`}
           >
             <Download size={14} />
             ดาวน์โหลดเทมเพลต CSV
           </button>
-          <button 
+          <button
             onClick={exportDatabase}
             disabled={isProcessing}
-            className={`flex-1 border font-extrabold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 ${
-              isDark 
-                ? 'border-white/10 text-slate-300 hover:bg-white/5' 
-                : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
-            }`}
+            className={`flex-1 border font-extrabold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 ${isDark
+              ? 'border-white/10 text-content-secondary hover:bg-white/5'
+              : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
+              }`}
           >
             <Send size={14} className="rotate-180" />
             ส่งออกและถอดรหัส (Export)
@@ -815,12 +788,11 @@ export default function AcademicDashboard() {
         </div>
 
         {/* Encryption Settings */}
-        <div className={`p-4 rounded-2xl border ${
-          isDark ? 'bg-slate-950/40 border-white/5' : 'bg-slate-50 border-slate-100'
-        } space-y-3`}>
+        <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-950/40 border-white/5' : 'bg-slate-50 border-slate-100'
+          } space-y-3`}>
           <div className="flex items-center gap-1.5">
-            <Key size={14} className="text-sbac-blue-light" />
-            <span className={`text-xs font-extrabold ${isDark ? 'text-slate-300' : 'text-ink-secondary'}`}>
+            <Key size={14} className="text-brand" />
+            <span className={`text-xs font-extrabold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
               การตั้งค่าความปลอดภัยและการเข้ารหัส
             </span>
           </div>
@@ -835,13 +807,12 @@ export default function AcademicDashboard() {
                 key={mode.id}
                 type="button"
                 onClick={() => setEncryptionMode(mode.id)}
-                className={`px-2 py-3 rounded-xl border text-left transition-all ${
-                  encryptionMode === mode.id
-                    ? 'bg-sbac-blue/10 border-sbac-blue text-sbac-blue-light ring-2 ring-sbac-blue/20'
-                    : isDark
-                    ? 'bg-slate-900 border-white/5 hover:bg-slate-800 text-slate-400'
+                className={`px-2 py-3 rounded-xl border text-left transition-all ${encryptionMode === mode.id
+                  ? 'bg-sbac-blue/10 border-sbac-blue text-brand ring-2 ring-sbac-blue/20'
+                  : isDark
+                    ? 'bg-neutral-900 border-white/10 hover:bg-neutral-800 text-content-secondary'
                     : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
-                }`}
+                  }`}
               >
                 <div className="text-xs font-extrabold">{mode.label}</div>
                 <div className="text-[9px] opacity-75 mt-0.5 leading-tight">{mode.desc}</div>
@@ -852,25 +823,24 @@ export default function AcademicDashboard() {
           {/* Key Passphrase input for AES mode */}
           {encryptionMode === 'aes256' && (
             <div className="space-y-1 animate-slide-down">
-              <label className={`text-[10px] font-bold block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                คีย์หลักความปลอดภัย (Encryption Passphrase) <span className="text-rose-500">*จำเป็นในการถอดรหัส</span>
+              <label className={`text-[10px] font-bold block ${isDark ? 'text-slate-200' : 'text-slate-600'}`}>
+                คีย์หลักความปลอดภัย (Encryption Passphrase) <span className="text-accent-rose">*จำเป็นในการถอดรหัส</span>
               </label>
               <div className="relative">
                 <input
                   type={showSecretKey ? 'text' : 'password'}
                   value={secretKey}
                   onChange={(e) => setSecretKey(e.target.value)}
-                  className={`w-full rounded-xl pl-4 pr-10 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${
-                    isDark 
-                      ? 'bg-slate-900 border-white/10 text-white placeholder:text-slate-600 focus:border-sbac-blue-light/50' 
-                      : 'bg-white border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue'
-                  }`}
+                  className={`w-full rounded-xl pl-4 pr-10 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
+                    ? 'bg-neutral-900 border-white/15 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50'
+                    : 'bg-white border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue'
+                    }`}
                   placeholder="ป้อนรหัสผ่านคีย์ส่วนตัวของคุณ..."
                 />
                 <button
                   type="button"
                   onClick={() => setShowSecretKey(!showSecretKey)}
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600`}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 text-content-muted hover:text-slate-600`}
                 >
                   {showSecretKey ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
@@ -879,7 +849,7 @@ export default function AcademicDashboard() {
           )}
 
           {encryptionMode === 'none' && (
-            <div className="text-[10px] text-amber-500 font-bold bg-amber-500/10 p-3 rounded-xl border border-amber-500/20 flex items-start gap-1.5 animate-slide-down">
+            <div className="text-[10px] text-accent-amber font-bold bg-amber-500/10 p-3 rounded-xl border border-amber-500/20 flex items-start gap-1.5 animate-slide-down">
               <ShieldAlert size={14} className="shrink-0 mt-0.5" />
               <span>
                 คำเตือน: การไม่เข้ารหัสข้อมูลส่วนบุคคล (National ID) ขัดต่อพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล (PDPA) และลดระดับความปลอดภัยของวิทยาลัย
@@ -898,13 +868,12 @@ export default function AcademicDashboard() {
             const file = e.dataTransfer.files[0];
             if (file) handleExcelFile(file);
           }}
-          className={`border-2 border-dashed rounded-3xl p-6 text-center cursor-pointer transition-all duration-200 ${
-            dragOver
-              ? 'bg-sbac-blue/5 border-sbac-blue scale-[1.01]'
-              : isDark
+          className={`border-2 border-dashed rounded-3xl p-6 text-center cursor-pointer transition-all duration-200 ${dragOver
+            ? 'bg-sbac-blue/5 border-sbac-blue scale-[1.01]'
+            : isDark
               ? 'border-white/15 bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/30'
               : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/50 hover:border-slate-400'
-          }`}
+            }`}
           onClick={() => document.getElementById('excelFileInput').click()}
         >
           <input
@@ -917,13 +886,12 @@ export default function AcademicDashboard() {
               if (file) handleExcelFile(file);
             }}
           />
-          <Upload size={32} className={`mx-auto mb-2.5 transition-colors ${
-            dragOver ? 'text-sbac-blue-light' : 'text-slate-400'
-          }`} />
+          <Upload size={32} className={`mx-auto mb-2.5 transition-colors ${dragOver ? 'text-brand' : 'text-content-muted'
+            }`} />
           <div className="text-xs font-extrabold text-ink-secondary dark:text-slate-200">
             ลากและวางไฟล์ หรือคลิกเพื่ออัปโหลด
           </div>
-          <div className="text-[10px] text-slate-400 mt-1">
+          <div className="text-[10px] text-content-muted mt-1">
             รองรับไฟล์ Excel (.xlsx, .xls) และ CSV (.csv)
           </div>
         </div>
@@ -932,50 +900,48 @@ export default function AcademicDashboard() {
         {parsedStudents.length > 0 && (
           <div className="space-y-3 pt-2">
             <div className="flex justify-between items-center px-1">
-              <span className={`text-xs font-extrabold ${isDark ? 'text-slate-300' : 'text-ink-secondary'}`}>
+              <span className={`text-xs font-extrabold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
                 ตัวอย่างผลลัพธ์การเข้ารหัส ({parsedStudents.length} รายชื่อ)
               </span>
               <button
                 onClick={() => setParsedStudents([])}
-                className="text-[10px] font-bold text-rose-500 hover:underline"
+                className="text-[10px] font-bold text-accent-rose hover:underline"
               >
                 ล้างข้อมูล
               </button>
             </div>
 
-            <div className={`rounded-2xl border max-h-48 overflow-y-auto divide-y ${
-              isDark ? 'bg-slate-950/40 border-white/5 divide-white/5' : 'bg-slate-50 border-slate-100 divide-slate-100'
-            }`}>
+            <div className={`rounded-2xl border max-h-48 overflow-y-auto divide-y ${isDark ? 'bg-slate-950/40 border-white/5 divide-white/5' : 'bg-slate-50 border-slate-100 divide-slate-100'
+              }`}>
               {parsedStudents.slice(0, 5).map((row, idx) => {
                 const norm = normalizeStudent(row);
-                const maskedId = norm.national_id 
+                const maskedId = norm.national_id
                   ? `${norm.national_id.substring(0, 5)}******${norm.national_id.substring(norm.national_id.length - 2)}`
                   : 'ไม่มีข้อมูล';
-                
+
                 return (
                   <div key={idx} className="p-3 text-[10px] flex items-center justify-between gap-4">
                     <div className="space-y-0.5 min-w-0">
                       <div className="font-extrabold text-ink-secondary dark:text-slate-200 truncate flex items-center gap-1.5">
-                        <span className="bg-sbac-blue/10 dark:bg-sbac-blue/20 text-sbac-blue-light px-1.5 py-0.5 rounded font-mono font-medium">
+                        <span className="bg-sbac-blue/10 dark:bg-sbac-blue/20 text-brand px-1.5 py-0.5 rounded font-mono font-medium">
                           {norm.student_id || 'N/A'}
                         </span>
                         <span>{norm.full_name || 'ไม่ระบุชื่อ'}</span>
                       </div>
-                      <div className="text-slate-400 flex items-center gap-1 truncate font-mono text-[9px]">
+                      <div className="text-content-muted flex items-center gap-1 truncate font-mono text-[9px]">
                         <span>เลขบัตร: {maskedId}</span>
                         <span className="opacity-40">|</span>
                         <span>ห้อง: {norm.class_id}</span>
                       </div>
                     </div>
-                    
+
                     <div className="text-right shrink-0">
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${
-                        encryptionMode === 'sha256'
-                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                          : encryptionMode === 'aes256'
-                          ? 'bg-sky-500/10 border-sky-500/20 text-sky-400'
-                          : 'bg-amber-500/10 border-amber-500/20 text-amber-500'
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${encryptionMode === 'sha256'
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-accent-emerald'
+                        : encryptionMode === 'aes256'
+                          ? 'bg-sky-500/10 border-sky-500/20 text-accent-cyan'
+                          : 'bg-amber-500/10 border-amber-500/20 text-accent-amber'
+                        }`}>
                         {encryptionMode === 'sha256' ? 'SHA-256 Hashed' : encryptionMode === 'aes256' ? 'AES Encrypted' : 'Plain Text'}
                       </span>
                     </div>
@@ -983,7 +949,7 @@ export default function AcademicDashboard() {
                 );
               })}
               {parsedStudents.length > 5 && (
-                <div className="p-2 text-center text-[9px] text-slate-400 font-semibold bg-slate-900/10 dark:bg-white/[0.01]">
+                <div className="p-2 text-center text-[9px] text-content-muted font-semibold bg-slate-900/10 dark:bg-white/[0.01]">
                   และนักเรียนคนอื่น ๆ อีก {parsedStudents.length - 5} รายการ
                 </div>
               )}
@@ -992,9 +958,8 @@ export default function AcademicDashboard() {
             <button
               onClick={syncToFirebase}
               disabled={isProcessing}
-              className={`w-full text-white font-extrabold py-3.5 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-2 select-none bg-gradient-to-r from-sbac-blue to-sbac-navy hover:to-sbac-blue cursor-pointer ${
-                isProcessing ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              className={`w-full text-white font-extrabold py-3.5 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-2 select-none bg-gradient-to-r from-sbac-blue to-sbac-navy hover:to-sbac-blue cursor-pointer ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
             >
               {isProcessing ? (
                 <>

@@ -1,4 +1,9 @@
 /** @type {import('tailwindcss').Config} */
+
+// สีที่ผูกกับ CSS variable จะสลับค่าเองตาม light/dark (ดู :root และ .dark ใน index.css)
+// ทำแบบนี้เพื่อให้ contrast ผ่าน WCAG AA ทั้งสองธีมโดยไม่ต้องเขียน ternary isDark ทุกจุด
+const v = (name) => `rgb(var(${name}) / <alpha-value>)`;
+
 export default {
   darkMode: 'class',
   content: [
@@ -8,6 +13,7 @@ export default {
   theme: {
     extend: {
       colors: {
+        /* ---- Brand (ค่าคงที่ ใช้เป็นพื้นหลัง/เส้นขอบ) ---- */
         sbac: {
           navy: '#0f1d5e',
           'navy-light': '#1a2d7a',
@@ -19,17 +25,40 @@ export default {
           'red-light': '#e11d48',
           'red-50': '#fff1f2',
         },
+
+        /* ---- Semantic text tokens (สลับค่าตามธีมอัตโนมัติ) ----
+           ใช้กับ "ตัวอักษร/ไอคอน" เท่านั้น เช่น text-brand, text-accent-amber
+           ทุกค่าผ่าน contrast ratio >= 4.5:1 บนพื้นหลังของธีมนั้น ๆ           */
+        brand: {
+          DEFAULT: v('--c-brand'),        // light #1a3cc8 (8.3:1) / dark #8ab4ff (9.0:1)
+          strong: v('--c-brand-strong'),  // หัวข้อ
+        },
+        accent: {
+          amber: v('--c-amber'),          // light #b45309 (5.0:1) / dark #fbbf24 (11.5:1)
+          emerald: v('--c-emerald'),      // light #047857 (5.5:1) / dark #34d399 (10.0:1)
+          cyan: v('--c-cyan'),            // light #0e7490 (5.4:1) / dark #22d3ee (11.6:1)
+          rose: v('--c-rose'),            // light #be123c (6.2:1) / dark #fb7185 (7.1:1)
+          violet: v('--c-violet'),        // light #6d28d9 (7.5:1) / dark #c4b5fd (10.9:1)
+        },
+        content: {
+          DEFAULT: v('--c-text'),         // ตัวอักษรหลัก
+          secondary: v('--c-text-2'),     // ตัวอักษรรอง
+          muted: v('--c-text-3'),         // คำอธิบาย/แคปชัน (>= 4.5:1 เสมอ)
+        },
+
+        /* ---- Surfaces ---- */
         surface: {
           DEFAULT: '#f8fafc',
           card: '#ffffff',
-          dark: '#0a1628',
+          dark: '#0b0f19',        // ให้ตรงกับ .dark body (เดิม #0a1628 ไม่ตรงกัน)
+          'dark-elev': '#141a28', // การ์ดยกระดับในโหมดมืด
           'dark-card': 'rgba(255,255,255,0.06)',
         },
         ink: {
-          DEFAULT: '#0f172a',
-          secondary: '#334155',
-          muted: '#64748b',
-          light: '#94a3b8',
+          DEFAULT: '#0f172a',   // 17.9:1 บนขาว
+          secondary: '#334155', // 10.4:1
+          muted: '#556274',     // 5.9:1 (เดิม #64748b = 4.55:1 ตึงเกินไปกับตัวอักษร 10px)
+          light: '#64748b',     // 4.8:1 (เดิม #94a3b8 = 2.6:1 ตก AA)
           inverse: '#ffffff',
         },
         border: {

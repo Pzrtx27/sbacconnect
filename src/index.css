@@ -4,10 +4,62 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============ Design Tokens ============
+   ค่าสีความหมาย (semantic) ที่สลับเองตามธีม เขียนเป็น "R G B" เพื่อให้
+   Tailwind ใช้ <alpha-value> ได้ เช่น text-brand/70
+   ทุกคู่ผ่าน contrast >= 4.5:1 (WCAG AA) บนพื้นหลังของธีมนั้น ๆ
+   ========================================= */
+@layer base {
+  :root {
+    --c-brand: 26 60 200;          /* #1a3cc8 — 7.95:1 บน #f8fafc */
+    --c-brand-strong: 15 29 94;    /* #0f1d5e — 14.78:1 */
+    --c-amber: 180 83 9;           /* #b45309 — 4.80:1 */
+    --c-emerald: 4 120 87;         /* #047857 — 5.24:1 */
+    --c-cyan: 14 116 144;          /* #0e7490 — 5.12:1 */
+    --c-rose: 190 18 60;           /* #be123c — 6.01:1 */
+    --c-violet: 109 40 217;        /* #6d28d9 — 6.79:1 */
+    --c-text: 15 23 42;            /* #0f172a — 17.06:1 */
+    --c-text-2: 51 65 85;          /* #334155 — 9.90:1 */
+    --c-text-3: 85 98 116;         /* #556274 — 5.93:1 */
+  }
+
+  /* ใช้ html.dark (specificity สูงกว่า :root) เพื่อการันตีว่าค่าโหมดมืดชนะเสมอ */
+  html.dark {
+    --c-brand: 138 180 255;        /* #8ab4ff — 9.17:1 บน #0b0f19 */
+    --c-brand-strong: 255 255 255; /* #ffffff — 19.15:1 */
+    --c-amber: 251 191 36;         /* #fbbf24 — 11.47:1 */
+    --c-emerald: 52 211 153;       /* #34d399 — 9.96:1 */
+    --c-cyan: 34 211 238;          /* #22d3ee — 10.60:1 */
+    --c-rose: 251 113 133;         /* #fb7185 — 7.12:1 */
+    --c-violet: 196 181 253;       /* #c4b5fd — 10.37:1 */
+    --c-text: 241 245 249;         /* #f1f5f9 — 17.48:1 */
+    --c-text-2: 203 213 225;       /* #cbd5e1 — 12.90:1 */
+    --c-text-3: 168 179 196;       /* #a8b3c4 — 9.04:1 */
+  }
+}
+
 /* ============ Base Styles ============ */
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ให้ focus ring มองเห็นชัดเสมอ (keyboard accessibility) */
+  :focus-visible {
+    outline: 2px solid rgb(var(--c-brand));
+    outline-offset: 2px;
+  }
+
+  /* เคารพการตั้งค่า reduce motion ของผู้ใช้ */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   html {
@@ -26,22 +78,6 @@
   .dark body {
     @apply bg-surface-dark text-white;
   }
-
-  /* Custom Scrollbar */
-  ::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: rgba(100, 116, 139, 0.3);
-    border-radius: 10px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(100, 116, 139, 0.5);
-  }
 }
 
 /* ============ Component Classes ============ */
@@ -55,8 +91,8 @@
   }
 
   .dark .glass {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(22, 27, 38, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.12);
   }
 
   .glass-white {
@@ -67,15 +103,15 @@
   }
 
   .dark .glass-white {
-    background: rgba(30, 41, 59, 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(22, 27, 38, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.12);
   }
 
   .glass-dark {
-    background: rgba(10, 22, 40, 0.8);
+    background: rgba(16, 21, 31, 0.9);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
   /* Card Styles */
@@ -86,8 +122,9 @@
   }
 
   .dark .card {
-    @apply bg-slate-800 shadow-none;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    @apply bg-[#161b26] shadow-none text-white;
+    background-color: #161b26;
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
   .card:hover {
@@ -140,14 +177,14 @@
   }
 
   .btn-ghost {
-    @apply bg-transparent text-sbac-blue font-semibold px-4 py-2 rounded-xl
+    @apply bg-transparent text-brand font-semibold px-4 py-2 rounded-xl
            transition-all duration-200
            hover:bg-sbac-blue-50
            active:scale-[0.97];
   }
 
   .dark .btn-ghost {
-    @apply text-sbac-blue-light hover:bg-white/5;
+    @apply text-brand hover:bg-white/5;
   }
 
   .btn-sm {
@@ -213,7 +250,7 @@
 
   /* Live Tag */
   .live-tag {
-    @apply text-xs font-bold text-emerald-600 flex items-center gap-1.5
+    @apply text-xs font-bold text-emerald-800 flex items-center gap-1.5
            bg-emerald-50 px-3 py-1 rounded-full;
   }
 
@@ -240,7 +277,7 @@
   }
 
   .status-preparing {
-    @apply bg-blue-50 text-blue-700;
+    @apply bg-blue-50 text-blue-800;
   }
 
   .dark .status-preparing {
@@ -248,7 +285,7 @@
   }
 
   .status-ready {
-    @apply bg-emerald-50 text-emerald-700;
+    @apply bg-emerald-50 text-emerald-800;
   }
 
   .dark .status-ready {
@@ -256,19 +293,19 @@
   }
 
   .status-completed {
-    @apply bg-slate-100 text-slate-500;
+    @apply bg-slate-100 text-slate-600;
   }
 
   .dark .status-completed {
-    @apply bg-slate-700 text-slate-400;
+    @apply bg-neutral-800 text-slate-300;
   }
 
   /* Grade Colors */
-  .grade-A { @apply text-emerald-600 font-extrabold; }
-  .grade-B { @apply text-sbac-blue font-extrabold; }
-  .grade-C { @apply text-amber-600 font-extrabold; }
-  .grade-D { @apply text-orange-600 font-extrabold; }
-  .grade-F { @apply text-red-600 font-extrabold; }
+  .grade-A { @apply text-accent-emerald font-extrabold; }
+  .grade-B { @apply text-brand font-extrabold; }
+  .grade-C { @apply text-accent-amber font-extrabold; }
+  .grade-D { @apply text-accent-amber font-extrabold; }
+  .grade-F { @apply text-accent-rose font-extrabold; }
 
   /* Chip */
   .chip {
@@ -279,8 +316,8 @@
   }
 
   .dark .chip {
-    @apply bg-slate-800 border-white/10 text-slate-300
-           hover:border-sbac-blue-light/40 hover:bg-white/5;
+    @apply bg-neutral-900 border-white/10 text-slate-200
+           hover:border-sbac-blue-light/40 hover:bg-white/10;
   }
 
   .chip-active {

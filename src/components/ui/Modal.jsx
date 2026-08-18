@@ -2,6 +2,19 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 
+/**
+ * Bottom sheet ที่ใช้ร่วมกันทุกโมดัลในแอป
+ *
+ * สูงคงที่ 70% ของจอเสมอ (h-[70vh]) ไม่ว่าเนื้อหาจะเยอะหรือน้อย — ทุกโมดัลจึงมี
+ * ขอบบนอยู่ตำแหน่งเดียวกันเป๊ะ เนื้อหาที่ยาวเกินสูง 70vh จะเลื่อนดูได้เองภายในผ่าน
+ * ส่วน content (overflow-y-auto flex-1) เนื้อหาที่สั้นก็แค่เว้นที่ว่างด้านล่างแทน
+ * การหดตัวสูงตามเนื้อหาแบบเดิม (เดิมใช้ min-h ทำให้แต่ละโมดัลสูงไม่เท่ากัน)
+ *
+ * หมายเหตุ: ตกแต่งพื้นที่ว่างด้วย radial-gradient เปล่าๆ (ไม่ใช้ filter: blur)
+ * เพราะ filter: blur() บนลูกที่อยู่ใน element ที่ overflow-hidden + ถูก transform
+ * (ตอน sheet เด้งขึ้น) ทำให้ Chrome/Safari บางเวอร์ชัน render เพี้ยนเป็นเส้นขาวหยักๆ
+ * ระหว่างแอนิเมชัน — gradient ธรรมดาให้ความนุ่มนวลใกล้เคียงกันแต่ปลอดภัยกว่า
+ */
 export default function Modal({ isOpen, onClose, title, children }) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -19,41 +32,70 @@ export default function Modal({ isOpen, onClose, title, children }) {
             onClick={onClose}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]"
           />
-          {/* Sheet */}
+          {/* Sheet — สูงคงที่ 70vh เท่ากันทุกโมดัล */}
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-            className="fixed bottom-0 left-0 right-0 z-[61] max-w-lg mx-auto"
+            className="fixed bottom-0 left-0 right-0 z-[61] max-w-lg mx-auto h-[70vh]"
           >
-            <div className={`rounded-t-3xl shadow-glass-lg max-h-[85vh] flex flex-col safe-bottom transition-colors duration-300 ${
-              isDark ? 'bg-slate-800' : 'bg-white'
-            }`}>
+            <div
+              className={`relative overflow-hidden rounded-t-3xl shadow-glass-lg h-full flex flex-col safe-bottom transition-colors duration-300 ${
+                isDark ? 'bg-neutral-900 border-t border-white/10 text-white' : 'bg-white'
+              }`}
+            >
+              {/* ลูกเล่นตกแต่ง: ไล่เฉดสีจางๆ มุมล่าง กันไม่ให้พื้นที่ว่างดูจืดตอนเนื้อหาน้อย
+                  (ตั้งใจไม่ใช้ filter: blur — ดูหมายเหตุด้านบน) */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-56"
+                style={{
+                  background: isDark
+                    ? 'radial-gradient(120% 100% at 85% 100%, rgba(26,60,200,0.16) 0%, transparent 60%), radial-gradient(80% 80% at 10% 100%, rgba(200,16,46,0.10) 0%, transparent 60%)'
+                    : 'radial-gradient(120% 100% at 85% 100%, rgba(26,60,200,0.08) 0%, transparent 60%), radial-gradient(80% 80% at 10% 100%, rgba(200,16,46,0.05) 0%, transparent 60%)',
+                }}
+              />
+
               {/* Handle */}
-              <div className="flex justify-center pt-3 pb-1">
-                <div className={`w-10 h-1 rounded-full transition-colors duration-300 ${
-                  isDark ? 'bg-slate-600' : 'bg-slate-200'
-                }`} />
+              <div className="relative flex justify-center pt-3 pb-1 shrink-0">
+                <div
+                  className={`w-10 h-1 rounded-full transition-colors duration-300 ${
+                    isDark ? 'bg-zinc-600' : 'bg-slate-200'
+                  }`}
+                />
               </div>
+
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-3">
-                <h2 className={`text-lg font-extrabold transition-colors duration-300 ${
-                  isDark ? 'text-white' : 'text-sbac-navy'
-                }`}>{title}</h2>
-                <button 
+              <div className="relative flex items-center justify-between px-6 py-3 shrink-0">
+                <h2
+                  className={`text-lg font-extrabold transition-colors duration-300 ${
+                    isDark ? 'text-white' : 'text-sbac-navy'
+                  }`}
+                >
+                  {title}
+                </h2>
+                <button
+                  type="button"
                   onClick={onClose}
+                  aria-label="ปิด"
                   className={`p-2 rounded-xl transition-colors ${
                     isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'
                   }`}
                 >
-                  <X size={20} className={isDark ? 'text-slate-400' : 'text-ink-muted'} />
+                  <X size={20} className={isDark ? 'text-content-secondary' : 'text-ink-muted'} aria-hidden="true" />
                 </button>
               </div>
-              {/* Content */}
-              <div className="px-6 pb-6 overflow-y-auto flex-1">
-                {children}
-              </div>
+
+              {/* เส้นแบ่งบางๆ ใต้หัวข้อ แทนความว่างเปล่าทึบๆ ระหว่าง header กับเนื้อหา */}
+              <div
+                className={`relative h-px shrink-0 mx-6 ${
+                  isDark ? 'bg-gradient-to-r from-white/10 via-white/5 to-transparent' : 'bg-gradient-to-r from-slate-100 via-slate-100 to-transparent'
+                }`}
+              />
+
+              {/* Content — เติมพื้นที่ที่เหลือเสมอ (flex-1) และ scroll เองเมื่อเนื้อหายาวเกิน 70vh */}
+              <div className="relative px-6 py-5 overflow-y-auto flex-1">{children}</div>
             </div>
           </motion.div>
         </>

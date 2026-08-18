@@ -285,17 +285,17 @@ export default function ChatbotFAB() {
             >
               <div className={`rounded-t-3xl shadow-glass-lg flex flex-col h-[75vh] transition-colors duration-300 ${
                 isDark 
-                  ? 'bg-slate-800 border border-white/10' 
+                  ? 'bg-neutral-900 border border-white/10 text-white' 
                   : 'bg-white border border-slate-100'
               }`}>
                 {/* Drag Handle */}
                 <div className="flex justify-center pt-3 pb-1">
-                  <div className={`w-10 h-1 rounded-full ${isDark ? 'bg-slate-600' : 'bg-slate-200'}`} />
+                  <div className={`w-10 h-1 rounded-full ${isDark ? 'bg-zinc-600' : 'bg-slate-200'}`} />
                 </div>
 
                 {/* Header */}
                 <div className={`flex items-center justify-between px-5 py-2 border-b ${
-                  isDark ? 'border-white/5' : 'border-slate-50'
+                  isDark ? 'border-white/10' : 'border-slate-50'
                 }`}>
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
@@ -309,7 +309,7 @@ export default function ChatbotFAB() {
                       isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'
                     }`}
                   >
-                    <X size={18} className={isDark ? 'text-slate-400' : 'text-ink-muted'} />
+                    <X size={18} className={isDark ? 'text-content-secondary' : 'text-ink-muted'} />
                   </button>
                 </div>
 
@@ -325,7 +325,7 @@ export default function ChatbotFAB() {
                           msg.sender === 'user'
                             ? 'bg-sbac-blue text-white rounded-tr-none'
                             : isDark
-                              ? 'bg-slate-700 border border-white/5 text-slate-200 rounded-tl-none'
+                              ? 'bg-neutral-800 border border-white/10 text-white rounded-tl-none'
                               : 'bg-slate-50 border border-slate-100 text-ink-secondary rounded-tl-none'
                         }`}
                       >
@@ -339,15 +339,15 @@ export default function ChatbotFAB() {
                     <div className="flex justify-start">
                       <div className={`px-4 py-3 rounded-2xl rounded-tl-none ${
                         isDark
-                          ? 'bg-slate-700 border border-white/5'
+                          ? 'bg-neutral-800 border border-white/10'
                           : 'bg-slate-50 border border-slate-100'
                       }`}>
                         <div className="flex items-center gap-1">
-                          <div className={`w-2 h-2 rounded-full animate-bounce ${isDark ? 'bg-slate-400' : 'bg-slate-400'}`} 
+                          <div className={`w-2 h-2 rounded-full animate-bounce ${isDark ? 'bg-slate-300' : 'bg-slate-400'}`} 
                                style={{ animationDelay: '0ms' }} />
-                          <div className={`w-2 h-2 rounded-full animate-bounce ${isDark ? 'bg-slate-400' : 'bg-slate-400'}`} 
+                          <div className={`w-2 h-2 rounded-full animate-bounce ${isDark ? 'bg-slate-300' : 'bg-slate-400'}`} 
                                style={{ animationDelay: '150ms' }} />
-                          <div className={`w-2 h-2 rounded-full animate-bounce ${isDark ? 'bg-slate-400' : 'bg-slate-400'}`} 
+                          <div className={`w-2 h-2 rounded-full animate-bounce ${isDark ? 'bg-slate-300' : 'bg-slate-400'}`} 
                                style={{ animationDelay: '300ms' }} />
                         </div>
                       </div>
@@ -359,7 +359,7 @@ export default function ChatbotFAB() {
 
                 {/* Quick Action Chips */}
                 <div className={`px-4 py-2 border-t overflow-x-auto scrollbar-hide ${
-                  isDark ? 'border-white/5' : 'border-slate-50'
+                  isDark ? 'border-white/10' : 'border-slate-50'
                 }`}>
                   <div className="flex gap-2 whitespace-nowrap">
                     {QUICK_ACTIONS.map((action) => (
@@ -368,7 +368,7 @@ export default function ChatbotFAB() {
                         onClick={() => handleSend(action.keyword)}
                         className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition-all active:scale-95 shrink-0 ${
                           isDark
-                            ? 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                            ? 'bg-white/10 border-white/15 text-slate-200 hover:bg-white/20'
                             : 'bg-slate-50 border-slate-200 text-ink-secondary hover:bg-slate-100'
                         }`}
                       >
@@ -381,7 +381,7 @@ export default function ChatbotFAB() {
                 {/* Input Area */}
                 <div className={`p-3 border-t flex gap-2 items-center ${
                   isDark 
-                    ? 'border-white/5 bg-slate-900/50' 
+                    ? 'border-white/10 bg-neutral-950/90' 
                     : 'border-slate-50 bg-slate-50/50'
                 }`}>
                   <input
@@ -398,7 +398,7 @@ export default function ChatbotFAB() {
                     }
                     className={`flex-1 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-colors duration-200 ${
                       isDark 
-                        ? 'bg-slate-700 border border-white/10 text-white placeholder:text-slate-400 focus:border-sbac-blue/50'
+                        ? 'bg-neutral-800 border border-white/15 text-white placeholder:text-content-muted focus:border-sbac-blue/50'
                         : 'bg-white border border-slate-200 text-ink focus:border-sbac-blue'
                     }`}
                   />

@@ -1,177 +1,191 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { sha256 } from '../utils/crypto';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { supabase, isSupabaseConfigured } from '../config/supabase';
+import { toEmail, toClassId } from '../utils/identity';
 
 const AuthContext = createContext(null);
 
-// Rate limiting constants
-const MAX_LOGIN_ATTEMPTS = 5;
-const LOCKOUT_DURATION_MS = 3 * 60 * 1000; // 3 minutes
+/* ระบบยืนยันตัวตนใช้ Supabase Auth (แทน Firebase เดิม)
+   - นักเรียนกรอก "ชื่อผู้ใช้ + รหัสประจำตัว" → แปลงเป็น email + password ให้อัตโนมัติ
+   - session เก็บโดย Supabase เอง (localStorage + refresh token) ไม่ใช่ค่าที่เราปั้นเอง
+     จึงแก้ role ผ่าน devtools ไม่ได้เหมือนของเดิม
+   - สิทธิ์การอ่านข้อมูลถูกกันด้วย RLS ฝั่ง DB (03_rls.sql) ไม่ใช่การเช็คในหน้าเว็บ */
+
+/** โหลดโปรไฟล์ของผู้ใช้ที่ล็อกอินอยู่
+ *  RLS กรองให้เหลือเฉพาะแถวของตัวเองแล้ว จึงไม่ต้องใส่ where เอง */
+async function loadProfile() {
+  const { data: userRow, error: userErr } = await supabase
+    .from('users')
+    .select('id, email, full_name')
+    .maybeSingle();
+
+  if (userErr) throw userErr;
+  if (!userRow) return null; // ล็อกอินผ่าน แต่ไม่มีแถวใน users = ยังไม่ถูกลงทะเบียน
+
+  // ดึงข้อมูลส่วนที่เหลือแบบขนาน ลดเวลารอ
+  const [roleRes, profileRes, balanceRes] = await Promise.all([
+    supabase.from('user_roles').select('role'),
+    supabase
+      .from('student_profiles')
+      .select('student_code, class_rooms(level, room_no)')
+      .maybeSingle(),
+    supabase.rpc('my_balance'),
+  ]);
+
+  const roles = (roleRes.data || []).map((r) => r.role);
+  // คนหนึ่งมีได้หลาย role — เลือกอันที่สิทธิ์สูงสุดมาใช้กำหนดหน้าเริ่มต้น
+  const dbRole =
+    roles.find((r) => r === 'sysadmin') ||
+    roles.find((r) => r === 'academic') ||
+    roles.find((r) => r === 'teacher') ||
+    roles.find((r) => r === 'pos') ||
+    roles.find((r) => r === 'cashier') ||
+    'student';
+
+  // ฝั่ง DB ใช้ 'pos' (enum app_role ไม่มี 'barista')
+  // ส่วนหน้าเว็บใช้ชื่อ 'barista' มาตั้งแต่แรกทั้งใน routing และเมนู
+  // แปลงตรงนี้จุดเดียว จะได้ไม่ต้องไล่แก้ App.jsx / BottomNav ทั้งหมด
+  const role = dbRole === 'pos' || dbRole === 'cashier' ? 'barista' : dbRole;
+
+  const sp = profileRes.data;
+  const room = sp?.class_rooms || null;
+  const balanceSatang = Number(balanceRes.data ?? 0);
+
+  return {
+    // ใช้รหัสนักเรียนเป็น id ที่แสดงผล (ของเดิมก็ใช้รหัสนักเรียน)
+    id: sp?.student_code || userRow.email.split('@')[0],
+    uid: userRow.id, // uuid จริงใน DB เผื่อต้องอ้างอิง
+    name: userRow.full_name,
+    email: userRow.email,
+    role,
+    roles,
+    class_id: room ? toClassId(room.level, room.room_no) : '',
+    room: room?.room_no || '',
+    year: room ? String(room.level).match(/\d+/)?.[0] || '' : '',
+    branch: '',
+    session: '',
+    // เก็บทั้งสองหน่วย: satang ไว้คำนวณ (แม่นยำ), baht ไว้แสดงผลให้เข้ากับ UI เดิม
+    balance_satang: balanceSatang,
+    card_balance: balanceSatang / 100,
+  };
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const loginAttempts = useRef(0);
-  const lockoutUntil = useRef(null);
+  const [authenticating, setAuthenticating] = useState(false);
 
-  useEffect(() => {
-    // Check localStorage for saved session
-    const saved = localStorage.getItem('sbac_user');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Basic session validation — must have id and role
-        if (parsed && parsed.id && parsed.role) {
-          setUser(parsed);
-        } else {
-          localStorage.removeItem('sbac_user');
-        }
-      } catch (e) {
-        localStorage.removeItem('sbac_user');
-      }
+  const refreshProfile = useCallback(async () => {
+    try {
+      const profile = await loadProfile();
+      setUser(profile);
+      return profile;
+    } catch (err) {
+      console.error('[auth] โหลดโปรไฟล์ล้มเหลว:', err);
+      setUser(null);
+      return null;
     }
-    setLoading(false);
   }, []);
 
-  const login = async (userId, nationalId) => {
-    // Rate limiting check
-    if (lockoutUntil.current && Date.now() < lockoutUntil.current) {
-      const remainSec = Math.ceil((lockoutUntil.current - Date.now()) / 1000);
-      return { 
-        success: false, 
-        error: `ระบบถูกล็อคชั่วคราว กรุณารอ ${remainSec} วินาที แล้วลองใหม่` 
-      };
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
     }
 
-    setLoading(true);
+    let active = true;
+
+    // ตรวจ session ที่ค้างอยู่ตอนเปิดแอป
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!active) return;
+      if (data.session) await refreshProfile();
+      if (active) setLoading(false);
+    });
+
+    // ติดตามการเปลี่ยนสถานะ (ล็อกอิน/ออก/ต่ออายุ token) จากทุกแท็บ
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!active) return;
+      if (event === 'SIGNED_OUT' || !session) {
+        setUser(null);
+        return;
+      }
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        await refreshProfile();
+      }
+    });
+
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [refreshProfile]);
+
+  /** login(ชื่อผู้ใช้, รหัสประจำตัว)
+   *  คงลายเซ็นเดิมไว้ เพื่อให้ LoginPage.jsx ใช้ต่อได้โดยไม่ต้องแก้ตรรกะ */
+  const login = async (username, studentCode) => {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: 'ยังไม่ได้ตั้งค่าการเชื่อมต่อ Supabase (ดู .env.example)' };
+    }
+
+    setAuthenticating(true);
     try {
-      let userData = null;
+      const email = toEmail(username);
 
-      // Compute SHA-256 hash of national ID
-      const hashedNationalId = await sha256(nationalId);
-      let studentDoc = null;
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: String(studentCode).trim(),
+      });
 
-      // 1. Try querying via hashed national ID (Secure Import)
-      const studentsHashQuery = query(
-        collection(db, 'students'),
-        where('national_id_hash', '==', hashedNationalId)
-      );
-      const studentHashSnap = await getDocs(studentsHashQuery);
-      
-      if (!studentHashSnap.empty) {
-        studentDoc = studentHashSnap.docs.find(d => d.id === userId);
+      if (signInError) {
+        // ไม่แยกข้อความว่า "ไม่มีชื่อผู้ใช้นี้" กับ "รหัสผิด"
+        // เพราะจะกลายเป็นเครื่องมือให้คนไล่เดาว่าใครมีบัญชีอยู่ในระบบบ้าง
+        return { success: false, error: 'ชื่อผู้ใช้หรือรหัสประจำตัวไม่ถูกต้อง' };
       }
 
-      // 2. Fallback: Try querying via plain national ID (Legacy)
-      if (!studentDoc) {
-        const studentsLegacyQuery = query(
-          collection(db, 'students'),
-          where('national_id', '==', nationalId)
-        );
-        const studentLegacySnap = await getDocs(studentsLegacyQuery);
-        if (!studentLegacySnap.empty) {
-          studentDoc = studentLegacySnap.docs.find(d => d.id === userId);
-        }
-      }
-      
-      if (studentDoc) {
-        const sData = studentDoc.data();
-        // Get user data for balance etc.
-        const userDoc = await getDoc(doc(db, 'users', `user_${userId}`));
-        const uData = userDoc.exists() ? userDoc.data() : {};
-        
-        userData = {
-          id: userId,
-          name: sData.full_name || uData.name || 'นักเรียน',
-          role: uData.role || 'student',
-          class_id: sData.class_id || uData.class || '',
-          branch: sData.branch || '',
-          year: sData.year || '',
-          room: sData.room || '',
-          session: sData.session || '',
-          card_balance: uData.card_balance || 0,
-          email: sData.email || uData.email || '',
+      const profile = await loadProfile();
+
+      if (!profile) {
+        // ล็อกอินผ่าน Auth แต่ไม่มีแถวใน public.users
+        // (auth_uid ยังไม่ถูกผูก หรือแอดมินยังไม่ได้ลงทะเบียนคนนี้)
+        await supabase.auth.signOut();
+        return {
+          success: false,
+          error: 'บัญชีนี้ยังไม่ถูกลงทะเบียน กรุณาติดต่อฝ่ายทะเบียน',
         };
       }
 
-      // Check users collection (for admin, barista, teacher, academic)
-      // Verify password/national_id stored in Firestore (plain or hashed)
-      if (!userData) {
-        const userDoc = await getDoc(doc(db, 'users', userId));
-        if (userDoc.exists()) {
-          const uData = userDoc.data();
-          const isMatch = 
-            uData.password === nationalId || 
-            uData.national_id === nationalId ||
-            uData.password_hash === hashedNationalId ||
-            uData.national_id_hash === hashedNationalId;
-
-          if (isMatch) {
-            userData = {
-              id: userId,
-              name: uData.name || userId,
-              role: uData.role || 'student',
-              class_id: uData.class || '',
-              card_balance: uData.card_balance || 0,
-              branch: uData.branch || '',
-              year: uData.year || '',
-              room: uData.room || '',
-              session: uData.session || '',
-            };
-          }
-        }
-      }
-
-      if (userData) {
-        // Reset login attempts on success
-        loginAttempts.current = 0;
-        lockoutUntil.current = null;
-
-        setUser(userData);
-        localStorage.setItem('sbac_user', JSON.stringify(userData));
-        return { success: true, user: userData };
-      }
-
-      // Failed login — increment attempts
-      loginAttempts.current += 1;
-      if (loginAttempts.current >= MAX_LOGIN_ATTEMPTS) {
-        lockoutUntil.current = Date.now() + LOCKOUT_DURATION_MS;
-        loginAttempts.current = 0;
-        return { 
-          success: false, 
-          error: `พยายามเข้าสู่ระบบผิดเกินกำหนด ระบบถูกล็อค 3 นาที` 
-        };
-      }
-
-      const remaining = MAX_LOGIN_ATTEMPTS - loginAttempts.current;
-      return { 
-        success: false, 
-        error: `รหัสหรือเลขบัตรประชาชนไม่ถูกต้อง (เหลืออีก ${remaining} ครั้ง)` 
-      };
+      setUser(profile);
+      return { success: true, user: profile };
     } catch (err) {
-      // Do not expose error details to client
+      console.error('[auth] login ล้มเหลว:', err);
       return { success: false, error: 'ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่อีกครั้ง' };
     } finally {
-      setLoading(false);
+      setAuthenticating(false);
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('sbac_user');
   };
 
-  const updateBalance = (newBalance) => {
-    if (user) {
-      const updated = { ...user, card_balance: newBalance };
-      setUser(updated);
-      localStorage.setItem('sbac_user', JSON.stringify(updated));
+  /** ยอดเงินเปลี่ยนได้จากฝั่ง DB เท่านั้น (place_order / topup_cash)
+   *  หน้าเว็บทำได้แค่ "ดึงยอดล่าสุด" มาแสดง — เขียน wallet_entries ตรงถูก revoke ไว้แล้ว */
+  const updateBalance = async () => {
+    const { data, error } = await supabase.rpc('my_balance');
+    if (error) {
+      console.error('[auth] อ่านยอดเงินล้มเหลว:', error);
+      return;
     }
+    const satang = Number(data ?? 0);
+    setUser((prev) =>
+      prev ? { ...prev, balance_satang: satang, card_balance: satang / 100 } : prev
+    );
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateBalance }}>
+    <AuthContext.Provider
+      value={{ user, loading, authenticating, login, logout, updateBalance, refreshProfile }}
+    >
       {children}
     </AuthContext.Provider>
   );

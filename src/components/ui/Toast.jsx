@@ -17,9 +17,9 @@ const icons = {
 };
 
 const colors = {
-  success: 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/85 dark:border-emerald-900/50 dark:text-emerald-300',
-  error: 'bg-red-50 border-red-200 text-red-800 dark:bg-rose-950/85 dark:border-rose-900/50 dark:text-rose-300',
-  info: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/85 dark:border-blue-900/50 dark:text-blue-300',
+  success: 'bg-emerald-50 border-emerald-200 text-accent-emerald dark:bg-emerald-950/85 dark:border-emerald-900/50 dark:text-accent-emerald',
+  error: 'bg-red-50 border-red-200 text-accent-rose dark:bg-rose-950/85 dark:border-rose-900/50 dark:text-accent-rose',
+  info: 'bg-blue-50 border-blue-200 text-brand dark:bg-blue-950/85 dark:border-blue-900/50 dark:text-brand',
 };
 
 export default function ToastContainer() {
