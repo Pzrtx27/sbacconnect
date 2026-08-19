@@ -333,18 +333,21 @@ export default function AcademicDashboard() {
   };
 
   useEffect(() => {
-    // Listen to real-time timetable updates for selected class room
-    const unsub = onSnapshot(doc(db, 'timetable', selectedClassId), (docSnap) => {
-      if (docSnap.exists()) {
-        setTimetableData(docSnap.data());
-      } else {
-        setTimetableData({});
-      }
-    }, (err) => {
-      console.warn('Timetable preview snapshot failed', err);
-    });
-
-    return () => unsub();
+    /* ฟีเจอร์กลุ่มนี้ยังผูกกับ Firebase ซึ่งถูกปิดไปแล้ว (ดู src/config/firebase.js)
+       ครอบ try/catch ไว้เพื่อให้หน้าไม่ล่มทั้งหน้า และแสดงคำเตือนแทน
+       ถ้าจะใช้งานจริงต้องย้ายมา Supabase ก่อน (ต้องสร้างตาราง timetable/substitutions/events) */
+    try {
+      const unsub = onSnapshot(doc(db, 'timetable', selectedClassId), (docSnap) => {
+        setTimetableData(docSnap.exists() ? docSnap.data() : {});
+      }, (err) => {
+        console.warn('Timetable preview snapshot failed', err);
+      });
+      return () => unsub();
+    } catch (err) {
+      console.warn('[academic] ฟีเจอร์ตารางสอนถูกปิด (Firebase disabled):', err.message);
+      setTimetableData({});
+      return undefined;
+    }
   }, [selectedClassId]);
 
   // Handle form updates when day/period changes

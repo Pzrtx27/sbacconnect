@@ -28,14 +28,24 @@ export default function ToastContainer() {
   useEffect(() => {
     addToast = (toast) => {
       setToasts(prev => [...prev, toast]);
+      // error ค้างนานกว่า เพราะมักเป็นข้อความยาวที่ต้องอ่านแล้วตัดสินใจ
+      // (เช่น "ยอดเงินคงเหลือไม่พอ ขาดอีก X บาท") 3 วิ อ่านไม่ทัน
+      const ms = toast.type === 'error' ? 6000 : 3000;
       setTimeout(() => {
         setToasts(prev => prev.filter(t => t.id !== toast.id));
-      }, 3000);
+      }, ms);
     };
   }, []);
 
   return (
-    <div className="fixed top-4 left-0 right-0 z-[100] flex flex-col items-center gap-2 pointer-events-none">
+    /* aria-live: ให้ screen reader อ่านข้อความแจ้งเตือนออกมาเอง
+       ไม่งั้นคนที่ใช้ screen reader จะไม่รู้เลยว่าสั่งซื้อสำเร็จหรือเงินไม่พอ */
+    <div
+      className="fixed top-4 left-0 right-0 z-[100] flex flex-col items-center gap-2 pointer-events-none"
+      role="status"
+      aria-live="polite"
+      aria-atomic="false"
+    >
       <AnimatePresence>
         {toasts.map((toast) => {
           const Icon = icons[toast.type] || Info;
@@ -45,16 +55,20 @@ export default function ToastContainer() {
               initial={{ opacity: 0, y: -20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
-              className={`pointer-events-auto max-w-sm w-[90%] px-4 py-3 rounded-2xl border shadow-lg backdrop-blur-md 
+              className={`pointer-events-auto max-w-sm w-[90%] px-4 py-3 rounded-2xl border shadow-lg backdrop-blur-md
                 flex items-center gap-3 ${colors[toast.type] || colors.info}`}
             >
-              <Icon size={18} strokeWidth={2.5} />
+              <Icon size={18} strokeWidth={2.5} aria-hidden="true" />
               <span className="text-sm font-semibold flex-1">{toast.message}</span>
               <button
+                type="button"
                 onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-                className="p-0.5 rounded-full hover:bg-black/5"
+                aria-label="ปิดการแจ้งเตือน"
+                /* -m-2 + p-2 = ขยายพื้นที่กดเป็น ~33px โดยหน้าตาไม่เปลี่ยน
+                   ของเดิม 17px เล็กกว่าเกณฑ์ WCAG 2.5.8 (24px) และกดยากบนมือถือ */
+                className="-m-2 p-2 rounded-full transition-colors hover:bg-black/10 dark:hover:bg-white/10"
               >
-                <X size={14} />
+                <X size={14} aria-hidden="true" />
               </button>
             </motion.div>
           );
