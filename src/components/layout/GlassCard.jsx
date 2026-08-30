@@ -19,7 +19,7 @@ export default function GlassCard({ children, className = '', onClick, delay = 0
       className={`rounded-3xl p-5 transition-colors duration-300 ${
         isDark
           ? 'bg-white/[0.06] backdrop-blur-2xl border border-white/10'
-          : 'bg-white shadow-card border border-slate-100 hover:shadow-card-hover'
+          : 'bg-surface-card shadow-card border border-slate-100 hover:shadow-card-hover'
       } ${onClick ? 'cursor-pointer' : ''} ${className}`}
     >
       {children}

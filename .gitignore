@@ -47,3 +47,9 @@ supabase/migrations/RUN_08_09.sql
 
 # บัญชีบุคลากรจริง — มีชื่อผู้ใช้ที่ใช้ล็อกอินจริง ไม่ควรขึ้น repo สาธารณะ
 supabase/migrations/08_seed_staff.sql
+
+.vercel
+.env*
+
+# ผลตรวจของเครื่องมือ design review (impeccable) ไม่ใช่ซอร์สโค้ดของโปรเจกต์
+.impeccable/

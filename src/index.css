@@ -11,16 +11,16 @@
    ========================================= */
 @layer base {
   :root {
-    --c-brand: 26 60 200;          /* #1a3cc8 — 7.95:1 บน #f8fafc */
+    --c-brand: 26 60 200;          /* #1a3cc8 — 6.65:1 บนครีม #ece5da */
     --c-brand-strong: 15 29 94;    /* #0f1d5e — 14.78:1 */
-    --c-amber: 180 83 9;           /* #b45309 — 4.80:1 */
-    --c-emerald: 4 120 87;         /* #047857 — 5.24:1 */
-    --c-cyan: 14 116 144;          /* #0e7490 — 5.12:1 */
-    --c-rose: 190 18 60;           /* #be123c — 6.01:1 */
-    --c-violet: 109 40 217;        /* #6d28d9 — 6.79:1 */
+    --c-amber: 163 74 8;           /* #a34a08 — 4.74:1 บนครีม #ece5da */
+    --c-emerald: 5 102 76;         /* #05664c — 5.57:1 บนครีม (#047857 เดิมเหลือ 4.38:1 = ตก AA) */
+    --c-cyan: 13 97 120;           /* #0d6178 — 5.60:1 บนครีม (#0e7490 เดิมเหลือ 4.28:1 = ตก AA) */
+    --c-rose: 190 18 60;           /* #be123c — 5.02:1 บนครีม */
+    --c-violet: 109 40 217;        /* #6d28d9 — 5.68:1 บนครีม */
     --c-text: 15 23 42;            /* #0f172a — 17.06:1 */
     --c-text-2: 51 65 85;          /* #334155 — 9.90:1 */
-    --c-text-3: 85 98 116;         /* #556274 — 5.93:1 */
+    --c-text-3: 85 98 116;         /* #556274 — 4.96:1 บนครีม */
   }
 
   /* ใช้ html.dark (specificity สูงกว่า :root) เพื่อการันตีว่าค่าโหมดมืดชนะเสมอ */
@@ -48,6 +48,21 @@
   :focus-visible {
     outline: 2px solid rgb(var(--c-brand));
     outline-offset: 2px;
+  }
+
+  /* ระหว่างสลับธีม ปิด transition/animation ทั้งหน้าไว้ชั่วขณะ
+     (ThemeContext เป็นคนใส่-ถอดคลาสนี้ให้ ใส่แค่ไม่กี่มิลลิวินาที)
+
+     เหตุผล: ทั้งแอปมี transition-colors อยู่ร้อยกว่าจุด บางจุดอยู่ใต้ backdrop-blur
+     ถ้าปล่อยให้ทุกจุดค่อย ๆ ไล่สี 300ms พร้อมกัน เบราว์เซอร์ต้องวาดใหม่ทั้งหน้าทุกเฟรม
+     กดสลับรัว ๆ แล้วงานทับกันจนหน้าค้าง — ตัดทิ้งไปเลย ธีมเปลี่ยนในเฟรมเดียว */
+  html.theme-switching,
+  html.theme-switching *,
+  html.theme-switching *::before,
+  html.theme-switching *::after {
+    transition: none !important;
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 
   /* เคารพการตั้งค่า reduce motion ของผู้ใช้ */
@@ -116,7 +131,7 @@
 
   /* Card Styles */
   .card {
-    @apply bg-white rounded-3xl p-5 shadow-card;
+    @apply bg-surface-card rounded-3xl p-5 shadow-card;
     border: 1px solid rgba(226, 232, 240, 0.6);
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -198,7 +213,7 @@
            text-ink font-medium text-sm placeholder:text-ink-light
            transition-all duration-200
            focus:outline-none focus:ring-2 focus:ring-sbac-blue/30 focus:border-sbac-blue
-           focus:bg-white;
+           focus:bg-surface-card;
   }
 
   .dark .input-field {
@@ -226,7 +241,7 @@
   /* Light mode login input */
   .input-field-login {
     @apply bg-slate-50 border border-slate-200 text-ink placeholder:text-ink-light
-           focus:ring-sbac-blue/30 focus:border-sbac-blue focus:bg-white;
+           focus:ring-sbac-blue/30 focus:border-sbac-blue focus:bg-surface-card;
   }
 
   .dark .input-field-login {
@@ -310,7 +325,7 @@
   /* Chip */
   .chip {
     @apply px-4 py-2 rounded-full text-xs font-bold border border-border
-           bg-white text-ink-secondary cursor-pointer
+           bg-surface-card text-ink-secondary cursor-pointer
            transition-all duration-200
            hover:border-sbac-blue/30 hover:bg-sbac-blue-50;
   }

@@ -106,7 +106,7 @@ export default function LoginPage() {
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-300 ${
             isDark 
               ? 'bg-neutral-900 hover:bg-neutral-800 text-slate-200 border border-neutral-800' 
-              : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 shadow-sm'
+              : 'bg-surface-card hover:bg-slate-50 text-slate-700 border border-slate-200/80 shadow-sm'
           }`}
           aria-label="Toggle language"
         >
@@ -120,7 +120,7 @@ export default function LoginPage() {
           className={`p-2 rounded-xl transition-all duration-300 border ${
             isDark 
               ? 'bg-neutral-900 hover:bg-neutral-800 text-accent-amber border-neutral-800' 
-              : 'bg-white hover:bg-slate-50 text-sbac-navy border-slate-200/80 shadow-sm'
+              : 'bg-surface-card hover:bg-slate-50 text-sbac-navy border-slate-200/80 shadow-sm'
           }`}
           aria-label="Toggle theme"
           id="login-theme-toggle"
@@ -169,7 +169,7 @@ export default function LoginPage() {
         <div className={`rounded-[32px] p-8 transition-all duration-300 border ${
           isDark 
             ? 'bg-neutral-900 border-neutral-800 shadow-2xl text-white' 
-            : 'bg-white shadow-xl border-slate-200 text-slate-900'
+            : 'bg-surface-card shadow-xl border-slate-200 text-slate-900'
         }`}>
           <div className="mb-6">
             <h2 className={`text-xl font-bold flex items-center gap-2 transition-colors duration-300 ${
@@ -207,7 +207,7 @@ export default function LoginPage() {
                   className={`w-full rounded-2xl pl-12 pr-4 py-3.5 font-medium text-sm transition-all duration-250 focus:outline-none focus:ring-2 border ${
                     isDark 
                       ? 'bg-black border-neutral-800 text-white placeholder:text-content-muted focus:ring-sbac-blue/40 focus:border-sbac-blue'
-                      : 'bg-slate-50 border-slate-200 text-slate-800 placeholder:text-content-muted focus:ring-sbac-blue/20 focus:border-sbac-blue focus:bg-white shadow-inner'
+                      : 'bg-slate-50 border-slate-200 text-slate-800 placeholder:text-content-muted focus:ring-sbac-blue/20 focus:border-sbac-blue focus:bg-surface-card shadow-inner'
                   }`}
                   id="login-user-id"
                   autoComplete="username"
@@ -241,7 +241,7 @@ export default function LoginPage() {
                   className={`w-full rounded-2xl pl-12 pr-12 py-3.5 font-medium text-sm transition-all duration-250 focus:outline-none focus:ring-2 border ${
                     isDark 
                       ? 'bg-black border-neutral-800 text-white placeholder:text-content-muted focus:ring-sbac-blue/40 focus:border-sbac-blue'
-                      : 'bg-slate-50 border-slate-200 text-slate-800 placeholder:text-content-muted focus:ring-sbac-blue/20 focus:border-sbac-blue focus:bg-white shadow-inner'
+                      : 'bg-slate-50 border-slate-200 text-slate-800 placeholder:text-content-muted focus:ring-sbac-blue/20 focus:border-sbac-blue focus:bg-surface-card shadow-inner'
                   }`}
                   id="login-national-id"
                   autoComplete="current-password"
