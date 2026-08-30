@@ -1,102 +1,31 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Calendar, ChevronLeft, ChevronRight, X, MapPin, Clock as ClockIcon, CalendarCheck } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, X, MapPin, Clock as ClockIcon, CalendarCheck, RefreshCw, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useEventsInRange, useClassRooms } from '../../hooks/useEvents';
+import {
+  MONTH_NAMES,
+  EVENT_TYPE_LABELS,
+  DOT_COLORS,
+  BADGE_COLORS,
+  groupByDayOfMonth,
+  monthRange,
+  eventTimeText,
+} from '../../utils/events';
 
 /* ============================================================
    ปฏิทินฝ่ายวิชาการ
-   โครงสร้างข้อมูล: ACADEMIC_EVENTS[ปี ค.ศ.][เดือน 0-11][วันที่] = [event, ...]
-   เดิมใช้ตัวแปรเดียว (JULY_EVENTS) ทำให้กดเปลี่ยนเดือนแล้วยังโชว์
-   กิจกรรมของเดือน ก.ค. ตลอด — แก้โดยแยกข้อมูลตามปี/เดือน
+
+   เดิมกิจกรรมทั้งหมดเป็นค่าคงที่ในไฟล์นี้ (ตัวแปร ACADEMIC_EVENTS)
+   ฝ่ายวิชาการจึงแก้อะไรเองไม่ได้เลย ต้องให้คนเขียนโค้ดแก้แล้ว deploy ใหม่ทุกครั้ง
+
+   ตอนนี้อ่านจากตาราง events ใน Supabase แทน (10_events.sql)
+   และ subscribe realtime ไว้ — ฝ่ายวิชาการกดบันทึกที่หน้าของเขา
+   เครื่องนักเรียนที่เปิดค้างอยู่จะอัปเดตเองโดยไม่ต้องรีเฟรช
    ============================================================ */
-const ACADEMIC_EVENTS = {
-  2026: {
-    // ---------- กรกฎาคม 2569 ----------
-    6: {
-      2: [{ title: 'รด. (ROTC)', type: 'activity', time: '13:00 - 16:00', location: 'สนามกีฬา', color: 'emerald' }],
-      3: [{ title: 'ประชุมฝ่ายวิชาการ', type: 'academic', time: '09:00 - 12:00', location: 'ห้องประชุม อาคาร 1', color: 'blue' }],
-      7: [{ title: 'ส่งงานโครงงานกลุ่ม', type: 'deadline', time: 'ก่อน 16:00', location: 'ห้อง 1406', color: 'orange' }],
-      9: [{ title: 'รด. (ROTC)', type: 'activity', time: '13:00 - 16:00', location: 'สนามกีฬา', color: 'emerald' }],
-      10: [{ title: 'กิจกรรมวันสถาปนา', type: 'activity', time: '08:00 - 12:00', location: 'หอประชุม', color: 'violet' }],
-      13: [{ title: 'วันอาสาฬหบูชา', type: 'holiday', time: 'หยุดราชการ', location: '', color: 'red' }],
-      14: [{ title: 'วันเข้าพรรษา', type: 'holiday', time: 'หยุดราชการ', location: '', color: 'red' }],
-      16: [{ title: 'รด. (ROTC)', type: 'activity', time: '13:00 - 16:00', location: 'สนามกีฬา', color: 'emerald' }],
-      18: [{ title: 'สอบกลางภาค - การสร้างเกมคอมพิวเตอร์', type: 'exam', time: '08:30 - 10:30', location: 'ห้อง 1409', color: 'rose' }],
-      19: [
-        { title: 'ส่งโปรเจค 50%', type: 'deadline', time: 'ก่อน 16:30 น.', location: 'ห้อง 1503 / ส่งระบบออนไลน์', color: 'orange' },
-        { title: 'สอบกลางภาค - English for Project Work', type: 'exam', time: '08:30 - 10:30', location: 'ห้อง 1503', color: 'rose' },
-      ],
-      21: [{ title: 'สอบกลางภาค - ทักษะดิจิทัล', type: 'exam', time: '08:30 - 10:30', location: 'ห้อง 1509', color: 'rose' }],
-      22: [{ title: 'สอบกลางภาค - การซ่อมบำรุงคอมพิวเตอร์', type: 'exam', time: '08:30 - 10:30', location: 'ห้อง 1401', color: 'rose' }],
-      23: [{ title: 'รด. (ROTC)', type: 'activity', time: '13:00 - 16:00', location: 'สนามกีฬา', color: 'emerald' }],
-      24: [{ title: 'สอบกลางภาค - การออกแบบกราฟิกพื้นฐาน', type: 'exam', time: '08:30 - 10:30', location: 'ห้อง 1406', color: 'rose' }],
-      28: [{ title: 'วันเฉลิมพระชนมพรรษา ร.10', type: 'holiday', time: 'หยุดราชการ', location: '', color: 'red' }],
-      30: [{ title: 'รด. (ROTC)', type: 'activity', time: '13:00 - 16:00', location: 'สนามกีฬา', color: 'emerald' }],
-    },
-
-    // ---------- สิงหาคม 2569 ----------
-    7: {
-      3: [{ title: 'ประชุมฝ่ายวิชาการ', type: 'academic', time: '09:00 - 12:00', location: 'ห้องประชุม อาคาร 1', color: 'blue' }],
-      6: [{ title: 'รด. (ROTC)', type: 'activity', time: '13:00 - 16:00', location: 'สนามกีฬา', color: 'emerald' }],
-      12: [{ title: 'วันแม่แห่งชาติ', type: 'holiday', time: 'หยุดราชการ', location: '', color: 'red' }],
-      13: [{ title: 'รด. (ROTC)', type: 'activity', time: '13:00 - 16:00', location: 'สนามกีฬา', color: 'emerald' }],
-      14: [{ title: 'ส่งโปรเจค 75%', type: 'deadline', time: 'ก่อน 16:30 น.', location: 'ห้อง 1503 / ส่งระบบออนไลน์', color: 'orange' }],
-      18: [{ title: 'กิจกรรมสัปดาห์วิทยาศาสตร์', type: 'activity', time: '08:00 - 15:00', location: 'หอประชุม', color: 'violet' }],
-      20: [{ title: 'รด. (ROTC)', type: 'activity', time: '13:00 - 16:00', location: 'สนามกีฬา', color: 'emerald' }],
-      21: [{ title: 'ส่งงานรายวิชาทักษะดิจิทัล', type: 'deadline', time: 'ก่อน 16:00', location: 'ห้อง 1509', color: 'orange' }],
-      27: [{ title: 'รด. (ROTC)', type: 'activity', time: '13:00 - 16:00', location: 'สนามกีฬา', color: 'emerald' }],
-      31: [{ title: 'ประกาศตารางสอบปลายภาค', type: 'academic', time: 'ทั้งวัน', location: 'บอร์ดฝ่ายวิชาการ / แอป', color: 'blue' }],
-    },
-
-    // ---------- กันยายน 2569 ----------
-    8: {
-      3: [{ title: 'รด. (ROTC)', type: 'activity', time: '13:00 - 16:00', location: 'สนามกีฬา', color: 'emerald' }],
-      10: [{ title: 'รด. (ROTC)', type: 'activity', time: '13:00 - 16:00', location: 'สนามกีฬา', color: 'emerald' }],
-      11: [{ title: 'ส่งโปรเจคฉบับสมบูรณ์ 100%', type: 'deadline', time: 'ก่อน 16:30 น.', location: 'ห้อง 1503', color: 'orange' }],
-      21: [{ title: 'สอบปลายภาค - วันแรก', type: 'exam', time: '08:30 - 15:30', location: 'ตามผังห้องสอบ', color: 'rose' }],
-      22: [{ title: 'สอบปลายภาค', type: 'exam', time: '08:30 - 15:30', location: 'ตามผังห้องสอบ', color: 'rose' }],
-      23: [{ title: 'สอบปลายภาค', type: 'exam', time: '08:30 - 15:30', location: 'ตามผังห้องสอบ', color: 'rose' }],
-      24: [{ title: 'สอบปลายภาค - วันสุดท้าย', type: 'exam', time: '08:30 - 15:30', location: 'ตามผังห้องสอบ', color: 'rose' }],
-      30: [{ title: 'ประกาศผลการเรียน', type: 'academic', time: 'ทั้งวัน', location: 'แอป SBAC Connect', color: 'blue' }],
-    },
-  },
-};
 
 const DAY_NAMES = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 const DAY_NAMES_FULL = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
-
-const MONTH_NAMES = [
-  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
-];
-
-const EVENT_TYPE_LABELS = {
-  activity: 'กิจกรรม',
-  holiday: 'วันหยุด',
-  exam: 'สอบ',
-  academic: 'วิชาการ',
-  deadline: 'กำหนดส่งงาน',
-};
-
-const DOT_COLORS = {
-  emerald: 'bg-emerald-500',
-  blue: 'bg-blue-500',
-  red: 'bg-red-500',
-  rose: 'bg-rose-500',
-  amber: 'bg-amber-500',
-  orange: 'bg-orange-500',
-  violet: 'bg-violet-500',
-};
-
-const BADGE_COLORS = {
-  emerald: { light: 'bg-emerald-50 text-emerald-800 border-emerald-200', dark: 'bg-emerald-900/30 text-emerald-300 border-emerald-800/40' },
-  blue: { light: 'bg-blue-50 text-blue-800 border-blue-200', dark: 'bg-blue-900/30 text-blue-300 border-blue-800/40' },
-  red: { light: 'bg-red-50 text-red-800 border-red-200', dark: 'bg-red-900/30 text-red-300 border-red-800/40' },
-  rose: { light: 'bg-rose-50 text-rose-800 border-rose-200', dark: 'bg-rose-900/30 text-rose-300 border-rose-800/40' },
-  amber: { light: 'bg-amber-50 text-amber-900 border-amber-200', dark: 'bg-amber-900/30 text-amber-300 border-amber-800/40' },
-  orange: { light: 'bg-orange-50 text-orange-900 border-orange-200', dark: 'bg-orange-900/30 text-orange-300 border-orange-800/40' },
-  violet: { light: 'bg-violet-50 text-violet-800 border-violet-200', dark: 'bg-violet-900/30 text-violet-300 border-violet-800/40' },
-};
 
 /** ภาคเรียนตามเดือน: พ.ค.–ก.ย. = ภาคเรียนที่ 1, ต.ค.–เม.ย. = ภาคเรียนที่ 2 */
 function getSemesterLabel(year, month) {
@@ -117,8 +46,19 @@ export default function AcademicCalendar() {
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState(null);
 
-  // ดึงเฉพาะกิจกรรมของ "เดือนที่กำลังดู" — จุดที่เป็นบั๊กเดิม
-  const monthEvents = ACADEMIC_EVENTS[viewYear]?.[viewMonth] || {};
+  // ดึงเฉพาะกิจกรรมของเดือนที่กำลังดู ไม่ดึงมาทั้งตาราง
+  const { from, to } = useMemo(() => monthRange(viewYear, viewMonth), [viewYear, viewMonth]);
+  const { events, loading, error } = useEventsInRange(from, to);
+
+  // ใช้ติดป้ายว่ากิจกรรมไหนเป็นของห้องไหน
+  // นักเรียนจะเห็นเฉพาะของกลางกับของห้องตัวเองอยู่แล้ว (RLS กรองให้)
+  // ป้ายนี้มีประโยชน์กับครูที่เห็นทุกห้อง จะได้ไม่สับสน
+  const { labelOf } = useClassRooms();
+
+  const monthEvents = useMemo(
+    () => groupByDayOfMonth(events, viewYear, viewMonth),
+    [events, viewYear, viewMonth]
+  );
 
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay();
@@ -134,10 +74,13 @@ export default function AcademicCalendar() {
     return cells;
   }, [firstDayOfWeek, daysInMonth]);
 
-  const eventCount = useMemo(
-    () => Object.values(monthEvents).reduce((sum, list) => sum + list.length, 0),
-    [monthEvents]
-  );
+  const eventCount = events.length;
+
+  /* ลบกิจกรรมจนหมดเดือนแล้ว การเลือกวันที่ค้างไว้ไม่มีความหมายอีก
+     ปล่อยไว้จะเหลือขอบสีลอยอยู่บนปฏิทินว่าง ๆ ซึ่งชวนเข้าใจผิดว่ายังมีของค้าง */
+  useEffect(() => {
+    if (!loading && events.length === 0 && selectedDate !== null) setSelectedDate(null);
+  }, [loading, events.length, selectedDate]);
 
   const textPrimary = isDark ? 'text-white' : 'text-sbac-navy';
   const textMuted = 'text-content-muted';
@@ -164,20 +107,33 @@ export default function AcademicCalendar() {
       : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
   }`;
 
+  /** ข้อความสรุปมุมขวาบน — บอกให้รู้ว่ากำลังโหลด / โหลดไม่ได้ / มีกี่กิจกรรม */
+  const summaryText = loading
+    ? 'กำลังโหลด...'
+    : error
+    ? 'โหลดกิจกรรมไม่ได้'
+    : eventCount > 0
+    ? `${eventCount} กิจกรรมในเดือนนี้`
+    : 'ไม่มีกิจกรรมในเดือนนี้';
+
   return (
     <div className="space-y-3">
       {/* Calendar Card */}
       <section
         aria-label="ปฏิทินฝ่ายวิชาการ"
         className={`rounded-3xl border p-4 transition-colors duration-300 ${
-          isDark ? 'bg-white/[0.06] backdrop-blur-2xl border-white/10' : 'bg-white shadow-card border-slate-100'
+          isDark ? 'bg-white/[0.06] backdrop-blur-2xl border-white/10' : 'bg-surface-card shadow-card border-slate-100'
         }`}
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-4 gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <div className={`p-2 rounded-xl shrink-0 text-brand ${isDark ? 'bg-sbac-blue/30' : 'bg-sbac-blue/10'}`}>
-              <Calendar size={18} aria-hidden="true" />
+              {loading ? (
+                <RefreshCw size={18} className="animate-spin" aria-hidden="true" />
+              ) : (
+                <Calendar size={18} aria-hidden="true" />
+              )}
             </div>
             <div className="min-w-0">
               <h3 className={`text-sm font-extrabold truncate ${textPrimary}`}>ปฏิทินฝ่ายวิชาการ</h3>
@@ -226,8 +182,8 @@ export default function AcademicCalendar() {
           >
             ภาคเรียน {getSemesterLabel(viewYear, viewMonth)}
           </span>
-          <span className={`text-[10px] font-bold ${textMuted}`}>
-            {eventCount > 0 ? `${eventCount} กิจกรรมในเดือนนี้` : 'ไม่มีกิจกรรมในเดือนนี้'}
+          <span className={`text-[10px] font-bold ${error ? 'text-accent-rose' : textMuted}`}>
+            {summaryText}
           </span>
         </div>
 
@@ -253,15 +209,15 @@ export default function AcademicCalendar() {
               return <div key={`empty-${idx}`} className="aspect-square" aria-hidden="true" />;
             }
 
-            const events = monthEvents[day] || [];
-            const hasEvents = events.length > 0;
+            const dayEvents = monthEvents[day] || [];
+            const hasEvents = dayEvents.length > 0;
             const isToday = day === currentDay;
             const isSelected = day === selectedDate;
             const isWeekend = idx % 7 === 0 || idx % 7 === 6;
-            const isHoliday = events.some((e) => e.type === 'holiday');
+            const isHoliday = dayEvents.some((e) => e.type === 'holiday');
 
             const label = hasEvents
-              ? `${day} ${MONTH_NAMES[viewMonth]} — ${events.length} กิจกรรม: ${events.map((e) => e.title).join(', ')}`
+              ? `${day} ${MONTH_NAMES[viewMonth]} — ${dayEvents.length} กิจกรรม: ${dayEvents.map((e) => e.title).join(', ')}`
               : `${day} ${MONTH_NAMES[viewMonth]} — ไม่มีกิจกรรม`;
 
             return (
@@ -274,11 +230,11 @@ export default function AcademicCalendar() {
                 aria-label={label}
                 aria-pressed={isSelected}
                 aria-current={isToday ? 'date' : undefined}
-                className={`aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all duration-200 cursor-pointer active:scale-90 ${
-                  isSelected
-                    ? 'bg-sbac-blue text-white shadow-button scale-105'
-                    : isToday
-                    ? `text-brand font-extrabold ring-1 ${isDark ? 'bg-sbac-blue/25 ring-sbac-blue/50' : 'bg-sbac-blue/10 ring-sbac-blue/40'}`
+                className={`aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all duration-200 cursor-pointer active:scale-90
+                  ${isSelected ? 'ring-2 ring-sbac-blue ring-offset-1 ' + (isDark ? 'ring-offset-surface-dark-elev' : 'ring-offset-surface-card') : ''}
+                  ${
+                  isToday
+                    ? `text-brand font-extrabold ${isDark ? 'bg-sbac-blue/25' : 'bg-sbac-blue/10'}`
                     : isHoliday
                     ? `text-accent-rose ${isDark ? 'bg-red-900/20' : 'bg-red-50'}`
                     : isWeekend
@@ -286,18 +242,14 @@ export default function AcademicCalendar() {
                     : `text-content ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`
                 }`}
               >
-                <span className={`text-xs font-bold leading-none ${isSelected ? 'text-white' : ''}`}>
-                  {day}
-                </span>
+                <span className="text-xs font-bold leading-none">{day}</span>
 
                 {hasEvents && (
                   <div className="flex gap-0.5 mt-0.5" aria-hidden="true">
-                    {events.slice(0, 3).map((evt, i) => (
+                    {dayEvents.slice(0, 3).map((evt) => (
                       <div
-                        key={i}
-                        className={`w-1 h-1 rounded-full ${
-                          isSelected ? 'bg-white/80' : DOT_COLORS[evt.color] || 'bg-blue-500'
-                        }`}
+                        key={evt.id}
+                        className={`w-1 h-1 rounded-full ${DOT_COLORS[evt.color] || 'bg-blue-500'}`}
                       />
                     ))}
                   </div>
@@ -310,7 +262,7 @@ export default function AcademicCalendar() {
         {/* Legend */}
         <div className={`flex flex-wrap gap-x-3 gap-y-1.5 mt-3 pt-3 border-t ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
           {[
-            { label: 'กิจกรรม/รด.', color: 'bg-emerald-500' },
+            { label: 'กิจกรรม', color: 'bg-emerald-500' },
             { label: 'สอบ', color: 'bg-rose-500' },
             { label: 'วันหยุด', color: 'bg-red-500' },
             { label: 'กิจกรรมพิเศษ', color: 'bg-violet-500' },
@@ -335,7 +287,7 @@ export default function AcademicCalendar() {
             exit={{ opacity: 0, y: 10, scale: 0.97 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             className={`rounded-2xl border p-4 transition-colors duration-300 ${
-              isDark ? 'bg-white/[0.06] backdrop-blur-2xl border-white/10' : 'bg-white shadow-card border-slate-100'
+              isDark ? 'bg-white/[0.06] backdrop-blur-2xl border-white/10' : 'bg-surface-card shadow-card border-slate-100'
             }`}
           >
             <div className="flex items-center justify-between mb-3">
@@ -356,9 +308,9 @@ export default function AcademicCalendar() {
               <p className={`text-[11px] font-semibold py-2 ${textMuted}`}>ไม่มีกิจกรรมในวันนี้</p>
             ) : (
               <div className="space-y-2.5">
-                {selectedEvents.map((evt, i) => (
+                {selectedEvents.map((evt) => (
                   <div
-                    key={i}
+                    key={evt.id}
                     className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${
                       BADGE_COLORS[evt.color]
                         ? isDark
@@ -379,10 +331,27 @@ export default function AcademicCalendar() {
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-white/10' : 'bg-white/70'}`}>
                           {EVENT_TYPE_LABELS[evt.type] || evt.type}
                         </span>
+                        {evt.classRoomId !== null && labelOf(evt.classRoomId) && (
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                              isDark ? 'bg-white/10' : 'bg-white/70'
+                            }`}
+                          >
+                            <Users size={9} aria-hidden="true" />
+                            {labelOf(evt.classRoomId)}
+                          </span>
+                        )}
                       </div>
+
+                      {evt.description && (
+                        <p className="text-[10px] font-semibold leading-relaxed opacity-90">
+                          {evt.description}
+                        </p>
+                      )}
+
                       <div className="flex items-center gap-3 flex-wrap">
                         <span className="flex items-center gap-1 text-[10px] font-semibold">
-                          <ClockIcon size={10} aria-hidden="true" /> {evt.time}
+                          <ClockIcon size={10} aria-hidden="true" /> {eventTimeText(evt)}
                         </span>
                         {evt.location && (
                           <span className="flex items-center gap-1 text-[10px] font-semibold">

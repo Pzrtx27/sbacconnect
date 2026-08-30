@@ -7,7 +7,6 @@ import { showToast } from '../../components/ui/Toast';
 import {
   Calendar,
   Settings,
-  Bell,
   Send,
   RefreshCw,
   Undo,
@@ -20,6 +19,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { sha256, encryptAES, decryptAES } from '../../utils/crypto';
+import EventManager from './EventManager';
 
 export default function AcademicDashboard() {
   const { user } = useAuth();
@@ -36,11 +36,9 @@ export default function AcademicDashboard() {
   const [roomMode, setRoomMode] = useState('same'); // 'same' or 'new'
   const [room, setRoom] = useState('');
 
-  // Event Announcement State
-  const [evtTitle, setEvtTitle] = useState('');
-  const [evtDesc, setEvtDesc] = useState('');
-  const [evtDate, setEvtDate] = useState('');
-  const [leaveUrl, setLeaveUrl] = useState('https://forms.gle/sbacleaveform');
+  /* ฟอร์มประกาศกิจกรรมเดิมถูกย้ายไป <EventManager /> ทั้งก้อน
+     ของเดิมเขียนลง Firebase collection 'events' ซึ่งปิดไปแล้ว และเป็นคนละที่กับ
+     ปฏิทินที่นักเรียนเห็นด้วย — ตอนนี้ทั้งสองฝั่งใช้ตาราง events ใน Supabase ร่วมกัน */
 
   // Selected class room/branch states
   const [selectedClassId, setSelectedClassId] = useState('m3_6');
@@ -414,32 +412,6 @@ export default function AcademicDashboard() {
     }
   };
 
-  const publishEvent = async () => {
-    if (!evtTitle || !evtDesc) {
-      showToast('กรุณากรอกข้อมูลให้ครบถ้วน', 'error');
-      return;
-    }
-
-    try {
-      await addDoc(collection(db, 'events'), {
-        title: evtTitle,
-        description: evtDesc,
-        date: evtDate,
-        leave_url: leaveUrl,
-        publisher: user.name,
-        created_at: new Date().toISOString()
-      });
-
-      showToast('ประกาศกิจกรรมและส่งแจ้งเตือนเรียบร้อย!', 'success');
-      setEvtTitle('');
-      setEvtDesc('');
-      setEvtDate('');
-    } catch (err) {
-      console.error('Announce failed:', err);
-      showToast('ไม่สามารถส่งประกาศได้', 'error');
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -454,8 +426,13 @@ export default function AcademicDashboard() {
         </span>
       </div>
 
-      {/* Select Branch and Class Room */}
-      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-white border-slate-100'
+      {/* หน้านี้ใช้งานบนคอมที่โต๊ะทำงาน ไม่ใช่บนมือถือ
+          บนจอกว้างจึงแยกเป็นสองคอลัมน์: ซ้ายคืองานตารางสอน ขวาคือปฏิทินกิจกรรม
+          items-start กันไม่ให้การ์ดสั้นถูกยืดตามการ์ดยาวในแถวเดียวกัน */}
+      <div className="grid gap-6 xl:grid-cols-2 items-start">
+        <div className="space-y-6">
+          {/* Select Branch and Class Room */}
+      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
         }`}>
         <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
           }`}>
@@ -470,7 +447,7 @@ export default function AcademicDashboard() {
               onChange={e => setSelectedBranch(e.target.value)}
               className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
                 ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-white'
+                : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-surface-card'
                 }`}
             >
               <option value="เทคโนโลยีสารสนเทศ">เทคโนโลยีสารสนเทศ (IT)</option>
@@ -494,7 +471,7 @@ export default function AcademicDashboard() {
               onChange={e => setSelectedClassId(e.target.value)}
               className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
                 ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-white'
+                : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-surface-card'
                 }`}
             >
               <optgroup label="มัธยมศึกษาปีที่ 1">
@@ -529,7 +506,7 @@ export default function AcademicDashboard() {
       </div>
 
       {/* Timetable modification form */}
-      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-white border-slate-100'
+      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
         }`}>
         <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
           }`}>
@@ -545,7 +522,7 @@ export default function AcademicDashboard() {
               onChange={e => setDay(e.target.value)}
               className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
                 ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-white'
+                : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-surface-card'
                 }`}
             >
               <option value="Monday">จันทร์</option>
@@ -565,7 +542,7 @@ export default function AcademicDashboard() {
               max={6}
               className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
                 ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-white'
+                : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-surface-card'
                 }`}
             />
           </div>
@@ -580,7 +557,7 @@ export default function AcademicDashboard() {
               onChange={e => setSubject(e.target.value)}
               className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
                 ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
+                : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-surface-card'
                 }`}
               placeholder="ระบุวิชาเรียน"
             />
@@ -594,7 +571,7 @@ export default function AcademicDashboard() {
               onChange={e => setOrigTeacher(e.target.value)}
               className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
                 ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
+                : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-surface-card'
                 }`}
               placeholder="ระบุครูผู้สอนเดิม"
             />
@@ -608,7 +585,7 @@ export default function AcademicDashboard() {
               onChange={e => setSubTeacher(e.target.value)}
               className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
                 ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
+                : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-surface-card'
                 }`}
               placeholder="ระบุชื่อครูสอนแทน"
             />
@@ -647,7 +624,7 @@ export default function AcademicDashboard() {
                 onChange={e => setRoom(e.target.value)}
                 className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
                   ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                  : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
+                  : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-surface-card'
                   }`}
                 placeholder="ระบุเลขห้องเรียนใหม่"
               />
@@ -676,83 +653,14 @@ export default function AcademicDashboard() {
         </div>
       </div>
 
-      {/* Announcement panel */}
-      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-white border-slate-100'
-        }`}>
-        <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
-          }`}>
-          <Bell size={18} className="text-brand" />
-          ประกาศกิจกรรม + แจ้งเตือนอีเมล
-        </h3>
-
-        <div className="space-y-3">
-          <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>หัวข้อประกาศ (ไทย)</label>
-            <input
-              type="text"
-              value={evtTitle}
-              onChange={e => setEvtTitle(e.target.value)}
-              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
-                ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
-                }`}
-              placeholder="ระบุหัวข้อ เช่น วันไหว้ครู"
-            />
-          </div>
-
-          <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>รายละเอียดกิจกรรม</label>
-            <textarea
-              value={evtDesc}
-              onChange={e => setEvtDesc(e.target.value)}
-              rows={3}
-              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
-                ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
-                }`}
-              placeholder="ระบุรายละเอียด หรือขั้นตอนปฏิบัติ"
-            />
-          </div>
-
-          <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>วันที่จัดกิจกรรม</label>
-            <input
-              type="date"
-              value={evtDate}
-              onChange={e => setEvtDate(e.target.value)}
-              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
-                ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-white'
-                }`}
-            />
-          </div>
-
-          <div>
-            <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>ลิงก์ Google Form การลา</label>
-            <input
-              type="text"
-              value={leaveUrl}
-              onChange={e => setLeaveUrl(e.target.value)}
-              className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
-                ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-white'
-                }`}
-              placeholder="ใส่ลิงก์สำหรับการลาเรียน"
-            />
-          </div>
         </div>
 
-        <button
-          onClick={publishEvent}
-          className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold py-3.5 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-2"
-        >
-          <Send size={14} />
-          ส่งประกาศ + แจ้งเตือนเมล
-        </button>
+        {/* ปฏิทินกิจกรรม เขียนลงตาราง events ใน Supabase ตัวเดียวกับที่นักเรียนอ่าน */}
+        <EventManager />
       </div>
 
-      {/* Excel sync panel */}
-      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-white border-slate-100'
+      {/* Excel sync panel — เต็มความกว้างเสมอ เพราะมีตารางพรีวิวรายชื่อนักเรียนอยู่ข้างใน */}
+      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
         }`}>
         <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
           }`}>
@@ -814,7 +722,7 @@ export default function AcademicDashboard() {
                   ? 'bg-sbac-blue/10 border-sbac-blue text-brand ring-2 ring-sbac-blue/20'
                   : isDark
                     ? 'bg-neutral-900 border-white/10 hover:bg-neutral-800 text-content-secondary'
-                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+                    : 'bg-surface-card border-slate-200 hover:bg-slate-50 text-slate-600'
                   }`}
               >
                 <div className="text-xs font-extrabold">{mode.label}</div>
@@ -836,7 +744,7 @@ export default function AcademicDashboard() {
                   onChange={(e) => setSecretKey(e.target.value)}
                   className={`w-full rounded-xl pl-4 pr-10 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
                     ? 'bg-neutral-900 border-white/15 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50'
-                    : 'bg-white border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue'
+                    : 'bg-surface-card border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue'
                     }`}
                   placeholder="ป้อนรหัสผ่านคีย์ส่วนตัวของคุณ..."
                 />
