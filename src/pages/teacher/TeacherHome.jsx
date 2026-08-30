@@ -185,7 +185,7 @@ export default function TeacherHome() {
   const pendingLeavesCount = leaveRequests.filter(req => req.status === 'pending').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 xl:max-w-4xl">
       {/* Profile Header */}
       <div className="bg-gradient-to-r from-sbac-navy to-sbac-blue p-6 rounded-3xl text-white shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 w-36 h-36 bg-white/5 rounded-full -mr-10 -mt-10 pointer-events-none" />
@@ -355,19 +355,19 @@ export default function TeacherHome() {
         </div>
 
         <div className="grid grid-cols-3 gap-3">
-          <div className={`p-3 rounded-2xl border text-center transition-all ${isDark ? 'bg-neutral-900/60 border-white/10' : 'bg-white border-slate-100 shadow-sm'}`}>
+          <div className={`p-3 rounded-2xl border text-center transition-all ${isDark ? 'bg-neutral-900/60 border-white/10' : 'bg-surface-card border-slate-100 shadow-sm'}`}>
             <span className="text-lg font-extrabold text-accent-emerald">
               {STUDENTS.filter(s => homeroomStatus[s.id] === 'present').length} / {STUDENTS.length}
             </span>
             <span className={`text-[9px] font-bold block mt-1 ${textMuted}`}>มาเรียน</span>
           </div>
-          <div className={`p-3 rounded-2xl border text-center transition-all ${isDark ? 'bg-neutral-900/60 border-white/10' : 'bg-white border-slate-100 shadow-sm'}`}>
+          <div className={`p-3 rounded-2xl border text-center transition-all ${isDark ? 'bg-neutral-900/60 border-white/10' : 'bg-surface-card border-slate-100 shadow-sm'}`}>
             <span className="text-lg font-extrabold text-accent-rose">
               {STUDENTS.filter(s => homeroomStatus[s.id] === 'absent').length}
             </span>
             <span className={`text-[9px] font-bold block mt-1 ${textMuted}`}>ขาดเรียน</span>
           </div>
-          <div className={`p-3 rounded-2xl border text-center transition-all ${isDark ? 'bg-neutral-900/60 border-white/10' : 'bg-white border-slate-100 shadow-sm'}`}>
+          <div className={`p-3 rounded-2xl border text-center transition-all ${isDark ? 'bg-neutral-900/60 border-white/10' : 'bg-surface-card border-slate-100 shadow-sm'}`}>
             <span className="text-lg font-extrabold text-brand">
               {Math.round(STUDENTS.reduce((acc, s) => acc + getStudentBehaviorScore(s.id), 0) / STUDENTS.length)}
             </span>
@@ -477,7 +477,7 @@ export default function TeacherHome() {
                   </div>
 
                   <div className={`p-2.5 rounded-xl text-xs space-y-1 ${
-                    isDark ? 'bg-white/[0.02]' : 'bg-white shadow-sm'
+                    isDark ? 'bg-white/[0.02]' : 'bg-surface-card shadow-sm'
                   }`}>
                     <div className="font-semibold">
                       <span className={textMuted}>วันที่ลา: </span>
@@ -592,7 +592,7 @@ export default function TeacherHome() {
                       ? 'border-sbac-blue bg-sbac-blue-50/20 text-brand'
                       : isDark
                       ? 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] text-content-secondary'
-                      : 'border-slate-100 bg-white hover:bg-slate-50 text-slate-600 shadow-sm'
+                      : 'border-slate-100 bg-surface-card hover:bg-slate-50 text-slate-600 shadow-sm'
                   }`}
                 >
                   <div className="truncate">{preset.reason}</div>

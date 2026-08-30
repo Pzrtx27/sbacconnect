@@ -11,10 +11,11 @@ import TeacherHome from './pages/teacher/TeacherHome';
 import AcademicDashboard from './pages/academic/AcademicDashboard';
 import BaristaDashboard from './pages/barista/BaristaDashboard';
 import BottomNav from './components/layout/BottomNav';
+import SideNav from './components/layout/SideNav';
 import Header from './components/layout/Header';
-import ChatbotFAB from './components/chatbot/ChatbotFAB';
 import PageWrapper from './components/layout/PageWrapper';
 import LoadingSpinner from './components/ui/LoadingSpinner';
+import { shellWidthClass } from './utils/layout';
 
 /** หน้าเริ่มต้นของแต่ละ role — ใช้ที่เดียวกันทั้งแอปเพื่อไม่ให้ redirect วนลูป */
 const HOME_BY_ROLE = {
@@ -167,7 +168,11 @@ function MainLayout() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col pb-24 transition-colors duration-300 relative bg-surface text-ink dark:bg-surface-dark dark:text-white">
+    /* pb-24 เว้นที่ให้ BottomNav บนมือถือ — บนคอมไม่มีแถบล่างแล้วจึงคืนพื้นที่ให้เนื้อหา
+       xl:pl-64 หลบแถบซ้ายที่เป็น fixed (กว้าง w-64 เท่ากัน) */
+    <div className="min-h-screen flex flex-col pb-24 xl:pb-0 xl:pl-64 transition-colors duration-300 relative bg-surface text-ink dark:bg-surface-dark dark:text-white">
+      <SideNav />
+
       <div className="relative z-10 flex-1 flex flex-col">
         <Header />
 
@@ -179,7 +184,10 @@ function MainLayout() {
           ข้ามไปยังเนื้อหาหลัก
         </a>
 
-        <main id="main-content" className="flex-1 container mx-auto px-4 py-6 max-w-md">
+        <main
+          id="main-content"
+          className={`flex-1 container mx-auto px-4 py-6 ${shellWidthClass(userRole)}`}
+        >
           <Routes>
             {/* หน้าเริ่มต้น ส่งตาม role */}
             <Route path="/" element={<Navigate to={homeFor(user)} replace />} />
@@ -247,7 +255,6 @@ function MainLayout() {
 
         <BottomNav />
 
-        {(userRole === 'student' || userRole === 'teacher') && <ChatbotFAB />}
       </div>
     </div>
   );

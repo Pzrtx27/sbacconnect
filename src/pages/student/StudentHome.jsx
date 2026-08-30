@@ -7,25 +7,20 @@ import { showToast } from '../../components/ui/Toast';
 import Modal from '../../components/ui/Modal';
 import GlassCard from '../../components/layout/GlassCard';
 import AcademicCalendar from '../../components/ui/AcademicCalendar';
+import UpcomingEvents from '../../components/ui/UpcomingEvents';
 import { readJSON, writeJSON } from '../../utils/storage';
 import { formatBaht } from '../../utils/identity';
 import { 
-  CreditCard, 
   Clock, 
-  Coins, 
   Award, 
   BookOpen, 
   GraduationCap, 
   Calendar, 
   FileText, 
   UserX, 
-  MessageSquare, 
   ArrowRight,
-  TrendingUp,
   Download,
-  AlertCircle,
   CheckCircle2,
-  ShoppingBag,
   History,
   Receipt,
   Coffee
@@ -86,13 +81,6 @@ export default function StudentHome() {
   // Modal states
   const [activeModal, setActiveModal] = useState(null);
   
-  // Custom top-up amount
-  const [customTopup, setCustomTopup] = useState('');
-  
-  // Transfer Form States
-  const [transferRecipient, setTransferRecipient] = useState('');
-  const [transferAmount, setTransferAmount] = useState('');
-
   // Leave Request Form States
   const [leaveType, setLeaveType] = useState('sick');
   const [leaveStartDate, setLeaveStartDate] = useState('');
@@ -101,28 +89,12 @@ export default function StudentHome() {
   const [leaveSubmitted, setLeaveSubmitted] = useState(false);
   const [leaveTicketId, setLeaveTicketId] = useState('');
 
-  /* เติมเงิน/โอนเงินทำเองจากหน้าเว็บไม่ได้แล้วหลังย้ายมา Supabase
-     RLS revoke สิทธิ์เขียน wallet_entries ทิ้งทั้งหมด ทางเข้าเดียวคือฟังก์ชัน
-     topup_cash() ซึ่งบังคับว่าต้องมี role 'cashier' (ดู 02_functions.sql)
-     — ตั้งใจให้เป็นแบบนี้ ไม่งั้นนักเรียนเสกเงินให้ตัวเองได้ */
-  const CASHIER_ONLY_MSG = 'การเติมเงินต้องทำที่จุดบริการการเงิน กรุณาติดต่อฝ่ายการเงิน';
-
-  const handleTopUp = () => {
-    showToast(CASHIER_ONLY_MSG, 'info');
-  };
-
-  const handleCustomTopUp = () => {
-    showToast(CASHIER_ONLY_MSG, 'info');
-    setCustomTopup('');
-  };
-
-  /* การโอนเงินระหว่างนักเรียนยังไม่มีฟังก์ชันรองรับฝั่ง DB
-     ถ้าจะเปิดใช้จริงต้องเขียนฟังก์ชัน transfer() ที่หักและเพิ่มใน transaction เดียว
-     พร้อม idempotency_key เหมือน place_order ไม่งั้นเงินหายกลางทางได้ */
-  const handleTransfer = () => {
-    showToast('ระบบโอนเงินระหว่างนักเรียนยังไม่เปิดให้บริการ', 'info');
-  };
-
+  /* เรื่องเงินในบัตร ฝั่ง DB ปิดทางไว้หมดตั้งแต่ย้ายมา Supabase:
+       เติมเงิน — RLS revoke สิทธิ์เขียน wallet_entries ทิ้ง ทางเข้าเดียวคือ topup_cash()
+                  ซึ่งบังคับ role 'cashier' (02_functions.sql) ปุ่มเติมเงินในหน้านี้จึงถูกเอาออก
+       โอนเงิน  — เอาปุ่มออกแล้ว ฝั่ง DB ไม่เคยมีฟังก์ชันรองรับ ปุ่มเดิมกดแล้วขึ้น
+                  toast ว่ายังไม่เปิดให้บริการอย่างเดียว
+     ตั้งใจให้เป็นแบบนี้ ไม่งั้นนักเรียนเสกเงินให้ตัวเองได้ */
   // Leave Request Submit
   const handleLeaveSubmit = () => {
     if (!leaveStartDate) {
@@ -218,11 +190,20 @@ export default function StudentHome() {
         </div>
       </div>
 
-      {/* Academic Calendar */}
-      <AcademicCalendar />
+      {/* บนมือถืออ่านไล่ลงมาตามลำดับใน DOM: กิจกรรม -> ปฏิทิน -> เมนู
+          บนคอมแยกเป็นสองคอลัมน์ เมนูอยู่ซ้าย ปฏิทินเป็นรางขวาที่ตรึงไว้
+          สลับตำแหน่งด้วย order ไม่ใช่ย้าย DOM เพื่อไม่ให้ลำดับบนมือถือเปลี่ยน */}
+      <div className="grid gap-6 xl:grid-cols-[1fr_380px] items-start">
+        <div className="space-y-6 xl:order-2 xl:sticky xl:top-24">
+          {/* กิจกรรมที่กำลังจะมาถึง — วางเหนือปฏิทิน เพราะเป็นสิ่งที่ต้องเห็นโดยไม่ต้องกดอะไรเลย */}
+          <UpcomingEvents />
 
-      {/* Dashboard Grid */}
-      <div className="grid grid-cols-2 gap-4">
+          {/* Academic Calendar */}
+          <AcademicCalendar />
+        </div>
+
+        {/* Dashboard Grid */}
+        <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 xl:order-1">
         {/* Entrance Times */}
         <GlassCard onClick={() => setActiveModal('entry')}>
           <div className="flex flex-col h-full justify-between min-h-[110px]">
@@ -385,22 +366,7 @@ export default function StudentHome() {
           </div>
         </GlassCard>
 
-        {/* Chatbot Assistant */}
-        <GlassCard onClick={() => {
-          const btn = document.getElementById('chat-fab-btn');
-          if (btn) btn.click();
-        }}>
-          <div className="flex flex-col h-full justify-between min-h-[110px]">
-            <div>
-              <MessageSquare className="text-accent-cyan mb-2" size={24} />
-              <div className={`text-sm font-extrabold ${textPrimary}`}>แชทบอทช่วยเหลือ</div>
-              <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ติดต่อวิชาการ / แจ้งซ่อม</div>
-            </div>
-            <div className="flex items-center text-xs font-bold text-brand mt-2">
-              เริ่มคุย <ArrowRight size={14} className="ml-1" />
-            </div>
-          </div>
-        </GlassCard>
+        </div>
       </div>
 
       {/* MODAL: Balance & Topup */}
@@ -419,105 +385,19 @@ export default function StudentHome() {
             <span className={`text-xs font-extrabold mt-2 block ${textMuted}`}>THB</span>
           </div>
 
-          <div className="space-y-3">
-            <span className={`text-xs font-extrabold uppercase tracking-wider block ${textMuted}`}>
-              ✨ เติมเงินด่วน (Quick Top Up)
-            </span>
-            <div className="grid grid-cols-4 gap-2">
-              {[50, 100, 200, 500].map(amt => (
-                <button 
-                  key={amt}
-                  onClick={() => handleTopUp(amt)}
-                  className={`py-2.5 border rounded-xl font-bold text-sm active:scale-95 transition-all ${
-                    isDark 
-                      ? 'bg-white/5 border-white/10 text-white hover:bg-white/10'
-                      : 'bg-slate-50 border-slate-200 text-sbac-navy hover:bg-slate-100'
-                  }`}
-                >
-                  +{amt}฿
-                </button>
-              ))}
-            </div>
-
-            <div className="flex gap-2">
-              <input 
-                type="number"
-                value={customTopup}
-                onChange={e => setCustomTopup(e.target.value)}
-                placeholder="ระบุจำนวนเงินอื่นๆ"
-                className={`flex-1 border rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none ${bgInput}`}
-              />
-              <button 
-                onClick={handleCustomTopUp}
-                className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold px-6 rounded-xl text-sm transition-all"
-              >
-                เติมเงิน
-              </button>
-            </div>
-          </div>
-
-          <div className={`border-t pt-4 ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
-            <button 
-              onClick={() => setActiveModal('transfer')}
-              className="w-full bg-sbac-blue hover:bg-sbac-navy text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-button flex items-center justify-center gap-2"
-            >
-              <Coins size={16} />
-              โอนเงินให้เพื่อน (Transfer)
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* MODAL: Transfer */}
-      <Modal
-        isOpen={activeModal === 'transfer'}
-        onClose={() => setActiveModal('balance')}
-        title="💸 โอนเงินภายในแอป"
-      >
-        <div className="space-y-4">
-          <p className={`text-xs leading-relaxed ${textMuted}`}>
-            โอนเงินไปยังรหัสนักเรียนอื่นทันทีด้วยระบบ SBAC Connect Wallet
-          </p>
-
-          <div>
-            <label className={`text-xs font-bold block mb-1 ${textPrimary}`}>รหัสนักเรียนผู้รับ (Student ID)</label>
-            <input 
-              type="text"
-              value={transferRecipient}
-              onChange={e => setTransferRecipient(e.target.value)}
-              placeholder="ระบุรหัสนักเรียนผู้รับ (เช่น 66002)"
-              className={`w-full border rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none ${bgInput}`}
-            />
-          </div>
-
-          <div>
-            <label className={`text-xs font-bold block mb-1 ${textPrimary}`}>จำนวนเงินที่ต้องการโอน (THB)</label>
-            <input 
-              type="number"
-              value={transferAmount}
-              onChange={e => setTransferAmount(e.target.value)}
-              placeholder="ระบุจำนวนเงิน"
-              className={`w-full border rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none ${bgInput}`}
-            />
-          </div>
-
-          <div className="flex gap-2 pt-4">
-            <button 
-              onClick={handleTransfer}
-              className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold py-3 rounded-xl text-sm transition-all"
-            >
-              ✓ ยืนยันการโอน
-            </button>
-            <button 
-              onClick={() => setActiveModal('balance')}
-              className={`flex-1 border-2 font-extrabold py-3 rounded-xl text-sm transition-all ${
-                isDark 
-                  ? 'border-white/10 text-content-secondary hover:bg-white/5'
-                  : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
-              }`}
-            >
-              ยกเลิก
-            </button>
+          {/* ปุ่มเติมเงินถูกเอาออก ไม่ใช่แค่ซ่อน
+              ฝั่ง DB ไม่เคยยอมให้หน้าเว็บเติมเงินอยู่แล้ว — RLS revoke สิทธิ์เขียน
+              wallet_entries ทิ้งทั้งหมด ทางเข้าเดียวคือ topup_cash() ที่บังคับ role 'cashier'
+              ปุ่มเดิมจึงเป็นปุ่มที่กดแล้วขึ้น toast ว่าทำไม่ได้เท่านั้น = หลอกให้กดเปล่า ๆ
+              บอกไปเลยว่าเติมที่ไหน ตรงไปตรงมากว่า */}
+          <div className={`rounded-2xl border p-4 ${
+            isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
+          }`}>
+            <span className={`text-xs font-extrabold block ${textPrimary}`}>เติมเงินอย่างไร</span>
+            <p className={`text-[11px] font-semibold leading-relaxed mt-1 ${textMuted}`}>
+              เติมเงินได้ที่จุดบริการการเงิน อาคาร 1 ชั้น 1 เท่านั้น
+              เจ้าหน้าที่จะแตะบัตรแล้วเติมให้ในระบบ ยอดจะขึ้นในแอปทันที
+            </p>
           </div>
         </div>
       </Modal>

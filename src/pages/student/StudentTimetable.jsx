@@ -166,7 +166,7 @@ export default function StudentTimetable() {
       : isDark ? 'bg-amber-950/30 text-accent-amber' : 'bg-amber-50 text-accent-amber';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 xl:max-w-4xl">
       <div className="flex justify-between items-center">
         <h2 className={`text-xl font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
           }`}>
@@ -210,7 +210,7 @@ export default function StudentTimetable() {
       </div>
 
       {/* Grid Timetable */}
-      <div className={`rounded-3xl border shadow-sm overflow-hidden transition-colors duration-300 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-white border-slate-100 shadow-sm'
+      <div className={`rounded-3xl border shadow-sm overflow-hidden transition-colors duration-300 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100 shadow-sm'
         }`}>
         <div className="overflow-x-auto scrollbar-hide">
           <table className={`w-full border-collapse text-left min-w-[900px] transition-colors duration-300 ${isDark ? 'divide-white/10' : 'divide-slate-100'

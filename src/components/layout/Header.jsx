@@ -1,6 +1,7 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Sun, Moon } from 'lucide-react';
+import { shellWidthClass } from '../../utils/layout';
 
 export default function Header({ title = 'SBAC CONNECT', subtitle = 'Smart Campus • Access • Care' }) {
   const { user } = useAuth();
@@ -12,9 +13,9 @@ export default function Header({ title = 'SBAC CONNECT', subtitle = 'Smart Campu
       <div className={`backdrop-blur-xl border-b transition-colors duration-300 ${
         isDark 
           ? 'bg-surface-dark/90 border-white/10 text-white' 
-          : 'bg-white/90 border-border/50 text-sbac-navy'
+          : 'bg-surface-card/90 border-border/50 text-sbac-navy'
       }`}>
-        <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+        <div className={`${shellWidthClass(user?.role)} mx-auto px-4 py-3 flex items-center justify-between`}>
           <div>
             <h1 className={`text-lg font-extrabold tracking-wide transition-colors duration-300 ${
               isDark ? 'text-white' : 'text-sbac-navy'
