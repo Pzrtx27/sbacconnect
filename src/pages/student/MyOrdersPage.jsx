@@ -10,6 +10,7 @@ import {
   ORDER_STATUS_COLOR,
   ACTIVE_STATUSES,
   productEmoji,
+  optionSummary,
 } from '../../utils/orders';
 
 /* หน้านี้แสดงเฉพาะ "ออเดอร์ที่กำลังดำเนินการอยู่" (paid / preparing)
@@ -17,7 +18,8 @@ import {
    RLS (orders_self_select) กรองให้เห็นเฉพาะออเดอร์ของตัวเองอยู่แล้ว */
 
 const ORDER_SELECT =
-  'id, total_satang, status, pickup_code, created_at, order_items(qty, unit_price_satang, products(name, category))';
+  'id, total_satang, status, pickup_code, note, created_at, ' +
+  'order_items(qty, unit_price_satang, note, products(name, category), order_item_options(option_name, group_name))';
 
 export default function MyOrdersPage() {
   const { user } = useAuth();
@@ -55,7 +57,7 @@ export default function MyOrdersPage() {
   }, [user, fetchOrders]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 xl:max-w-3xl">
       <div className="flex justify-between items-center gap-3">
         <h2
           className={`text-xl font-extrabold flex items-center gap-2 transition-colors duration-300 ${
@@ -107,7 +109,7 @@ export default function MyOrdersPage() {
       ) : orders.length === 0 ? (
         <div
           className={`rounded-3xl border shadow-sm p-8 text-center space-y-3 transition-colors duration-300 ${
-            isDark ? 'bg-white/[0.06] border-white/10' : 'bg-white border-slate-100'
+            isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
           }`}
         >
           <div className="text-5xl">☕</div>
@@ -124,7 +126,7 @@ export default function MyOrdersPage() {
             <div
               key={order.id}
               className={`rounded-3xl border shadow-sm p-5 space-y-4 transition-colors duration-300 ${
-                isDark ? 'bg-white/[0.06] border-white/10' : 'bg-white border-slate-100'
+                isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
               }`}
             >
               <div
@@ -167,10 +169,27 @@ export default function MyOrdersPage() {
                     >
                       {productEmoji(item.products?.name, item.products?.category)}
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
                         {item.products?.name || 'สินค้า'}
                       </div>
+
+                      {/* ตัวเลือกที่สั่งไว้ — ชื่อกับราคาเป็น snapshot จากตอนสั่ง
+                          ต่อให้ร้านขึ้นราคาทีหลัง ออเดอร์ใบนี้ก็ยังแสดงของเดิม */}
+                      {item.order_item_options?.length > 0 && (
+                        <div className="text-[10px] font-bold mt-0.5 text-accent-amber leading-snug">
+                          {optionSummary(
+                            item.order_item_options.map((o) => ({ name: o.option_name }))
+                          )}
+                        </div>
+                      )}
+
+                      {item.note && (
+                        <div className="text-[10px] font-semibold mt-0.5 text-brand leading-snug">
+                          📝 {item.note}
+                        </div>
+                      )}
+
                       <div
                         className={`text-[10px] mt-0.5 ${
                           isDark ? 'text-content-secondary' : 'text-ink-muted'

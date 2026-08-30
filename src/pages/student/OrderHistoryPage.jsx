@@ -42,7 +42,7 @@ export default function OrderHistoryPage() {
   const textMuted = isDark ? 'text-content-secondary' : 'text-ink-muted';
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 xl:max-w-3xl">
       <button
         type="button"
         onClick={() => navigate('/orders')}
@@ -69,7 +69,7 @@ export default function OrderHistoryPage() {
       ) : orders.length === 0 ? (
         <div
           className={`rounded-3xl border shadow-sm p-8 text-center space-y-3 transition-colors duration-300 ${
-            isDark ? 'bg-white/[0.06] border-white/10' : 'bg-white border-slate-100'
+            isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
           }`}
         >
           <div className="text-5xl">🧾</div>
@@ -83,7 +83,7 @@ export default function OrderHistoryPage() {
           className={`rounded-3xl border shadow-sm divide-y transition-colors duration-300 ${
             isDark
               ? 'bg-white/[0.06] border-white/10 divide-white/10'
-              : 'bg-white border-slate-100 divide-slate-100'
+              : 'bg-surface-card border-slate-100 divide-slate-100'
           }`}
         >
           {orders.map((order) => {

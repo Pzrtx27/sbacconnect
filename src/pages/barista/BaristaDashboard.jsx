@@ -2,9 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../config/supabase';
 import { showToast } from '../../components/ui/Toast';
-import { LogOut, Clock, Check, RefreshCw, Coffee, X } from 'lucide-react';
+import { useConfirm } from '../../components/ui/ConfirmDialog';
+import { LogOut, Clock, Check, RefreshCw, Coffee, X, Archive } from 'lucide-react';
 import { formatBaht } from '../../utils/identity';
-import { ORDER_STATUS_TEXT, productEmoji } from '../../utils/orders';
+import { ORDER_STATUS_TEXT, productEmoji, optionSummary, bulkErrorText } from '../../utils/orders';
 
 /* คิวหน้าร้าน — ต้องเรียกผ่านฟังก์ชันใน 07_pos_ops.sql เท่านั้น
    เพราะ RLS ให้เห็นแค่ออเดอร์ของตัวเอง และ revoke สิทธิ์ update บน orders ไว้
@@ -16,6 +17,26 @@ export default function BaristaDashboard() {
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
+
+  /* หน้านี้ต่างจากหน้าอื่นในแอป: มันคือจอที่ตั้งอยู่บนเคาน์เตอร์
+     คนใช้คือบาริสต้าคนเดียว มองข้ามเคาน์เตอร์ตอนมือไม่ว่าง
+     สิ่งที่ต้องเห็นคือ "ยังเหลืออะไรต้องชง" ไม่ใช่ประวัติทั้งวัน
+     ของเสร็จแล้วจึงย้ายไปอีกแท็บ ไม่ปนอยู่ในคิว */
+  const [tab, setTab] = useState('active');
+
+  /* เลือกหลายใบแล้วจัดการทีเดียว
+
+     ช่วงพีคคิวยาวเป็นสิบใบ การกดปิดทีละใบทำให้บาริสต้าต้องหยุดชงมานั่งกด
+     ที่ทำได้ต่างกันตามแท็บ:
+       แท็บรอทำ    -> ยกเลิกที่เลือก (pos_bulk_set_status)
+       แท็บเสร็จแล้ว -> เก็บเข้าคลัง (pos_archive_orders)
+
+     "เก็บเข้าคลัง" ไม่ใช่ "ลบ" — แค่ประทับ archived_at แล้วคิวกรองทิ้ง
+     ของเดิมเป็นการลบแถวจริง ซึ่งทำให้ประวัติการสั่งซื้อของนักเรียนหายไปด้วย
+     เพราะหน้าประวัติอ่านจากตาราง orders ตัวเดียวกัน (ดู 17_archive_orders.sql) */
+  const [selected, setSelected] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
 
   const audioRef = useRef(null);
   const knownIdsRef = useRef(new Set());
@@ -98,8 +119,115 @@ export default function BaristaDashboard() {
     }
   };
 
+  // คิวที่ต้องทำเรียงเก่าไปใหม่ ใครสั่งก่อนได้ก่อน — ตรงข้ามกับหน้าประวัติที่เรียงใหม่ไปเก่า
+  const activeOrders = orders
+    .filter((o) => o.status === 'paid' || o.status === 'preparing')
+    .slice()
+    .reverse();
+  const doneOrders = orders.filter((o) => o.status === 'done' || o.status === 'cancelled');
+  const visibleOrders = tab === 'active' ? activeOrders : doneOrders;
+
+  const allVisibleSelected =
+    visibleOrders.length > 0 && visibleOrders.every((o) => selected.has(o.id));
+
+  const toggleSelected = (id) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleSelectAll = () =>
+    setSelected(allVisibleSelected ? new Set() : new Set(visibleOrders.map((o) => o.id)));
+
+  // สลับแท็บแล้วล้างการเลือก กันเผลอสั่งงานกับใบที่มองไม่เห็นอยู่บนจอ
+  const switchTab = (name) => {
+    setTab(name);
+    setSelected(new Set());
+  };
+
+  const bulkCancel = async () => {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    const ok = await confirm({
+      title: `ยกเลิกออเดอร์ ${ids.length} ใบ`,
+      message: 'ออเดอร์ที่เลือกจะถูกเปลี่ยนสถานะเป็นยกเลิก และหายจากคิวรอทำ',
+      detail: 'ใบที่เปลี่ยนสถานะไม่ได้จะถูกข้ามไป',
+      confirmLabel: `ยกเลิก ${ids.length} ใบ`,
+      danger: true,
+    });
+    if (!ok) return;
+
+    setBulkBusy(true);
+    try {
+      const { data, error } = await supabase.rpc('pos_bulk_set_status', {
+        p_ids: ids,
+        p_status: 'cancelled',
+      });
+
+      if (error || !data?.ok) {
+        showToast(bulkErrorText(data?.error, error), 'error');
+        return;
+      }
+
+      showToast(
+        data.skipped > 0
+          ? `ยกเลิกแล้ว ${data.updated} ใบ (ข้าม ${data.skipped} ใบที่เปลี่ยนสถานะไม่ได้)`
+          : `ยกเลิกแล้ว ${data.updated} ใบ`,
+        'success'
+      );
+      setSelected(new Set());
+      await fetchQueue();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const bulkArchive = async () => {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    const ok = await confirm({
+      title: `เก็บออเดอร์ ${ids.length} ใบเข้าคลัง`,
+      message: 'ออเดอร์ที่เลือกจะหายจากหน้าจอนี้ เพื่อให้คิวโล่ง',
+      detail: 'ไม่ได้ลบข้อมูล ประวัติการสั่งซื้อของนักเรียนยังอยู่ครบเหมือนเดิม',
+      confirmLabel: `เก็บ ${ids.length} ใบ`,
+    });
+    if (!ok) return;
+
+    setBulkBusy(true);
+    try {
+      const { data, error } = await supabase.rpc('pos_archive_orders', { p_ids: ids });
+
+      if (error || !data?.ok) {
+        showToast(bulkErrorText(data?.error, error), 'error');
+        return;
+      }
+
+      showToast(
+        data.blocked > 0
+          ? `เก็บแล้ว ${data.archived} ใบ (ข้าม ${data.blocked} ใบที่ยังทำไม่เสร็จ)`
+          : `เก็บแล้ว ${data.archived} ใบ`,
+        'success'
+      );
+      setSelected(new Set());
+      await fetchQueue();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const tabClass = (name) =>
+    `flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-black transition-all ${
+      tab === name
+        ? 'bg-amber-500 text-slate-950'
+        : 'bg-neutral-900 text-content-secondary hover:bg-neutral-800'
+    }`;
+
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
+      {confirmDialog}
+
       <header className="bg-neutral-950 border-b border-neutral-800 px-6 py-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-amber-500/10 text-accent-amber rounded-2xl">
@@ -122,10 +250,72 @@ export default function BaristaDashboard() {
         </button>
       </header>
 
-      <main className="flex-1 p-6 max-w-lg mx-auto w-full space-y-4 overflow-y-auto">
-        <h2 className="text-sm font-extrabold text-slate-200 uppercase tracking-wider block">
-          📋 รายการคิวเครื่องดื่มทั้งหมด
-        </h2>
+      {/* กว้างเต็มจอบนคอมที่เคาน์เตอร์ แต่หยุดที่ 1600px กันไม่ให้การ์ดยืดจนอ่านยากบนจอ 4K */}
+      <main className="flex-1 p-6 max-w-[1600px] mx-auto w-full space-y-4 overflow-y-auto">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-2 flex-1 sm:flex-none" role="tablist" aria-label="สถานะออเดอร์">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'active'}
+              onClick={() => switchTab('active')}
+              className={tabClass('active')}
+            >
+              รอทำ ({activeOrders.length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'done'}
+              onClick={() => switchTab('done')}
+              className={tabClass('done')}
+            >
+              เสร็จแล้ว ({doneOrders.length})
+            </button>
+          </div>
+
+          {visibleOrders.length > 0 && (
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              className="px-3 py-2.5 rounded-xl text-[11px] font-bold border border-neutral-800 text-content-secondary hover:bg-neutral-900 transition-colors"
+            >
+              {allVisibleSelected ? 'ล้างการเลือก' : `เลือกทั้งหมด (${visibleOrders.length})`}
+            </button>
+          )}
+        </div>
+
+        {/* แถบสั่งงาน โผล่เฉพาะตอนมีของถูกเลือก
+            ปุ่มต่างกันตามแท็บ เพราะ DB ยอมให้ทำคนละอย่าง */}
+        {selected.size > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30">
+            <span className="text-xs font-black text-accent-amber">
+              เลือกไว้ {selected.size} ใบ
+            </span>
+
+            {tab === 'active' ? (
+              <button
+                type="button"
+                onClick={bulkCancel}
+                disabled={bulkBusy}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-black bg-accent-rose text-white disabled:opacity-60 transition-all active:scale-95"
+              >
+                <X size={13} aria-hidden="true" />
+                {bulkBusy ? 'กำลังทำรายการ...' : `ยกเลิกทั้ง ${selected.size} ใบ`}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={bulkArchive}
+                disabled={bulkBusy}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-black bg-accent-rose text-white disabled:opacity-60 transition-all active:scale-95"
+              >
+                <Archive size={13} aria-hidden="true" />
+                {bulkBusy ? 'กำลังเก็บ...' : `เก็บ ${selected.size} ใบเข้าคลัง`}
+              </button>
+            )}
+          </div>
+        )}
 
         {forbidden ? (
           <div className="bg-rose-500/5 border border-rose-500/25 rounded-3xl p-8 text-center space-y-3">
@@ -143,17 +333,25 @@ export default function BaristaDashboard() {
             <RefreshCw className="animate-spin text-accent-amber mx-auto mb-2" size={28} />
             <span className="text-xs font-semibold text-content-secondary">กำลังเชื่อมต่อคิวเรียลไทม์...</span>
           </div>
-        ) : orders.length === 0 ? (
+        ) : visibleOrders.length === 0 ? (
           <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-10 text-center space-y-3">
-            <span className="text-4xl block">😴</span>
-            <h3 className="text-sm font-extrabold text-slate-200">ยังไม่มีคิวออเดอร์ในขณะนี้</h3>
+            <span className="text-4xl block" aria-hidden="true">
+              {tab === 'active' ? '😴' : '📭'}
+            </span>
+            <h3 className="text-sm font-extrabold text-slate-200">
+              {tab === 'active' ? 'ชงหมดแล้ว ไม่มีคิวค้าง' : 'ยังไม่มีออเดอร์ที่เสร็จวันนี้'}
+            </h3>
             <p className="text-xs text-content-muted leading-normal">
-              เมื่อนักเรียนสั่งซื้อผ่านแอป ออเดอร์จะแสดงขึ้นที่นี่พร้อมเสียงเตือนทันที
+              {tab === 'active'
+                ? 'เมื่อนักเรียนสั่งซื้อผ่านแอป ออเดอร์จะเด้งขึ้นที่นี่พร้อมเสียงเตือนทันที'
+                : 'ออเดอร์ที่ส่งมอบหรือยกเลิกแล้วจะย้ายมาเก็บที่แท็บนี้'}
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {orders.map((order) => {
+          /* auto-fill + minmax: จอเคาน์เตอร์กว้าง ๆ ได้ 4-5 คอลัมน์ แท็บเล็ตได้ 2 มือถือได้ 1
+             โดยไม่ต้องเขียน breakpoint ไล่ทีละขนาด */
+          <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(340px,1fr))] items-start">
+            {visibleOrders.map((order) => {
               const busy = updatingId === order.id;
               return (
                 <div
@@ -163,17 +361,26 @@ export default function BaristaDashboard() {
                       ? 'bg-amber-500/5 border-amber-500/25 ring-1 ring-amber-500/10'
                       : order.status === 'preparing'
                       ? 'bg-blue-500/5 border-blue-500/25'
-                      : 'bg-neutral-900 border-neutral-800 opacity-60'
+                      : 'bg-neutral-900 border-neutral-800'
                   }`}
                 >
-                  <div className="flex justify-between items-start border-b border-neutral-800 pb-3">
-                    <div>
+                  <div className="flex justify-between items-start border-b border-neutral-800 pb-3 gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(order.id)}
+                        onChange={() => toggleSelected(order.id)}
+                        aria-label={`เลือกออเดอร์ ${order.pickup_code}`}
+                        className="w-5 h-5 mt-1 shrink-0 accent-amber-500 cursor-pointer"
+                      />
+                      <div className="min-w-0">
                       <span className="text-[10px] text-content-secondary font-bold block">
                         นักเรียน: {order.student_name} ({order.student_code || '—'})
                       </span>
-                      <span className="text-2xl font-black text-white tracking-tight mt-1 block tabular-nums">
+                      <span className="text-2xl xl:text-3xl font-black text-white tracking-tight mt-1 block tabular-nums">
                         รหัสรับของ #{order.pickup_code}
                       </span>
+                      </div>
                     </div>
                     <span
                       className={`text-[10px] font-extrabold px-2.5 py-1 rounded-md uppercase tracking-wider ${
@@ -192,19 +399,46 @@ export default function BaristaDashboard() {
 
                   <div className="space-y-2.5">
                     {order.items?.map((item, idx) => (
-                      <div key={idx} className="flex gap-3 items-center">
-                        <span className="text-2xl">{productEmoji(item.name, item.category)}</span>
-                        <div className="flex-1">
+                      <div key={idx} className="flex gap-3 items-start">
+                        <span className="text-2xl leading-none pt-0.5" aria-hidden="true">
+                          {productEmoji(item.name, item.category)}
+                        </span>
+                        <div className="flex-1 min-w-0">
                           <div className="text-sm font-extrabold text-white">
                             {item.name} × {item.qty}
                           </div>
-                          <div className="text-[10px] text-content-muted mt-0.5">
+
+                          {/* ตัวเลือกคือสิ่งที่บาริสต้าต้องอ่านก่อนอย่างอื่น
+                              ตัวใหญ่กว่าราคา เพราะราคาไม่ได้ใช้ตอนชง */}
+                          {item.options?.length > 0 && (
+                            <div className="text-xs font-bold text-accent-amber mt-1 leading-snug">
+                              {optionSummary(item.options)}
+                            </div>
+                          )}
+
+                          {item.note && (
+                            <div className="text-[11px] font-bold text-brand mt-1 leading-snug">
+                              📝 {item.note}
+                            </div>
+                          )}
+
+                          <div className="text-[10px] text-content-muted mt-1">
                             {formatBaht(item.unit_price_satang)} ฿ / หน่วย
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
+
+                  {/* หมายเหตุระดับทั้งออเดอร์ */}
+                  {order.order_note && (
+                    <div className="bg-blue-500/5 border border-blue-500/25 rounded-xl px-3 py-2">
+                      <span className="text-[10px] font-extrabold text-content-secondary uppercase tracking-wider block">
+                        หมายเหตุถึงร้าน
+                      </span>
+                      <span className="text-xs font-bold text-white">{order.order_note}</span>
+                    </div>
+                  )}
 
                   <div className="flex justify-between text-xs font-bold text-slate-300 pt-2 border-t border-neutral-800">
                     <span>

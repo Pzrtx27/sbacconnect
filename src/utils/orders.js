@@ -56,11 +56,31 @@ export function newIdempotencyKey(prefix = 'web') {
   return `${prefix}:${rand}`;
 }
 
-/** แปลงข้อความ error จาก place_order ให้เป็นภาษาคนอ่าน */
+/** ย่อรายการตัวเลือกให้อยู่บรรทัดเดียว เช่น "เย็น · หวานน้อย · ไข่มุก"
+ *  ใช้ทั้งหน้าตะกร้า หน้าออเดอร์ของฉัน และหน้าคิวบาริสต้า จะได้อ่านเหมือนกันทุกที่ */
+export function optionSummary(options = []) {
+  return options.map((o) => o.name).filter(Boolean).join(' · ');
+}
+
+/** แปลงข้อความ error จาก place_order / place_order_v2 ให้เป็นภาษาคนอ่าน */
 export function placeOrderErrorText(code, payload = {}) {
   switch (code) {
     case 'CARD_NOT_FOUND':
       return 'ไม่พบบัตร/รหัสนักเรียนนี้ในระบบ';
+    case 'NOT_AUTHENTICATED':
+      return 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่';
+    case 'PRODUCT_NOT_FOUND':
+      return 'มีเมนูในตะกร้าที่ร้านปิดการขายไปแล้ว กรุณาเอาออกแล้วสั่งใหม่';
+    case 'INVALID_QTY':
+      return `จำนวนของ "${payload.product || 'รายการนี้'}" ไม่ถูกต้อง (1-20 แก้ว)`;
+    case 'INVALID_OPTION':
+      return `ตัวเลือกของ "${payload.product || 'รายการนี้'}" ใช้กับเมนูนี้ไม่ได้`;
+    case 'OPTION_RULE_VIOLATED':
+      return `"${payload.product || 'รายการนี้'}" เลือกตัวเลือกไม่ครบหรือเกินที่กำหนด`;
+    case 'TOO_MANY_ITEMS':
+      return 'สั่งได้สูงสุด 20 รายการต่อหนึ่งออเดอร์';
+    case 'NOTE_TOO_LONG':
+      return 'หมายเหตุยาวเกินไป (ไม่เกิน 300 ตัวอักษร)';
     case 'INSUFFICIENT_FUNDS': {
       const short = Number(payload.total ?? 0) - Number(payload.balance ?? 0);
       return `ยอดเงินคงเหลือไม่พอ ขาดอีก ${(short / 100).toFixed(2)} บาท`;
@@ -71,6 +91,24 @@ export function placeOrderErrorText(code, payload = {}) {
       return 'ระบบกำลังประมวลผลคำสั่งซื้อนี้อยู่ กรุณารอสักครู่';
     case 'FORBIDDEN':
       return 'บัญชีนี้ไม่มีสิทธิ์ทำรายการ';
+    default:
+      return code ? `ทำรายการไม่สำเร็จ (${code})` : 'ทำรายการไม่สำเร็จ';
+  }
+}
+
+/** ข้อความ error ของงานแบบเลือกหลายรายการในหน้าบาริสต้า
+ *  (pos_bulk_set_status / pos_delete_orders ใน 16_bulk_ops.sql) */
+export function bulkErrorText(code, networkError) {
+  if (networkError) return `ทำรายการไม่สำเร็จ: ${networkError.message}`;
+  switch (code) {
+    case 'FORBIDDEN':
+      return 'บัญชีนี้ไม่มีสิทธิ์จัดการคิว';
+    case 'NO_SELECTION':
+      return 'ยังไม่ได้เลือกออเดอร์';
+    case 'TOO_MANY':
+      return 'เลือกได้สูงสุด 200 ใบต่อครั้ง';
+    case 'NOTHING_ARCHIVABLE':
+      return 'เก็บไม่ได้ ออเดอร์ที่เลือกยังทำไม่เสร็จ กดยกเลิกก่อนถึงจะเก็บได้';
     default:
       return code ? `ทำรายการไม่สำเร็จ (${code})` : 'ทำรายการไม่สำเร็จ';
   }
