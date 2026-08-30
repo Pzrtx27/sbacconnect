@@ -1,0 +1,4 @@
+id,name,role,password,class,email
+academic,ฝ่ายวิชาการ SBAC,academic,เปลี่ยนรหัสผ่านก่อนใช้จริง,ปวช.3/6,academic@sbacnon.ac.th
+teacher01,อาจารย์ตัวอย่าง,teacher,เปลี่ยนรหัสผ่านก่อนใช้จริง,ปวช.3/6,teacher01@sbacnon.ac.th
+barista,บาริสต้าประจำร้าน,barista,เปลี่ยนรหัสผ่านก่อนใช้จริง,,barista@sbacnon.ac.th
