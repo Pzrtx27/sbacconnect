@@ -4,6 +4,12 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { db } from '../../config/firebase.js';
 import { doc, getDoc, setDoc, updateDoc, collection, addDoc, onSnapshot } from 'firebase/firestore';
 import { showToast } from '../../components/ui/Toast';
+import { useConfirm } from '../../components/ui/ConfirmDialog';
+import BehaviorLogList from '../../components/behavior/BehaviorLogList';
+import BehaviorLogEditModal from '../../components/behavior/BehaviorLogEditModal';
+import LeaveRequestList from '../../components/leave/LeaveRequestList';
+import { useBehaviorLogs } from '../../hooks/useBehaviorLogs';
+import { useLeaveRequests } from '../../hooks/useLeaveRequests';
 import {
   Calendar,
   Settings,
@@ -16,10 +22,15 @@ import {
   Key,
   ShieldAlert,
   Eye,
-  EyeOff
+  EyeOff,
+  Award,
+  ListChecks,
+  ClipboardCheck
 } from 'lucide-react';
 import { sha256, encryptAES, decryptAES } from '../../utils/crypto';
 import EventManager from './EventManager';
+import BehaviorDeductionWizard from './BehaviorDeductionWizard';
+import HomeroomAssignmentPanel from './HomeroomAssignmentPanel';
 
 export default function AcademicDashboard() {
   const { user } = useAuth();
@@ -54,6 +65,26 @@ export default function AcademicDashboard() {
   const [parsedStudents, setParsedStudents] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+
+  // จัดการรายการตัด/เพิ่มคะแนนพฤติกรรมทั้งหมด (ทุกครู) — role academic เป็น overseer
+  // ตาม list_behavior_logs() ใน 21_behavior_crud_and_academic.sql จึงแก้ไข/ลบได้ทุกรายการ
+  const { logs: allBehaviorLogs, loading: allBehaviorLogsLoading, updateLog: updateBehaviorLog, deleteLog: deleteBehaviorLog } = useBehaviorLogs();
+  const { confirm: confirmBehaviorDelete, confirmDialog: behaviorConfirmDialog } = useConfirm();
+  const [editingBehaviorLog, setEditingBehaviorLog] = useState(null);
+
+  const handleDeleteBehaviorLog = async (log) => {
+    const ok = await confirmBehaviorDelete({
+      title: 'ลบรายการนี้?',
+      message: `"${log.reason}" (${log.action_type === 'add' ? '+' : '-'}${log.points} คะแนน) ของ ${log.student_name} — บันทึกโดย ${log.teacher_name}`,
+      detail: 'ระบบจะเก็บหลักฐานไว้ตรวจสอบย้อนหลัง ไม่ได้ลบถาวร และคะแนนของนักเรียนจะกลับมาทันที',
+      confirmLabel: 'ลบรายการ',
+      danger: true,
+    });
+    if (ok) deleteBehaviorLog(log.id);
+  };
+
+  // อนุมัติใบลาขั้นที่ 2 (ขั้นสุดท้าย) — เห็นเฉพาะที่ครูประจำชั้นอนุมัติผ่านมาแล้ว (22_leave_requests.sql)
+  const { requests: pendingAcademicLeaves, loading: pendingAcademicLeavesLoading, academicDecide } = useLeaveRequests('pending_academic');
 
   // Dynamic Loader for SheetJS (xlsx) from CDN
   const loadXLSX = () => {
@@ -886,6 +917,80 @@ export default function AcademicDashboard() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* ============================================================
+          จัดการพฤติกรรมและการตัดคะแนนนักเรียน (ฝ่ายวิชาการ)
+          - Workflow แบบ step-by-step อยู่ใน BehaviorDeductionWizard.jsx
+          - รายการทั้งหมด: role academic เห็น/แก้ไข/ลบได้ทุกรายการของทุกครู
+            (list_behavior_logs() กรองสิทธิ์ให้แล้วฝั่ง DB — ดู 21_behavior_crud_and_academic.sql)
+          ============================================================ */}
+      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${
+        isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
+      }`}>
+        <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+          <Award size={18} className="text-brand" />
+          จัดการพฤติกรรมและการตัดคะแนนนักเรียน
+        </h3>
+
+        <div className="grid gap-4 xl:grid-cols-[280px_1fr] items-start">
+          <BehaviorDeductionWizard />
+
+          <div className="space-y-3">
+            <span className={`text-xs font-extrabold flex items-center gap-1.5 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+              <ListChecks size={14} />
+              รายการทั้งหมด ({allBehaviorLogs.length})
+            </span>
+            <div className="max-h-[420px] overflow-y-auto pr-1">
+              <BehaviorLogList
+                logs={allBehaviorLogs}
+                loading={allBehaviorLogsLoading}
+                showStudentName
+                onEdit={setEditingBehaviorLog}
+                onDeleteRequest={handleDeleteBehaviorLog}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <BehaviorLogEditModal
+        log={editingBehaviorLog}
+        onClose={() => setEditingBehaviorLog(null)}
+        onSave={(logId, payload) => updateBehaviorLog(logId, payload)}
+      />
+
+      {behaviorConfirmDialog}
+
+      {/* ============================================================
+          อนุมัติใบลา (ขั้นสุดท้าย) + กำหนดครูประจำชั้น (22_leave_requests.sql)
+          ============================================================ */}
+      <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${
+        isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
+      }`}>
+        <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+          <ClipboardCheck size={18} className="text-brand" />
+          อนุมัติใบลา (ขั้นสุดท้าย)
+        </h3>
+
+        <div className="grid gap-4 xl:grid-cols-[280px_1fr] items-start">
+          <HomeroomAssignmentPanel />
+
+          <div className="space-y-3">
+            <span className={`text-xs font-extrabold flex items-center gap-1.5 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+              <ListChecks size={14} />
+              รอฝ่ายวิชาการอนุมัติ ({pendingAcademicLeaves.length})
+            </span>
+            <div className="max-h-[420px] overflow-y-auto pr-1">
+              <LeaveRequestList
+                requests={pendingAcademicLeaves}
+                loading={pendingAcademicLeavesLoading}
+                mode="academic"
+                onDecide={(req, approve, reason) => academicDecide(req.id, approve, reason)}
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

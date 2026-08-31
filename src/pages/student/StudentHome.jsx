@@ -9,17 +9,19 @@ import GlassCard from '../../components/layout/GlassCard';
 import AcademicCalendar from '../../components/ui/AcademicCalendar';
 import UpcomingEvents from '../../components/ui/UpcomingEvents';
 import TopUpSlipForm from '../../components/wallet/TopUpSlipForm';
-import { readJSON, writeJSON } from '../../utils/storage';
 import { supabase } from '../../config/supabase';
 import { formatBaht } from '../../utils/identity';
-import { 
-  Clock, 
-  Award, 
-  BookOpen, 
-  GraduationCap, 
-  Calendar, 
-  FileText, 
-  UserX, 
+import { LEAVE_TYPE_LABELS } from '../../utils/leave';
+import { useLeaveRequests } from '../../hooks/useLeaveRequests';
+import LeaveRequestList from '../../components/leave/LeaveRequestList';
+import {
+  Clock,
+  Award,
+  BookOpen,
+  GraduationCap,
+  Calendar,
+  FileText,
+  UserX,
   ArrowRight,
   Download,
   CheckCircle2,
@@ -96,14 +98,10 @@ export default function StudentHome() {
     return isDark ? 'bg-rose-950/40 text-accent-rose border border-rose-500/20' : 'bg-rose-50 text-accent-rose border border-rose-200';
   };
 
-  const getLeaveStatus = (ticketId) => {
-    const existing = readJSON('sbac_leave_requests', []);
-    const found = existing.find(req => req.id === ticketId);
-    if (!found) return 'รอครูอนุมัติ';
-    if (found.status === 'approved') return 'อนุมัติแล้ว';
-    if (found.status === 'rejected') return 'ไม่อนุมัติ';
-    return 'รอครูอนุมัติ';
-  };
+  // ใบลาจริง (22_leave_requests.sql) — แทนของเดิมที่เขียน/อ่านผ่าน localStorage
+  const { requests: myLeaveRequests, loading: myLeaveLoading, submit: submitLeaveRequest } = useLeaveRequests();
+  const pendingLeaveCount = myLeaveRequests.filter((r) => r.status.startsWith('pending')).length;
+  const [leaveView, setLeaveView] = useState('form'); // 'form' | 'history'
 
   // Modal states
   const [activeModal, setActiveModal] = useState(null);
@@ -113,8 +111,7 @@ export default function StudentHome() {
   const [leaveStartDate, setLeaveStartDate] = useState('');
   const [leaveEndDate, setLeaveEndDate] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
-  const [leaveSubmitted, setLeaveSubmitted] = useState(false);
-  const [leaveTicketId, setLeaveTicketId] = useState('');
+  const [submittingLeave, setSubmittingLeave] = useState(false);
 
   /* เรื่องเงินในบัตร ฝั่ง DB ปิดทางไว้หมดตั้งแต่ย้ายมา Supabase:
        เติมเงิน — RLS revoke สิทธิ์เขียน wallet_entries ทิ้ง ทางเข้าตรงมีแค่ topup_cash()
@@ -130,8 +127,8 @@ export default function StudentHome() {
      เป็นความเสี่ยงที่ทีมงานรับทราบและเลือกใช้เอง (แลกความเร็ว) อ่านคำเตือนเต็มในคอมเมนต์
      หัวไฟล์ 19_topup_qr_instant.sql — ถ้าจะกลับไปให้ตรวจก่อนเหมือนเดิม (ปลอดภัยกว่า)
      ไฟล์ 18_topup_requests.sql ยังมี approve_topup_request()/reject_topup_request() ให้ใช้อยู่ */
-  // Leave Request Submit
-  const handleLeaveSubmit = () => {
+  // ยื่นใบลาจริงผ่าน RPC submit_leave_request (22_leave_requests.sql)
+  const handleLeaveSubmit = async () => {
     if (!leaveStartDate) {
       showToast('กรุณาเลือกวันที่เริ่มลา', 'error');
       return;
@@ -140,29 +137,20 @@ export default function StudentHome() {
       showToast('กรุณาระบุเหตุผลการลา', 'error');
       return;
     }
-    const ticketId = `LV-${Date.now().toString(36).toUpperCase()}`;
-    
-    // Save to localStorage so Teacher can see it
-    const newRequest = {
-      id: ticketId,
-      studentId: user.id,
-      studentName: user.name,
-      branch: user.branch || 'เทคโนโลยีสารสนเทศ',
-      type: leaveType,
+
+    setSubmittingLeave(true);
+    const id = await submitLeaveRequest({
+      leaveType,
       startDate: leaveStartDate,
       endDate: leaveEndDate,
-      reason: leaveReason,
-      status: 'pending',
-      timestamp: new Date().toISOString()
-    };
-    
-    const existing = readJSON('sbac_leave_requests', []);
-    existing.push(newRequest);
-    writeJSON('sbac_leave_requests', existing);
+      reason: leaveReason.trim(),
+    });
+    setSubmittingLeave(false);
 
-    setLeaveTicketId(ticketId);
-    setLeaveSubmitted(true);
-    showToast('ยื่นใบลาเรียบร้อยแล้ว', 'success');
+    if (!id) return;
+
+    resetLeaveForm();
+    setLeaveView('history');
   };
 
   const resetLeaveForm = () => {
@@ -170,15 +158,6 @@ export default function StudentHome() {
     setLeaveStartDate('');
     setLeaveEndDate('');
     setLeaveReason('');
-    setLeaveSubmitted(false);
-    setLeaveTicketId('');
-  };
-
-  const leaveTypeLabels = {
-    sick: { label: '🏥 ลาป่วย', desc: 'ป่วย ไม่สบาย' },
-    personal: { label: '📋 ลากิจ', desc: 'ธุระส่วนตัว' },
-    activity: { label: '🎯 ลากิจกรรม', desc: 'กิจกรรมวิทยาลัย' },
-    other: { label: '📝 อื่นๆ', desc: 'เหตุผลอื่นๆ' },
   };
 
   // Dark mode aware colors
@@ -357,17 +336,23 @@ export default function StudentHome() {
           </div>
         </GlassCard>
 
-        {/* Leave Request — now opens in-app modal */}
-        <GlassCard onClick={() => { resetLeaveForm(); setActiveModal('leave'); }}>
+        {/* Leave Request — เปิด modal ให้เลือกได้ทั้งยื่นใหม่/ดูประวัติ */}
+        <GlassCard onClick={() => { setLeaveView(pendingLeaveCount > 0 ? 'history' : 'form'); resetLeaveForm(); setActiveModal('leave'); }}>
           <div className="flex flex-col h-full justify-between min-h-[110px]">
             <div>
               <UserX className="text-accent-rose mb-2" size={24} />
               <div className={`text-sm font-extrabold ${textPrimary}`}>ยื่นใบลา</div>
               <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ยื่นใบลาผ่านแอป SBAC</div>
             </div>
-            <div className="flex items-center text-xs font-bold text-brand mt-2">
-              ยื่นใบลา <ArrowRight size={14} className="ml-1" />
-            </div>
+            {pendingLeaveCount > 0 ? (
+              <span className="inline-block self-start text-[9px] font-extrabold px-2.5 py-0.5 rounded-full mt-2 bg-amber-500/10 text-accent-amber">
+                รออนุมัติ {pendingLeaveCount} ใบ
+              </span>
+            ) : (
+              <div className="flex items-center text-xs font-bold text-brand mt-2">
+                ยื่นใบลา <ArrowRight size={14} className="ml-1" />
+              </div>
+            )}
           </div>
         </GlassCard>
 
@@ -454,133 +439,123 @@ export default function StudentHome() {
         <TopUpSlipForm />
       </Modal>
 
-      {/* MODAL: Leave Request (In-App) */}
-      <Modal 
-        isOpen={activeModal === 'leave'} 
-        onClose={() => setActiveModal(null)} 
+      {/* MODAL: Leave Request — ยื่นใหม่ (form) / ดูสถานะ (history) ผ่าน RPC จริง (22_leave_requests.sql) */}
+      <Modal
+        isOpen={activeModal === 'leave'}
+        onClose={() => setActiveModal(null)}
         title="📝 ยื่นใบลา"
       >
-        {leaveSubmitted ? (
-          <div className="space-y-5 text-center py-4">
-            <div className={`inline-flex p-4 border rounded-full mb-2 ${
-              isDark ? 'bg-emerald-900/30 border-emerald-800/30 text-accent-emerald' : 'bg-emerald-50 border-emerald-100 text-accent-emerald'
-            }`}>
-              <CheckCircle2 size={40} />
-            </div>
-            <div>
-              <h3 className={`text-lg font-extrabold ${textPrimary}`}>ยื่นใบลาเรียบร้อย!</h3>
-              <p className={`text-xs mt-1 ${textMuted}`}>ระบบได้ส่งใบลาไปยังครูที่ปรึกษาแล้ว</p>
-            </div>
-            <div className={`rounded-2xl p-4 border space-y-2 text-left ${
-              isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
-            }`}>
-              <div className="flex justify-between text-sm">
-                <span className={`font-semibold ${textMuted}`}>เลขที่ใบลา</span>
-                <span className={`font-extrabold text-brand`}>{leaveTicketId}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className={`font-semibold ${textMuted}`}>ประเภท</span>
-                <span className={`font-bold ${textSecondary}`}>{leaveTypeLabels[leaveType].label}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className={`font-semibold ${textMuted}`}>วันที่ลา</span>
-                <span className={`font-bold ${textSecondary}`}>{leaveStartDate}{leaveEndDate ? ` ถึง ${leaveEndDate}` : ''}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className={`font-semibold ${textMuted}`}>สถานะ</span>
-                <span className={`font-extrabold ${
-                  getLeaveStatus(leaveTicketId) === 'อนุมัติแล้ว' ? 'text-accent-emerald' :
-                  getLeaveStatus(leaveTicketId) === 'ไม่อนุมัติ' ? 'text-accent-rose' : 'text-accent-amber'
-                }`}>{getLeaveStatus(leaveTicketId) === 'อนุมัติแล้ว' ? 'อนุมัติแล้ว' : getLeaveStatus(leaveTicketId) === 'ไม่อนุมัติ' ? 'ปฏิเสธคำขอลา' : 'รอครูอนุมัติ'}</span>
-              </div>
-            </div>
-            <button 
-              onClick={() => setActiveModal(null)}
-              className="w-full bg-sbac-blue hover:bg-sbac-navy text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-button"
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setLeaveView('form')}
+              className={`py-2 rounded-xl text-xs font-extrabold border transition-all ${
+                leaveView === 'form'
+                  ? 'bg-sbac-blue text-white border-sbac-blue'
+                  : isDark ? 'bg-white/5 border-white/10 text-content-secondary' : 'bg-slate-50 border-slate-200 text-ink-secondary'
+              }`}
             >
-              ปิด
+              ยื่นใบลาใหม่
+            </button>
+            <button
+              type="button"
+              onClick={() => setLeaveView('history')}
+              className={`py-2 rounded-xl text-xs font-extrabold border transition-all ${
+                leaveView === 'history'
+                  ? 'bg-sbac-blue text-white border-sbac-blue'
+                  : isDark ? 'bg-white/5 border-white/10 text-content-secondary' : 'bg-slate-50 border-slate-200 text-ink-secondary'
+              }`}
+            >
+              ประวัติของฉัน {myLeaveRequests.length > 0 && `(${myLeaveRequests.length})`}
             </button>
           </div>
-        ) : (
-          <div className="space-y-4">
-            <p className={`text-xs leading-relaxed ${textMuted}`}>
-              กรุณากรอกข้อมูลการลาให้ครบถ้วน ระบบจะส่งแจ้งเตือนไปยังครูที่ปรึกษาอัตโนมัติ
-            </p>
 
-            {/* Leave Type */}
-            <div>
-              <label className={`text-xs font-bold block mb-2 ${textPrimary}`}>ประเภทการลา</label>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(leaveTypeLabels).map(([key, val]) => (
-                  <button
-                    key={key}
-                    onClick={() => setLeaveType(key)}
-                    className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all text-left ${
-                      leaveType === key
-                        ? 'bg-sbac-blue text-white border-sbac-blue shadow-sm'
-                        : isDark
-                        ? 'bg-white/5 border-white/10 text-content-secondary hover:bg-white/10'
-                        : 'bg-slate-50 border-slate-200 text-ink-secondary hover:bg-slate-100'
-                    }`}
-                  >
-                    <div>{val.label}</div>
-                    <div className={`text-[9px] mt-0.5 ${leaveType === key ? 'text-white/70' : textMuted}`}>{val.desc}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
+          {leaveView === 'history' ? (
+            <LeaveRequestList requests={myLeaveRequests} loading={myLeaveLoading} mode="student" />
+          ) : (
+            <div className="space-y-4">
+              <p className={`text-xs leading-relaxed ${textMuted}`}>
+                กรุณากรอกข้อมูลการลาให้ครบถ้วน ระบบจะส่งแจ้งเตือนไปยังครูประจำชั้นอัตโนมัติ
+                หลังจากครูอนุมัติแล้วฝ่ายวิชาการจะอนุมัติอีกขั้นหนึ่ง แล้วแจ้งเตือนคุณทันทีทุกขั้นตอน
+              </p>
 
-            {/* Date Range */}
-            <div className="grid grid-cols-2 gap-3">
+              {/* Leave Type */}
               <div>
-                <label className={`text-xs font-bold block mb-1 ${textPrimary}`}>วันที่เริ่มลา *</label>
-                <input 
-                  type="date"
-                  value={leaveStartDate}
-                  onChange={e => setLeaveStartDate(e.target.value)}
-                  className={`w-full border rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none ${bgInput}`}
+                <label className={`text-xs font-bold block mb-2 ${textPrimary}`}>ประเภทการลา</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(LEAVE_TYPE_LABELS).map(([key, val]) => (
+                    <button
+                      key={key}
+                      onClick={() => setLeaveType(key)}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all text-left ${
+                        leaveType === key
+                          ? 'bg-sbac-blue text-white border-sbac-blue shadow-sm'
+                          : isDark
+                          ? 'bg-white/5 border-white/10 text-content-secondary hover:bg-white/10'
+                          : 'bg-slate-50 border-slate-200 text-ink-secondary hover:bg-slate-100'
+                      }`}
+                    >
+                      <div>{val.label}</div>
+                      <div className={`text-[9px] mt-0.5 ${leaveType === key ? 'text-white/70' : textMuted}`}>{val.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Date Range */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`text-xs font-bold block mb-1 ${textPrimary}`}>วันที่เริ่มลา *</label>
+                  <input
+                    type="date"
+                    value={leaveStartDate}
+                    onChange={e => setLeaveStartDate(e.target.value)}
+                    className={`w-full border rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none ${bgInput}`}
+                  />
+                </div>
+                <div>
+                  <label className={`text-xs font-bold block mb-1 ${textPrimary}`}>ถึงวันที่ (ไม่บังคับ)</label>
+                  <input
+                    type="date"
+                    value={leaveEndDate}
+                    onChange={e => setLeaveEndDate(e.target.value)}
+                    className={`w-full border rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none ${bgInput}`}
+                  />
+                </div>
+              </div>
+
+              {/* Reason */}
+              <div>
+                <label className={`text-xs font-bold block mb-1 ${textPrimary}`}>เหตุผลการลา *</label>
+                <textarea
+                  value={leaveReason}
+                  onChange={e => setLeaveReason(e.target.value)}
+                  rows={3}
+                  className={`w-full border rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none resize-none ${bgInput}`}
+                  placeholder="ระบุเหตุผลการลา เช่น ไม่สบาย มีไข้สูง"
                 />
               </div>
-              <div>
-                <label className={`text-xs font-bold block mb-1 ${textPrimary}`}>ถึงวันที่ (ไม่บังคับ)</label>
-                <input 
-                  type="date"
-                  value={leaveEndDate}
-                  onChange={e => setLeaveEndDate(e.target.value)}
-                  className={`w-full border rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none ${bgInput}`}
-                />
+
+              {/* Student Info */}
+              <div className={`rounded-xl p-3 border ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'}`}>
+                <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${textMuted}`}>ข้อมูลผู้ยื่น</div>
+                <div className={`text-xs font-semibold ${textSecondary}`}>
+                  {user?.name} • รหัส {user?.id} • {user?.branch || 'IT'}
+                </div>
               </div>
-            </div>
 
-            {/* Reason */}
-            <div>
-              <label className={`text-xs font-bold block mb-1 ${textPrimary}`}>เหตุผลการลา *</label>
-              <textarea 
-                value={leaveReason}
-                onChange={e => setLeaveReason(e.target.value)}
-                rows={3}
-                className={`w-full border rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none resize-none ${bgInput}`}
-                placeholder="ระบุเหตุผลการลา เช่น ไม่สบาย มีไข้สูง"
-              />
+              <button
+                onClick={handleLeaveSubmit}
+                disabled={submittingLeave}
+                className="w-full bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-sm flex items-center justify-center gap-2"
+              >
+                <UserX size={16} />
+                {submittingLeave ? 'กำลังส่ง...' : 'ยืนยันการยื่นใบลา'}
+              </button>
             </div>
-
-            {/* Student Info */}
-            <div className={`rounded-xl p-3 border ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'}`}>
-              <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${textMuted}`}>ข้อมูลผู้ยื่น</div>
-              <div className={`text-xs font-semibold ${textSecondary}`}>
-                {user?.name} • รหัส {user?.id} • {user?.branch || 'IT'}
-              </div>
-            </div>
-
-            <button 
-              onClick={handleLeaveSubmit}
-              className="w-full bg-rose-600 hover:bg-rose-700 text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-sm flex items-center justify-center gap-2"
-            >
-              <UserX size={16} />
-              ยืนยันการยื่นใบลา
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </Modal>
 
       {/* MODAL: Entrance Times */}
