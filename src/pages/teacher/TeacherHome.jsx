@@ -1,25 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import { showToast } from '../../components/ui/Toast';
 import Modal from '../../components/ui/Modal';
 import GlassCard from '../../components/layout/GlassCard';
+import { useConfirm } from '../../components/ui/ConfirmDialog';
+import TopUpSlipForm from '../../components/wallet/TopUpSlipForm';
+import BehaviorLogList from '../../components/behavior/BehaviorLogList';
+import BehaviorLogEditModal from '../../components/behavior/BehaviorLogEditModal';
+import LeaveRequestList from '../../components/leave/LeaveRequestList';
 import { readJSON, writeJSON } from '../../utils/storage';
-import { 
-  Calendar, 
-  Coffee, 
-  AlertCircle, 
-  Clock, 
-  UserCheck, 
-  ClipboardCheck, 
-  Award, 
-  CheckCircle2, 
-  Search, 
+import { formatBaht } from '../../utils/identity';
+import { supabase } from '../../config/supabase';
+import { useBehaviorCategories } from '../../hooks/useBehaviorCategories';
+import { useBehaviorLogs } from '../../hooks/useBehaviorLogs';
+import { useLeaveRequests } from '../../hooks/useLeaveRequests';
+import {
+  Calendar,
+  Coffee,
+  AlertCircle,
+  Clock,
+  UserCheck,
+  ClipboardCheck,
+  Award,
+  CheckCircle2,
+  Search,
   ChevronRight,
   TrendingUp,
   UserX,
-  XCircle
+  XCircle,
+  QrCode,
+  History
 } from 'lucide-react';
 
 /* รายชื่อตัวอย่างสำหรับหน้าครู — เป็นข้อมูลสมมติทั้งหมด
@@ -53,50 +65,92 @@ export default function TeacherHome() {
   // Modal control
   const [activeModal, setActiveModal] = useState(null);
 
-  // Leave Requests state
-  const [leaveRequests, setLeaveRequests] = useState([]);
-  
+  // Leave Requests — คิวรออนุมัติขั้นที่ 1 ของครูประจำชั้น (22_leave_requests.sql)
+  const { requests: pendingLeaveRequests, loading: pendingLeaveLoading, teacherDecide } = useLeaveRequests('pending_teacher');
+
   // Homeroom state
   const [homeroomStatus, setHomeroomStatus] = useState({});
   const [isHomeroomSubmitted, setIsHomeroomSubmitted] = useState(false);
 
-  // Behavior state
-  const [selectedStudentId, setSelectedStudentId] = useState('66001');
-  const [behaviorLogs, setBehaviorLogs] = useState([]);
+  // Behavior state — ค้นหา/เลือกนักเรียนจริงผ่าน RPC search_students (แทนรายชื่อ mock เดิม)
+  const [studentQuery, setStudentQuery] = useState('');
+  const [studentResults, setStudentResults] = useState([]);
+  const [searchingStudents, setSearchingStudents] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const { byActionType: behaviorCategoriesByType } = useBehaviorCategories();
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [behaviorReason, setBehaviorReason] = useState('');
   const [behaviorPoints, setBehaviorPoints] = useState('5');
   const [behaviorActionType, setBehaviorActionType] = useState('deduct'); // 'add' | 'deduct'
+  const [submittingBehavior, setSubmittingBehavior] = useState(false);
+  const [todayLogCount, setTodayLogCount] = useState(0);
 
-  // Presets for behavior
-  const behaviorPresets = {
-    deduct: [
-      { reason: 'มาสายบ่อยครั้ง', score: -3 },
-      { reason: 'แต่งกายไม่เรียบร้อย', score: -5 },
-      { reason: 'ใช้โทรศัพท์ในห้องเรียน', score: -2 },
-      { reason: 'ไม่ส่งงานวิชาโครงการ', score: -10 }
-    ],
-    add: [
-      { reason: 'ช่วยเหลือกิจกรรมวิทยาลัย', score: 5 },
-      { reason: 'รักษาความสะอาดห้องเรียน', score: 2 },
-      { reason: 'มีจิตสาธารณะดีเด่น', score: 5 },
-      { reason: 'ชนะการประกวดทักษะวิชาการ', score: 10 }
-    ]
-  };
+  // นับรายการวินัยที่ตัวเองบันทึกวันนี้ — ใช้แสดงในการ์ดสรุปสถานะห้องเรียนด้านล่าง
+  const loadTodayLogCount = useCallback(async () => {
+    if (!user?.uid) return;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const { count, error } = await supabase
+      .from('behavior_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('teacher_user_id', user.uid)
+      .gte('created_at', startOfToday.toISOString());
+
+    if (error) console.error('[behavior] นับรายการวันนี้ไม่สำเร็จ:', error);
+    else setTodayLogCount(count || 0);
+  }, [user?.uid]);
 
   useEffect(() => {
-    // Load student leaves from local storage
-    const storedLeaves = readJSON('sbac_leave_requests', []);
-    setLeaveRequests(storedLeaves);
-
     // Load homeroom status
     const storedHomeroom = readJSON('sbac_homeroom_attendance', {});
     setHomeroomStatus(storedHomeroom.status || {});
     setIsHomeroomSubmitted(storedHomeroom.submitted || false);
-
-    // Load behavior logs
-    const storedLogs = readJSON('sbac_behavior_logs', []);
-    setBehaviorLogs(storedLogs);
   }, [activeModal]);
+
+  // นับรายการวินัยที่ตัวเองบันทึกวันนี้ ครั้งเดียวตอนเข้าหน้า (หมวดหมู่โหลดผ่าน useBehaviorCategories แล้ว)
+  useEffect(() => {
+    loadTodayLogCount();
+  }, [loadTodayLogCount]);
+
+  // ประวัติรายการที่ตัวเองบันทึก — แก้ไข/ลบได้ (21_behavior_crud_and_academic.sql)
+  const { logs: myLogs, loading: myLogsLoading, updateLog, deleteLog } = useBehaviorLogs();
+  const { confirm, confirmDialog } = useConfirm();
+  const [editingLog, setEditingLog] = useState(null);
+
+  const handleDeleteLog = async (log) => {
+    const ok = await confirm({
+      title: 'ลบรายการนี้?',
+      message: `"${log.reason}" (${log.action_type === 'add' ? '+' : '-'}${log.points} คะแนน) ของ ${log.student_name}`,
+      detail: 'ระบบจะเก็บหลักฐานไว้ตรวจสอบย้อนหลัง ไม่ได้ลบถาวร และคะแนนของนักเรียนจะกลับมาทันที',
+      confirmLabel: 'ลบรายการ',
+      danger: true,
+    });
+    if (ok) deleteLog(log.id);
+  };
+
+  // ค้นหานักเรียนแบบ debounce — พิมพ์อย่างน้อย 2 ตัวอักษรถึงเริ่มยิง RPC
+  useEffect(() => {
+    const q = studentQuery.trim();
+    if (selectedStudent || q.length < 2) {
+      setStudentResults([]);
+      return undefined;
+    }
+
+    setSearchingStudents(true);
+    const handle = setTimeout(async () => {
+      const { data, error } = await supabase.rpc('search_students', { p_query: q, p_limit: 15 });
+      setSearchingStudents(false);
+      if (error) {
+        console.error('[behavior] ค้นหานักเรียนไม่สำเร็จ:', error);
+        setStudentResults([]);
+        return;
+      }
+      setStudentResults(data?.ok ? data.students || [] : []);
+    }, 300);
+
+    return () => clearTimeout(handle);
+  }, [studentQuery, selectedStudent]);
 
   // Save Homeroom Attendance
   const handleHomeroomSave = () => {
@@ -116,62 +170,79 @@ export default function TeacherHome() {
     setActiveModal(null);
   };
 
-  // Student Leave Action
-  const handleLeaveDecision = (ticketId, status) => {
-    const updated = leaveRequests.map(req => {
-      if (req.id === ticketId) {
-        return { ...req, status };
-      }
-      return req;
-    });
-    writeJSON('sbac_leave_requests', updated);
-    setLeaveRequests(updated);
-    showToast(status === 'approved' ? 'อนุมัติใบลาเรียบร้อยแล้ว' : 'ปฏิเสธใบลาเรียบร้อยแล้ว', 'success');
+  // เลือกหมวดหมู่สำเร็จรูป — เติมเหตุผล/คะแนนให้อัตโนมัติ แล้วผูก category_id ไว้ส่งไปด้วย
+  const handlePickCategory = (cat) => {
+    setSelectedCategoryId(cat.id);
+    setBehaviorReason(cat.label);
+    setBehaviorPoints(String(cat.default_points));
   };
 
-  // Student Behavior Action
-  const handleBehaviorSave = () => {
+  // พิมพ์เหตุผลเอง = เลิกผูกกับหมวดหมู่สำเร็จรูปที่เคยเลือกไว้
+  const handleReasonInput = (value) => {
+    setBehaviorReason(value);
+    setSelectedCategoryId(null);
+  };
+
+  const handlePickStudent = (student) => {
+    setSelectedStudent(student);
+    setStudentQuery(student.full_name);
+    setStudentResults([]);
+  };
+
+  const handleChangeStudent = () => {
+    setSelectedStudent(null);
+    setStudentQuery('');
+  };
+
+  // Student Behavior Action — บันทึกจริงผ่าน RPC submit_behavior_log
+  // (insert behavior_logs + สร้างแจ้งเตือนให้นักเรียนในธุรกรรมเดียวกัน ดู 20_behavior_and_notifications.sql)
+  const handleBehaviorSave = async () => {
+    if (!selectedStudent) {
+      showToast('กรุณาค้นหาและเลือกนักเรียนก่อน', 'error');
+      return;
+    }
     if (!behaviorReason.trim()) {
       showToast('กรุณาระบุหรือเลือกเหตุผลของรายการ', 'error');
       return;
     }
-    const scoreVal = Number(behaviorPoints);
+    const scoreVal = Math.round(Number(behaviorPoints));
     if (!scoreVal || scoreVal <= 0) {
       showToast('กรุณาระบุคะแนนที่ถูกต้อง', 'error');
       return;
     }
 
-    const selectedStudent = STUDENTS.find(s => s.id === selectedStudentId);
-    const scoreOffset = behaviorActionType === 'add' ? scoreVal : -scoreVal;
+    setSubmittingBehavior(true);
+    const { data, error } = await supabase.rpc('submit_behavior_log', {
+      p_student_user_id: selectedStudent.user_id,
+      p_category_id: selectedCategoryId,
+      p_reason: behaviorReason.trim(),
+      p_points: scoreVal,
+      p_action_type: behaviorActionType,
+    });
+    setSubmittingBehavior(false);
 
-    const newLog = {
-      id: `BH-${Date.now()}`,
-      studentId: selectedStudentId,
-      studentName: selectedStudent.name,
-      reason: behaviorReason,
-      score: scoreOffset,
-      teacherName: user.name,
-      timestamp: new Date().toISOString()
-    };
+    if (error || !data?.ok) {
+      const errorMessages = {
+        FORBIDDEN: 'บัญชีนี้ไม่มีสิทธิ์บันทึกพฤติกรรมนักเรียน',
+        STUDENT_NOT_FOUND: 'ไม่พบข้อมูลนักเรียนคนนี้ในระบบ',
+      };
+      showToast(errorMessages[data?.error] || 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 'error');
+      return;
+    }
 
-    const existingLogs = readJSON('sbac_behavior_logs', []);
-    existingLogs.push(newLog);
-    writeJSON('sbac_behavior_logs', existingLogs);
-    setBehaviorLogs(existingLogs);
+    showToast(
+      `อัปเดตพฤติกรรม ${selectedStudent.full_name} ${behaviorActionType === 'add' ? '+' : '-'}${scoreVal} คะแนนสำเร็จ — แจ้งเตือนนักเรียนแล้ว`,
+      'success'
+    );
 
-    showToast(`อัปเดตพฤติกรรม ${selectedStudent.name} ${scoreOffset > 0 ? `+${scoreOffset}` : scoreOffset} คะแนนสำเร็จ`, 'success');
-    
     // Reset form
+    setSelectedStudent(null);
+    setStudentQuery('');
+    setSelectedCategoryId(null);
     setBehaviorReason('');
     setBehaviorPoints('5');
     setActiveModal(null);
-  };
-
-  const getStudentBehaviorScore = (studentId) => {
-    const logs = readJSON('sbac_behavior_logs', []);
-    const studentLogs = logs.filter(log => log.studentId === studentId);
-    const totalDeductions = studentLogs.reduce((acc, log) => acc + Number(log.score), 0);
-    return Math.max(0, Math.min(100, 100 + totalDeductions));
+    loadTodayLogCount();
   };
 
   // Helper colors
@@ -182,21 +253,35 @@ export default function TeacherHome() {
   const borderSubtle = isDark ? 'border-white/10' : 'border-slate-100';
   const bgInput = isDark ? 'bg-neutral-900 border-white/15 text-white focus:border-sbac-blue-light/50' : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue';
 
-  const pendingLeavesCount = leaveRequests.filter(req => req.status === 'pending').length;
+  const pendingLeavesCount = pendingLeaveRequests.length;
 
   return (
     <div className="space-y-6 xl:max-w-4xl">
       {/* Profile Header */}
       <div className="bg-gradient-to-r from-sbac-navy to-sbac-blue p-6 rounded-3xl text-white shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 w-36 h-36 bg-white/5 rounded-full -mr-10 -mt-10 pointer-events-none" />
-        <div className="relative space-y-1 z-10">
-          <span className="text-[10px] bg-white/20 text-white font-extrabold px-3 py-1 rounded-full inline-block uppercase tracking-wider mb-2">
-            อาจารย์ผู้สอน (Faculty Panel)
-          </span>
-          <h2 className="text-2xl font-extrabold">{user?.name}</h2>
-          <p className="text-xs text-white/80">
-            อาจารย์ผู้ดูแลแผนกวิชาคอมพิวเตอร์ประจำชั้น ม.3/6 • SBAC Nonthaburi
-          </p>
+        <div className="relative z-10 flex justify-between items-start gap-3">
+          <div className="space-y-1 min-w-0">
+            <span className="text-[10px] bg-white/20 text-white font-extrabold px-3 py-1 rounded-full inline-block uppercase tracking-wider mb-2">
+              อาจารย์ผู้สอน (Faculty Panel)
+            </span>
+            <h2 className="text-2xl font-extrabold truncate">{user?.name}</h2>
+            <p className="text-xs text-white/80">
+              อาจารย์ผู้ดูแลแผนกวิชาคอมพิวเตอร์ประจำชั้น ม.3/6 • SBAC Nonthaburi
+            </p>
+          </div>
+
+          {/* Wallet — เหมือนฝั่งนักเรียนทุกประการ (ดึง balance_satang เดียวกันจาก AuthContext) */}
+          <button
+            type="button"
+            onClick={() => setActiveModal('balance')}
+            className="shrink-0 p-3 rounded-2xl bg-white/15 hover:bg-white/20 border border-white/20 flex flex-col items-end active:scale-95 transition-all"
+          >
+            <span className="text-[9px] font-bold uppercase tracking-wider text-white/70">Wallet</span>
+            <span className="text-base font-extrabold text-white">
+              {formatBaht(user?.balance_satang || 0)} <span className="text-xs font-semibold text-white/80">฿</span>
+            </span>
+          </button>
         </div>
       </div>
 
@@ -305,6 +390,23 @@ export default function TeacherHome() {
             </div>
           </GlassCard>
 
+          {/* Behavior Log History — แก้ไข/ลบรายการที่ตัวเองบันทึกได้ (21_behavior_crud_and_academic.sql) */}
+          <GlassCard onClick={() => setActiveModal('myLogs')}>
+            <div className="flex flex-col h-full justify-between min-h-[115px]">
+              <div>
+                <History className="text-brand mb-2" size={24} />
+                <div className={`text-sm font-extrabold ${textPrimary}`}>ประวัติที่ฉันบันทึก</div>
+                <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>แก้ไข / ลบรายการตัด-เพิ่มคะแนนย้อนหลัง</div>
+              </div>
+              <div className="mt-2.5 flex items-center justify-between">
+                <span className={`text-[9px] font-semibold text-brand`}>
+                  {myLogs.length} รายการ
+                </span>
+                <ChevronRight size={14} className={textMuted} />
+              </div>
+            </div>
+          </GlassCard>
+
           {/* Timetable view */}
           <GlassCard onClick={() => navigate('/timetable')}>
             <div className="flex flex-col h-full justify-between min-h-[115px]">
@@ -349,10 +451,18 @@ export default function TeacherHome() {
               รายงานสถานะห้องเรียน ปวช. 3/6 วันนี้
             </span>
           </div>
-          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/5 text-content-muted' : 'bg-slate-200/50 text-content-muted'}`}>
-            ข้อมูลเรียลไทม์
+          {/* ป้ายเดิมเขียนว่า "ข้อมูลเรียลไทม์" ทั้งที่รายชื่อเป็นข้อมูลสมมติ 3 คน
+              และการเช็คชื่อบันทึกลง localStorage เครื่องเดียว ไม่ได้แตะ Supabase เลย
+              คนดูตอนนำเสนอจะเชื่อว่าเป็นของจริงแล้วถามต่อ — บอกตามจริงดีกว่า */}
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-accent-amber border border-amber-500/25">
+            ข้อมูลตัวอย่าง
           </span>
         </div>
+
+        <p className="text-[10px] font-semibold leading-relaxed text-content-muted">
+          รายชื่อชุดนี้เป็นข้อมูลสมมติสำหรับสาธิตหน้าจอ และผลการเช็คชื่อบันทึกไว้ในเครื่องนี้เท่านั้น
+          ยังไม่ได้เชื่อมกับรายชื่อนักเรียนจริงในฐานข้อมูล
+        </p>
 
         <div className="grid grid-cols-3 gap-3">
           <div className={`p-3 rounded-2xl border text-center transition-all ${isDark ? 'bg-neutral-900/60 border-white/10' : 'bg-surface-card border-slate-100 shadow-sm'}`}>
@@ -369,9 +479,9 @@ export default function TeacherHome() {
           </div>
           <div className={`p-3 rounded-2xl border text-center transition-all ${isDark ? 'bg-neutral-900/60 border-white/10' : 'bg-surface-card border-slate-100 shadow-sm'}`}>
             <span className="text-lg font-extrabold text-brand">
-              {Math.round(STUDENTS.reduce((acc, s) => acc + getStudentBehaviorScore(s.id), 0) / STUDENTS.length)}
+              {todayLogCount}
             </span>
-            <span className={`text-[9px] font-bold block mt-1 ${textMuted}`}>คะแนนวินัยเฉลี่ย</span>
+            <span className={`text-[9px] font-bold block mt-1 ${textMuted}`}>รายการวินัยที่บันทึกวันนี้</span>
           </div>
         </div>
       </div>
@@ -444,84 +554,14 @@ export default function TeacherHome() {
       >
         <div className="space-y-4">
           <p className={`text-xs ${textMuted}`}>
-            รายการใบลาป่วย หรือลากิจที่นักเรียนยื่นผ่านแอปพลิเคชัน SBAC CONNECT
+            ใบลาของนักเรียนในห้องที่คุณเป็นครูประจำชั้น — อนุมัติแล้วจะส่งต่อให้ฝ่ายวิชาการอนุมัติอีกขั้นหนึ่ง
           </p>
-
-          {leaveRequests.length === 0 ? (
-            <div className={`rounded-2xl p-8 border text-center transition-all ${
-              isDark ? 'bg-white/[0.02] border-white/5' : 'bg-slate-50 border-slate-100'
-            }`}>
-              <CheckCircle2 size={36} className="text-accent-emerald mx-auto mb-2" />
-              <p className={`text-sm font-extrabold ${textPrimary}`}>ไม่มีคำขอลาที่ค้างอยู่</p>
-              <p className={`text-xs mt-1 ${textMuted}`}>นักเรียนในความดูแลของคุณไม่มีการยื่นใบลาในขณะนี้</p>
-            </div>
-          ) : (
-            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-              {leaveRequests.map(req => (
-                <div 
-                  key={req.id} 
-                  className={`p-4 border rounded-2xl space-y-2.5 transition-all relative overflow-hidden ${
-                    isDark ? 'bg-slate-900 border-white/5' : 'bg-slate-50 border-slate-100'
-                  }`}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className={`text-xs font-extrabold ${textPrimary}`}>{req.studentName}</span>
-                      <span className={`text-[9px] font-semibold block ${textMuted}`}>สาขา {req.branch} • ID: {req.studentId}</span>
-                    </div>
-                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                      req.type === 'sick' ? 'bg-emerald-500/10 text-accent-emerald' : 'bg-indigo-500/10 text-brand'
-                    }`}>
-                      {req.type === 'sick' ? '🏥 ลาป่วย' : '📋 ลากิจ'}
-                    </span>
-                  </div>
-
-                  <div className={`p-2.5 rounded-xl text-xs space-y-1 ${
-                    isDark ? 'bg-white/[0.02]' : 'bg-surface-card shadow-sm'
-                  }`}>
-                    <div className="font-semibold">
-                      <span className={textMuted}>วันที่ลา: </span>
-                      <span className={textSecondary}>{req.startDate} {req.endDate ? `ถึง ${req.endDate}` : ''}</span>
-                    </div>
-                    <div className="font-semibold">
-                      <span className={textMuted}>เหตุผล: </span>
-                      <span className={textSecondary}>{req.reason}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center pt-1">
-                    <span className={`text-[9px] font-bold ${textMuted}`}>
-                      ส่งเมื่อ {new Date(req.timestamp).toLocaleDateString('th-TH')}
-                    </span>
-
-                    {req.status === 'pending' ? (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleLeaveDecision(req.id, 'rejected')}
-                          className="bg-rose-500/10 text-accent-rose hover:bg-rose-500 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1 border border-rose-500/20"
-                        >
-                          <UserX size={12} /> ปฏิเสธ
-                        </button>
-                        <button
-                          onClick={() => handleLeaveDecision(req.id, 'approved')}
-                          className="bg-emerald-500 text-white hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1"
-                        >
-                          <CheckCircle2 size={12} /> อนุมัติ
-                        </button>
-                      </div>
-                    ) : (
-                      <span className={`text-xs font-extrabold flex items-center gap-1 ${
-                        req.status === 'approved' ? 'text-accent-emerald' : 'text-accent-rose'
-                      }`}>
-                        {req.status === 'approved' ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                        {req.status === 'approved' ? 'อนุมัติแล้ว' : 'ไม่อนุมัติ'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <LeaveRequestList
+            requests={pendingLeaveRequests}
+            loading={pendingLeaveLoading}
+            mode="teacher"
+            onDecide={(req, approve, reason) => teacherDecide(req.id, approve, reason)}
+          />
         </div>
       </Modal>
 
@@ -532,26 +572,69 @@ export default function TeacherHome() {
         title="จัดการพฤติกรรมและความประพฤติ"
       >
         <div className="space-y-4">
-          {/* Select Student */}
+          {/* Select Student — ค้นหานักเรียนจริงจากฐานข้อมูล (ชื่อ หรือ รหัสประจำตัว) */}
           <div>
-            <label className={`text-xs font-bold block mb-1.5 ${textPrimary}`}>เลือกนักเรียนสำหรับการจัดการ</label>
-            <select
-              value={selectedStudentId}
-              onChange={e => setSelectedStudentId(e.target.value)}
-              className={`w-full border rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-none ${bgInput}`}
-            >
-              {STUDENTS.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.name} (รหัส {s.id}) — ปัจจุบัน {getStudentBehaviorScore(s.id)} แต้ม
-                </option>
-              ))}
-            </select>
+            <label className={`text-xs font-bold block mb-1.5 ${textPrimary}`}>ค้นหานักเรียนสำหรับการจัดการ</label>
+            <div className="relative">
+              <Search size={14} className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${textMuted}`} />
+              <input
+                type="text"
+                value={studentQuery}
+                onChange={e => { setStudentQuery(e.target.value); setSelectedStudent(null); }}
+                placeholder="พิมพ์ชื่อหรือรหัสนักเรียน อย่างน้อย 2 ตัวอักษร"
+                className={`w-full border rounded-xl pl-9 pr-3 py-2.5 text-xs font-bold focus:outline-none ${bgInput}`}
+              />
+            </div>
+
+            {searchingStudents && (
+              <p className={`text-[10px] font-semibold mt-1.5 ${textMuted}`}>กำลังค้นหา...</p>
+            )}
+
+            {!selectedStudent && !searchingStudents && studentQuery.trim().length >= 2 && studentResults.length === 0 && (
+              <p className={`text-[10px] font-semibold mt-1.5 ${textMuted}`}>ไม่พบนักเรียนที่ตรงกับ "{studentQuery.trim()}"</p>
+            )}
+
+            {!selectedStudent && studentResults.length > 0 && (
+              <div className={`mt-2 max-h-40 overflow-y-auto rounded-xl border divide-y ${isDark ? 'border-white/10 divide-white/5' : 'border-slate-100 divide-slate-100'}`}>
+                {studentResults.map(s => (
+                  <button
+                    key={s.user_id}
+                    type="button"
+                    onClick={() => handlePickStudent(s)}
+                    className={`w-full text-left px-3 py-2.5 transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`}
+                  >
+                    <div className={`text-xs font-extrabold ${textPrimary}`}>{s.full_name}</div>
+                    <div className={`text-[9px] font-semibold mt-0.5 ${textMuted}`}>
+                      รหัส {s.student_code || '—'} • {s.class_label || 'ไม่มีข้อมูลห้อง'} • ปัจจุบัน {s.score} แต้ม
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {selectedStudent && (
+              <div className={`mt-2 flex items-center justify-between gap-2 p-3 rounded-xl border ${isDark ? 'bg-white/[0.02] border-white/10' : 'bg-slate-50 border-slate-100'}`}>
+                <div className="min-w-0">
+                  <div className={`text-xs font-extrabold truncate ${textPrimary}`}>{selectedStudent.full_name}</div>
+                  <div className={`text-[9px] font-semibold mt-0.5 ${textMuted}`}>
+                    รหัส {selectedStudent.student_code || '—'} • {selectedStudent.class_label || 'ไม่มีข้อมูลห้อง'} • ปัจจุบัน {selectedStudent.score} แต้ม
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleChangeStudent}
+                  className="shrink-0 text-[10px] font-extrabold text-brand px-2 py-1"
+                >
+                  เปลี่ยน
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Action Type (Add / Deduct) */}
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => { setBehaviorActionType('deduct'); setBehaviorReason(''); }}
+              onClick={() => { setBehaviorActionType('deduct'); setBehaviorReason(''); setSelectedCategoryId(null); }}
               className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center ${
                 behaviorActionType === 'deduct'
                   ? 'bg-rose-500 text-white border-rose-500 shadow-sm'
@@ -563,7 +646,7 @@ export default function TeacherHome() {
               ⚠️ ตัดคะแนนความประพฤติ
             </button>
             <button
-              onClick={() => { setBehaviorActionType('add'); setBehaviorReason(''); }}
+              onClick={() => { setBehaviorActionType('add'); setBehaviorReason(''); setSelectedCategoryId(null); }}
               className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center ${
                 behaviorActionType === 'add'
                   ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
@@ -576,31 +659,30 @@ export default function TeacherHome() {
             </button>
           </div>
 
-          {/* Presets List */}
+          {/* Presets List — หมวดหมู่ความผิด/ความดีสำเร็จรูปจาก behavior_categories */}
           <div>
             <label className={`text-xs font-bold block mb-2 ${textPrimary}`}>รายการบันทึกสำเร็จรูป (Presets)</label>
             <div className="grid grid-cols-2 gap-2">
-              {behaviorPresets[behaviorActionType].map((preset, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setBehaviorReason(preset.reason);
-                    setBehaviorPoints(Math.abs(preset.score).toString());
-                  }}
-                  className={`p-2.5 rounded-xl border text-[10px] font-bold text-left transition-all ${
-                    behaviorReason === preset.reason
-                      ? 'border-sbac-blue bg-sbac-blue-50/20 text-brand'
-                      : isDark
-                      ? 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] text-content-secondary'
-                      : 'border-slate-100 bg-surface-card hover:bg-slate-50 text-slate-600 shadow-sm'
-                  }`}
-                >
-                  <div className="truncate">{preset.reason}</div>
-                  <div className={`text-[9px] mt-0.5 font-extrabold ${behaviorActionType === 'add' ? 'text-accent-emerald' : 'text-accent-rose'}`}>
-                    {preset.score > 0 ? `+${preset.score}` : preset.score} คะแนน
-                  </div>
-                </button>
-              ))}
+              {behaviorCategoriesByType(behaviorActionType)
+                .map(cat => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => handlePickCategory(cat)}
+                    className={`p-2.5 rounded-xl border text-[10px] font-bold text-left transition-all ${
+                      selectedCategoryId === cat.id
+                        ? 'border-sbac-blue bg-sbac-blue-50/20 text-brand'
+                        : isDark
+                        ? 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] text-content-secondary'
+                        : 'border-slate-100 bg-surface-card hover:bg-slate-50 text-slate-600 shadow-sm'
+                    }`}
+                  >
+                    <div className="truncate">{cat.label}</div>
+                    <div className={`text-[9px] mt-0.5 font-extrabold ${behaviorActionType === 'add' ? 'text-accent-emerald' : 'text-accent-rose'}`}>
+                      {behaviorActionType === 'add' ? '+' : '-'}{cat.default_points} คะแนน
+                    </div>
+                  </button>
+                ))}
             </div>
           </div>
 
@@ -611,7 +693,7 @@ export default function TeacherHome() {
               <input
                 type="text"
                 value={behaviorReason}
-                onChange={e => setBehaviorReason(e.target.value)}
+                onChange={e => handleReasonInput(e.target.value)}
                 placeholder="พิมพ์ระบุเหตุผล เช่น ทะเลาะวิวาท, มีจิตอาสาช่วยขยะ"
                 className={`w-full border rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none ${bgInput}`}
               />
@@ -621,6 +703,7 @@ export default function TeacherHome() {
               <label className={`text-xs font-bold block mb-1 ${textPrimary}`}>จำนวนคะแนน</label>
               <input
                 type="number"
+                min="1"
                 value={behaviorPoints}
                 onChange={e => setBehaviorPoints(e.target.value)}
                 className={`w-full border rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none ${bgInput}`}
@@ -629,17 +712,87 @@ export default function TeacherHome() {
           </div>
 
           {/* Submit Behavior Log */}
-          <button 
+          <button
             onClick={handleBehaviorSave}
-            className={`w-full text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-sm flex items-center justify-center gap-1.5 ${
+            disabled={submittingBehavior || !selectedStudent}
+            className={`w-full text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed ${
               behaviorActionType === 'add' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-rose-500 hover:bg-rose-600'
             }`}
           >
             <Award size={16} />
-            ลงบันทึกพฤติกรรมนักเรียน
+            {submittingBehavior ? 'กำลังบันทึก...' : 'ลงบันทึกพฤติกรรมนักเรียน'}
           </button>
         </div>
       </Modal>
+
+      {/* MODAL: Wallet — เหมือนฝั่งนักเรียนทุกประการ (ดูข้อ 3 ของงาน) */}
+      <Modal
+        isOpen={activeModal === 'balance'}
+        onClose={() => setActiveModal(null)}
+        title="💳 ยอดเงินบัตร"
+      >
+        <div className="space-y-6">
+          <div className={`text-center py-4 rounded-2xl border transition-colors ${
+            isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
+          }`}>
+            <span className={`text-5xl font-extrabold block ${textPrimary}`}>
+              {formatBaht(user?.balance_satang || 0)}
+            </span>
+            <span className={`text-xs font-extrabold mt-2 block ${textMuted}`}>THB</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setActiveModal('topup')}
+            className="w-full flex items-center justify-center gap-2 bg-sbac-blue hover:bg-sbac-navy text-white text-sm font-extrabold py-3.5 rounded-2xl shadow-lg shadow-sbac-blue/30 active:scale-[0.98] transition-all"
+          >
+            <QrCode size={18} aria-hidden="true" />
+            เติมเงินด้วย QR พร้อมเพย์
+          </button>
+
+          <div className={`rounded-2xl border p-4 ${
+            isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
+          }`}>
+            <span className={`text-xs font-extrabold block ${textPrimary}`}>เติมเงินอย่างไร</span>
+            <p className={`text-[11px] font-semibold leading-relaxed mt-1 ${textMuted}`}>
+              โอนผ่าน QR พร้อมเพย์แล้วแนบสลิปด้านบน หรือเติมเงินสดได้ที่จุดบริการการเงิน
+              อาคาร 1 ชั้น 1 — เจ้าหน้าที่จะแตะบัตรแล้วเติมให้ในระบบ ยอดขึ้นในแอปทันที
+            </p>
+          </div>
+        </div>
+      </Modal>
+
+      {/* MODAL: เติมเงินด้วย QR พร้อมเพย์ + แนบสลิป — คอมโพเนนต์เดียวกับฝั่งนักเรียนเป๊ะ (topup_qr_instant ไม่แยก role) */}
+      <Modal
+        isOpen={activeModal === 'topup'}
+        onClose={() => setActiveModal(null)}
+        title="📷 เติมเงินด้วย QR + สลิป"
+      >
+        <TopUpSlipForm />
+      </Modal>
+
+      {/* MODAL: ประวัติที่ฉันบันทึก — แก้ไข/ลบได้ (21_behavior_crud_and_academic.sql) */}
+      <Modal
+        isOpen={activeModal === 'myLogs'}
+        onClose={() => setActiveModal(null)}
+        title="ประวัติที่ฉันบันทึก"
+      >
+        <BehaviorLogList
+          logs={myLogs}
+          loading={myLogsLoading}
+          showStudentName
+          onEdit={setEditingLog}
+          onDeleteRequest={handleDeleteLog}
+        />
+      </Modal>
+
+      <BehaviorLogEditModal
+        log={editingLog}
+        onClose={() => setEditingLog(null)}
+        onSave={(logId, payload) => updateLog(logId, payload)}
+      />
+
+      {confirmDialog}
     </div>
   );
 }

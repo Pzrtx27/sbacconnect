@@ -16,9 +16,11 @@ export default function BottomNav() {
 
   const items = navItemsFor(user.role);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  /* ต้อง await: logout() เคลียร์ user หลัง signOut() คืนค่าแล้วเท่านั้น
+     ถ้า navigate ก่อน LoginRoute จะยังเห็น user ค้างอยู่แล้วเด้งกลับหน้าเดิมให้เห็นแวบหนึ่ง */
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
   };
 
   // แถบล่างเป็นของมือถือ บนคอม (>=1280px) ซ่อนไว้แล้วใช้ SideNav แทน

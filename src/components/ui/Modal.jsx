@@ -1,3 +1,4 @@
+import { useEffect, useId, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -19,6 +20,59 @@ import { useIsDesktop } from '../../hooks/useMediaQuery';
 export default function Modal({ isOpen, onClose, title, children, footer = null }) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const panelRef = useRef(null);
+  const titleId = useId();
+
+  /* Esc ปิด + โฟกัสวนอยู่ในกล่อง + คืนโฟกัสให้ปุ่มที่เปิดตอนปิด + ล็อกไม่ให้พื้นหลังเลื่อน
+     ConfirmDialog ทำครบสี่ข้อนี้มาตั้งแต่แรก แต่ Modal ซึ่งใช้เยอะกว่ามาก
+     (ตะกร้ากาแฟ กระเป๋าเงิน ฟอร์มใบลา แก้ไขคะแนน แจ้งเตือน) กลับไม่มีสักข้อ
+     คนที่ใช้คีย์บอร์ดล้วนจึงเปิดโมดัลแล้ว Tab หลุดไปโดนปุ่มข้างหลังที่มองไม่เห็น */
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab' || !panelRef.current) return;
+
+      const focusables = panelRef.current.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    const previouslyFocused = document.activeElement;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onKeyDown);
+
+    // โฟกัสตัวแรกในกล่องหลังแอนิเมชันเริ่มแล้ว ไม่งั้นจะไปโฟกัส element ที่ยังไม่อยู่บนจอ
+    const raf = requestAnimationFrame(() => {
+      const target = panelRef.current?.querySelector(
+        'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
+      );
+      target?.focus();
+    });
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevOverflow;
+      cancelAnimationFrame(raf);
+      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
+    };
+  }, [isOpen, onClose]);
 
   /* บนมือถือเป็น bottom sheet: เลื่อนขึ้นจากขอบล่าง สูงตายตัว 70vh ทุกอัน
      บนคอมเป็น dialog กลางจอ: สูงตามเนื้อหา สูงสุด 80vh กว้างขึ้นเป็น 2xl
@@ -41,6 +95,10 @@ export default function Modal({ isOpen, onClose, title, children, footer = null 
           />
           {/* Sheet — สูงคงที่ 70vh เท่ากันทุกโมดัล */}
           <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
             initial={isDesktop ? { opacity: 0, scale: 0.97 } : { y: '100%' }}
             animate={isDesktop ? { opacity: 1, scale: 1 } : { y: 0 }}
             exit={isDesktop ? { opacity: 0, scale: 0.97 } : { y: '100%' }}
@@ -84,6 +142,7 @@ export default function Modal({ isOpen, onClose, title, children, footer = null 
               {/* Header */}
               <div className="relative flex items-center justify-between px-6 py-3 shrink-0 xl:pt-5 xl:px-7">
                 <h2
+                  id={titleId}
                   className={`text-lg xl:text-xl font-extrabold transition-colors duration-300 ${
                     isDark ? 'text-white' : 'text-sbac-navy'
                   }`}

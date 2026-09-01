@@ -1,18 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../config/supabase';
 import { ArrowLeft, RefreshCw, Receipt } from 'lucide-react';
 import { formatBaht } from '../../utils/identity';
-import { ORDER_STATUS_TEXT, ORDER_STATUS_COLOR, productEmoji } from '../../utils/orders';
+import { ORDER_STATUS_TEXT, ORDER_STATUS_COLOR, productEmoji, optionSummary } from '../../utils/orders';
 
 /* ประวัติการสั่งซื้อทั้งหมด แยกจากหน้าสถานะปัจจุบัน (/orders)
    จัดเป็นลิสต์แถวเดียวต่อออเดอร์ แบบแอปช้อปปิ้ง (Shopee / LINE MAN)
    RLS กรองให้เห็นเฉพาะออเดอร์ของตัวเองอยู่แล้ว */
 
+// ต้องดึง order_item_options ด้วย ไม่งั้นประวัติจะขึ้นแค่ "ลาเต้" เฉย ๆ
+// แยกไม่ออกว่าแก้วนั้นร้อนหรือเย็น หวานเท่าไหร่ ใส่ท็อปปิ้งอะไร
+// (หน้า /orders ดึงครบอยู่แล้ว หน้านี้ตกไปตอนย้ายมาใช้ตัวเลือกใน 11_menu_options.sql)
 const ORDER_SELECT =
-  'id, total_satang, status, pickup_code, created_at, order_items(qty, unit_price_satang, products(name, category))';
+  'id, total_satang, status, pickup_code, created_at, ' +
+  'order_items(qty, unit_price_satang, products(name, category), order_item_options(option_name, group_name))';
 
 export default function OrderHistoryPage() {
   const { user } = useAuth();
@@ -21,22 +25,32 @@ export default function OrderHistoryPage() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  const fetchHistory = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('orders')
+      .select(ORDER_SELECT)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      // เหมือนหน้า /orders — "ดึงไม่ได้" กับ "ไม่เคยสั่ง" ต้องไม่หน้าตาเหมือนกัน
+      console.warn('[history] โหลดประวัติไม่สำเร็จ:', error);
+      setLoadFailed(true);
+      setLoading(false);
+      return;
+    }
+
+    setLoadFailed(false);
+    setOrders(data || []);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
-
-    (async () => {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(ORDER_SELECT)
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (error) console.warn('[history] โหลดประวัติไม่สำเร็จ:', error);
-      else setOrders(data || []);
-      setLoading(false);
-    })();
-  }, [user]);
+    fetchHistory();
+  }, [user, fetchHistory]);
 
   const textPrimary = isDark ? 'text-white' : 'text-sbac-navy';
   const textMuted = isDark ? 'text-content-secondary' : 'text-ink-muted';
@@ -65,6 +79,28 @@ export default function OrderHistoryPage() {
         <div className="text-center py-10">
           <RefreshCw className="animate-spin text-brand mx-auto mb-2" size={24} />
           <span className={`text-xs font-semibold ${textMuted}`}>กำลังโหลดประวัติออเดอร์...</span>
+        </div>
+      ) : loadFailed ? (
+        <div
+          role="alert"
+          className={`rounded-3xl border p-8 text-center space-y-3 transition-colors duration-300 ${
+            isDark ? 'bg-rose-950/30 border-rose-900/40' : 'bg-rose-50 border-rose-200'
+          }`}
+        >
+          <h3 className="text-sm font-extrabold text-accent-rose">โหลดประวัติการสั่งซื้อไม่สำเร็จ</h3>
+          <p className={`text-xs leading-relaxed ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+            ประวัติของคุณยังอยู่ในระบบครบถ้วน แค่หน้านี้ดึงมาแสดงไม่ได้ชั่วคราว
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              fetchHistory();
+            }}
+            className="px-5 py-2.5 rounded-2xl text-xs font-extrabold bg-sbac-blue hover:bg-sbac-navy text-white transition-colors"
+          >
+            ลองโหลดใหม่
+          </button>
         </div>
       ) : orders.length === 0 ? (
         <div
@@ -106,6 +142,11 @@ export default function OrderHistoryPage() {
                     {first?.qty > 1 ? ` ×${first.qty}` : ''}
                     {extraCount > 0 ? ` และอีก ${extraCount} รายการ` : ''}
                   </div>
+                  {first?.order_item_options?.length > 0 && (
+                    <div className="text-[10px] font-bold mt-0.5 text-accent-amber truncate">
+                      {optionSummary(first.order_item_options.map((o) => ({ name: o.option_name })))}
+                    </div>
+                  )}
                   <div className={`text-[10px] mt-0.5 transition-colors duration-300 ${textMuted}`}>
                     {new Date(order.created_at).toLocaleString('th-TH', {
                       day: '2-digit',

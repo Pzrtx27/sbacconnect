@@ -24,9 +24,10 @@ export default function SideNav() {
 
   const items = navItemsFor(user.role);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  /* ต้อง await — เหตุผลเดียวกับใน BottomNav.jsx */
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
   };
 
   return (

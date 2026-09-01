@@ -2,6 +2,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Sun, Moon } from 'lucide-react';
 import { shellWidthClass } from '../../utils/layout';
+import NotificationBell from './NotificationBell';
 
 export default function Header({ title = 'SBAC CONNECT', subtitle = 'Smart Campus • Access • Care' }) {
   const { user } = useAuth();
@@ -27,6 +28,9 @@ export default function Header({ title = 'SBAC CONNECT', subtitle = 'Smart Campu
             )}
           </div>
           <div className="flex items-center gap-1.5">
+            {/* แจ้งเตือนในระบบ — เห็นทันทีที่มีรายการใหม่ผ่าน Supabase Realtime */}
+            {user && <NotificationBell />}
+
             {/* Theme Toggle */}
             <button
               type="button"

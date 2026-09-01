@@ -15,14 +15,19 @@ import SideNav from './components/layout/SideNav';
 import Header from './components/layout/Header';
 import PageWrapper from './components/layout/PageWrapper';
 import LoadingSpinner from './components/ui/LoadingSpinner';
+import AssistantFAB from './components/assistant/AssistantFAB';
 import { shellWidthClass } from './utils/layout';
 
-/** หน้าเริ่มต้นของแต่ละ role — ใช้ที่เดียวกันทั้งแอปเพื่อไม่ให้ redirect วนลูป */
+/** หน้าเริ่มต้นของแต่ละ role — ใช้ที่เดียวกันทั้งแอปเพื่อไม่ให้ redirect วนลูป
+ *  sysadmin ต้องมีในนี้ด้วย: AuthContext เลือก role นี้เป็นอันดับแรกถ้ามี
+ *  ถ้าไม่ระบุไว้ จะตกไปที่ '/home' ซึ่ง ProtectedRoute อนุญาตแค่ student
+ *  แล้วเด้งกลับมา homeFor() = '/home' อีก กลายเป็นวนไม่จบ */
 const HOME_BY_ROLE = {
   student: '/home',
   teacher: '/teacher',
   academic: '/academic',
   barista: '/barista',
+  sysadmin: '/academic',
 };
 
 const normalizeRole = (user) => (user?.role || 'student').toLowerCase().trim();
@@ -163,6 +168,7 @@ function MainLayout() {
             <Route path="*" element={<Navigate to="/barista" replace />} />
           </Routes>
         </div>
+        <AssistantFAB />
       </div>
     );
   }
@@ -203,7 +209,7 @@ function MainLayout() {
             <Route
               path="/timetable"
               element={
-                <ProtectedRoute allowedRoles={['student', 'teacher', 'academic']}>
+                <ProtectedRoute allowedRoles={['student', 'teacher', 'academic', 'sysadmin']}>
                   <PageWrapper><StudentTimetable /></PageWrapper>
                 </ProtectedRoute>
               }
@@ -243,7 +249,7 @@ function MainLayout() {
             <Route
               path="/academic"
               element={
-                <ProtectedRoute allowedRoles={['academic']}>
+                <ProtectedRoute allowedRoles={['academic', 'sysadmin']}>
                   <PageWrapper><AcademicDashboard /></PageWrapper>
                 </ProtectedRoute>
               }
@@ -254,6 +260,7 @@ function MainLayout() {
         </main>
 
         <BottomNav />
+        <AssistantFAB />
 
       </div>
     </div>
