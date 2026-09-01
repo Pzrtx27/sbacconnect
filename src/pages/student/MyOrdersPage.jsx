@@ -28,6 +28,7 @@ export default function MyOrdersPage() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     const { data, error } = await supabase
@@ -36,8 +37,17 @@ export default function MyOrdersPage() {
       .in('status', ACTIVE_STATUSES)
       .order('created_at', { ascending: false });
 
-    if (error) console.warn('[orders] โหลดออเดอร์ไม่สำเร็จ:', error);
-    else setOrders(data || []);
+    if (error) {
+      // ต้องแยก "ดึงไม่ได้" ออกจาก "ไม่มีออเดอร์" ให้ชัด — ของเดิม error แล้ว orders
+      // ค้างเป็น [] หน้าจอจึงขึ้นว่า "ยังไม่มีคำสั่งซื้อ" ทั้งที่นักเรียนเพิ่งจ่ายเงินไป
+      console.warn('[orders] โหลดออเดอร์ไม่สำเร็จ:', error);
+      setLoadFailed(true);
+      setLoading(false);
+      return;
+    }
+
+    setLoadFailed(false);
+    setOrders(data || []);
     setLoading(false);
   }, []);
 
@@ -105,6 +115,30 @@ export default function MyOrdersPage() {
           <span className={`text-xs font-semibold ${isDark ? 'text-content-muted' : 'text-ink-muted'}`}>
             กำลังโหลดสถานะออเดอร์...
           </span>
+        </div>
+      ) : loadFailed ? (
+        <div
+          role="alert"
+          className={`rounded-3xl border p-8 text-center space-y-3 transition-colors duration-300 ${
+            isDark ? 'bg-rose-950/30 border-rose-900/40' : 'bg-rose-50 border-rose-200'
+          }`}
+        >
+          <h3 className="text-sm font-extrabold text-accent-rose">โหลดสถานะออเดอร์ไม่สำเร็จ</h3>
+          <p className={`text-xs leading-relaxed ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+            ออเดอร์ของคุณยังอยู่ในระบบตามปกติ แค่หน้านี้ดึงข้อมูลมาแสดงไม่ได้ชั่วคราว
+            <br />
+            ตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วกดลองใหม่
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              fetchOrders();
+            }}
+            className="px-5 py-2.5 rounded-2xl text-xs font-extrabold bg-sbac-blue hover:bg-sbac-navy text-white transition-colors"
+          >
+            ลองโหลดใหม่
+          </button>
         </div>
       ) : orders.length === 0 ? (
         <div

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { db } from '../../config/firebase.js';
+import { db, isFirebaseDisabled } from '../../config/firebase.js';
 import { doc, getDoc, setDoc, updateDoc, collection, addDoc, onSnapshot } from 'firebase/firestore';
 import { showToast } from '../../components/ui/Toast';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
@@ -10,6 +10,7 @@ import BehaviorLogEditModal from '../../components/behavior/BehaviorLogEditModal
 import LeaveRequestList from '../../components/leave/LeaveRequestList';
 import { useBehaviorLogs } from '../../hooks/useBehaviorLogs';
 import { useLeaveRequests } from '../../hooks/useLeaveRequests';
+import RepairTicketQueue from '../../components/repair/RepairTicketQueue';
 import {
   Calendar,
   Settings,
@@ -31,6 +32,23 @@ import { sha256, encryptAES, decryptAES } from '../../utils/crypto';
 import EventManager from './EventManager';
 import BehaviorDeductionWizard from './BehaviorDeductionWizard';
 import HomeroomAssignmentPanel from './HomeroomAssignmentPanel';
+
+/* ป้ายบอกตรง ๆ ว่าส่วนไหนยังต่อฐานข้อมูลไม่ได้
+   ก่อนหน้านี้ปุ่มพวกนี้กดได้ปกติแล้วเด้ง toast กลาง ๆ ว่า "อัปเดตตาราง­ล้มเหลว"
+   คนกดจะเข้าใจว่าแอปพัง ทั้งที่จริงคือฟีเจอร์ยังย้ายมาไม่เสร็จ — คนละเรื่องกัน
+   โดยเฉพาะตอนนำเสนอที่คนดูจะกดทุกปุ่มที่เห็น */
+function NotConnectedNotice({ isDark, what, why }) {
+  return (
+    <div
+      className={`rounded-2xl border px-4 py-3 text-xs leading-relaxed ${
+        isDark ? 'bg-amber-950/30 border-amber-900/40 text-amber-100' : 'bg-amber-50 border-amber-200 text-amber-950'
+      }`}
+    >
+      <strong className="font-extrabold">ตัวอย่างหน้าจอ — {what}ยังใช้งานจริงไม่ได้</strong>
+      <p className="mt-1 opacity-90">{why}</p>
+    </div>
+  );
+}
 
 export default function AcademicDashboard() {
   const { user } = useAuth();
@@ -545,6 +563,12 @@ export default function AcademicDashboard() {
           แก้ไขตารางสอน (Real-time)
         </h3>
 
+        <NotConnectedNotice
+          isDark={isDark}
+          what="ตารางสอนและการสอนแทน"
+          why="ส่วนนี้ยังเขียนลง Firebase ซึ่งถูกปิดไปตอนย้ายระบบมา Supabase (โปรเจกต์เดิมเปิดให้ใครก็อ่าน-แก้ข้อมูลนักเรียนได้) ต้องสร้างตาราง timetable / substitutions ใน Supabase ก่อนจึงจะเปิดใช้ได้"
+        />
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>วัน</label>
@@ -666,14 +690,18 @@ export default function AcademicDashboard() {
         <div className="flex gap-2 pt-2">
           <button
             onClick={saveSubstitute}
-            className="flex-1 bg-sbac-blue hover:bg-sbac-navy text-white font-extrabold py-3 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-1.5"
+            disabled={isFirebaseDisabled}
+            title={isFirebaseDisabled ? 'ยังเชื่อมต่อฐานข้อมูลตารางสอนไม่ได้' : undefined}
+            className="flex-1 bg-sbac-blue hover:bg-sbac-navy text-white font-extrabold py-3 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-sbac-blue"
           >
             <RefreshCw size={14} />
             อัปเดตตาราง
           </button>
           <button
             onClick={resetSubstitute}
-            className={`flex-1 border-2 font-extrabold py-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 ${isDark
+            disabled={isFirebaseDisabled}
+            title={isFirebaseDisabled ? 'ยังเชื่อมต่อฐานข้อมูลตารางสอนไม่ได้' : undefined}
+            className={`flex-1 border-2 font-extrabold py-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${isDark
               ? 'border-white/10 text-content-secondary hover:bg-white/5'
               : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
               }`}
@@ -690,6 +718,9 @@ export default function AcademicDashboard() {
         <EventManager />
       </div>
 
+      {/* คิวใบแจ้งซ่อมจริงจากผู้ช่วย SBAC Connect (23_repair_tickets.sql) */}
+      <RepairTicketQueue />
+
       {/* Excel sync panel — เต็มความกว้างเสมอ เพราะมีตารางพรีวิวรายชื่อนักเรียนอยู่ข้างใน */}
       <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
         }`}>
@@ -698,6 +729,12 @@ export default function AcademicDashboard() {
           <FileSpreadsheet size={18} className="text-brand" />
           นำเข้าข้อมูลด้วย Excel / CSV + เข้ารหัสข้อมูล
         </h3>
+
+        <NotConnectedNotice
+          isDark={isDark}
+          what="การนำเข้าและส่งออกรายชื่อนักเรียน"
+          why="ส่วนนี้ยังเขียนลง Firebase ซึ่งถูกปิดไปแล้ว การเปิดใช้อีกครั้งจะทำให้ชื่อ-นามสกุลจริงของนักเรียนถูกเขียนขึ้นฐานข้อมูลที่เปิดสาธารณะ ต้องย้ายมา Supabase ก่อน — ดาวน์โหลดเทมเพลต CSV และดูตัวอย่างหน้าจอยังใช้ได้ตามปกติ"
+        />
 
         <p className={`text-xs leading-relaxed transition-colors duration-300 ${isDark ? 'text-content-muted' : 'text-content-muted'
           }`}>
@@ -718,8 +755,9 @@ export default function AcademicDashboard() {
           </button>
           <button
             onClick={exportDatabase}
-            disabled={isProcessing}
-            className={`flex-1 border font-extrabold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 ${isDark
+            disabled={isProcessing || isFirebaseDisabled}
+            title={isFirebaseDisabled ? 'ยังเชื่อมต่อฐานข้อมูลรายชื่อนักเรียนไม่ได้' : undefined}
+            className={`flex-1 border font-extrabold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${isDark
               ? 'border-white/10 text-content-secondary hover:bg-white/5'
               : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
               }`}
@@ -899,8 +937,9 @@ export default function AcademicDashboard() {
 
             <button
               onClick={syncToFirebase}
-              disabled={isProcessing}
-              className={`w-full text-white font-extrabold py-3.5 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-2 select-none bg-gradient-to-r from-sbac-blue to-sbac-navy hover:to-sbac-blue cursor-pointer ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''
+              disabled={isProcessing || isFirebaseDisabled}
+              title={isFirebaseDisabled ? 'ยังเชื่อมต่อฐานข้อมูลรายชื่อนักเรียนไม่ได้' : undefined}
+              className={`w-full text-white font-extrabold py-3.5 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-2 select-none bg-gradient-to-r from-sbac-blue to-sbac-navy hover:to-sbac-blue cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
             >
               {isProcessing ? (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -26,16 +26,32 @@ const HOME_BY_ROLE = {
   barista: '/barista',
 };
 
+/* จำเฉพาะ "ชื่อผู้ใช้" เท่านั้น ไม่เก็บรหัสประจำตัวลงเครื่องเด็ดขาด
+   เครื่องในห้องคอมเป็นเครื่องใช้ร่วม ถ้าเก็บรหัสไว้ด้วยคนถัดไปล็อกอินเป็นคนก่อนหน้าได้เลย */
+const REMEMBER_KEY = 'sbac_remembered_username';
+
 export default function LoginPage() {
   const [userId, setUserId] = useState('');
   const [nationalId, setNationalId] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [lang, setLang] = useState('TH');
   const { login, authenticating } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+
+  // เติมชื่อผู้ใช้ที่เคยจำไว้ให้อัตโนมัติ (localStorage ถูกบล็อกได้ในโหมดไม่ระบุตัวตน จึงห่อ try)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(REMEMBER_KEY);
+      if (saved) setUserId(saved);
+      else setRememberMe(false);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const handleLogin = async (e) => {
     e?.preventDefault();
@@ -50,6 +66,12 @@ export default function LoginPage() {
     const result = await login(userId, nationalId);
     setIsLoading(false);
     if (result.success) {
+      try {
+        if (rememberMe) localStorage.setItem(REMEMBER_KEY, userId.trim());
+        else localStorage.removeItem(REMEMBER_KEY);
+      } catch {
+        /* ignore */
+      }
       const role = (result.user.role || 'student').toLowerCase().trim();
       const welcomeMsg = lang === 'TH'
         ? `ยินดีต้อนรับคุณ ${result.user.name}`
@@ -231,13 +253,16 @@ export default function LoginPage() {
                 }`}>
                   <IdCard size={18} />
                 </div>
+                {/* ห้ามใส่ inputMode="numeric" ตรงนี้ — รหัสประจำตัวนักเรียนขึ้นต้นด้วยตัวอักษร
+                    (เช่น S0001 ดู 06_seed_real.example.sql) บนมือถือแป้นตัวเลขล้วนพิมพ์ S ไม่ได้เลย */}
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={nationalId}
                   onChange={(e) => setNationalId(e.target.value)}
                   placeholder={t.phPass}
-                  inputMode="numeric"
-                  pattern="[0-9]*"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
                   className={`w-full rounded-2xl pl-12 pr-12 py-3.5 font-medium text-sm transition-all duration-250 focus:outline-none focus:ring-2 border ${
                     isDark 
                       ? 'bg-black border-neutral-800 text-white placeholder:text-content-muted focus:ring-sbac-blue/40 focus:border-sbac-blue'
@@ -249,6 +274,8 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'ซ่อนรหัสประจำตัว' : 'แสดงรหัสประจำตัว'}
+                  aria-pressed={showPassword}
                   className={`absolute right-3.5 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-colors ${
                     isDark ? 'text-content-muted hover:text-white hover:bg-white/5' : 'text-content-muted hover:text-slate-700 hover:bg-slate-100'
                   }`}
@@ -261,12 +288,13 @@ export default function LoginPage() {
             {/* Options Bar */}
             <div className="flex items-center justify-between px-1">
               <label className="flex items-center gap-2 cursor-pointer select-none group">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
                   className={`w-4 h-4 rounded border-slate-300 text-brand focus:ring-sbac-blue/30 transition-all ${
                     isDark ? 'bg-black border-neutral-800' : ''
-                  }`} 
-                  defaultChecked
+                  }`}
                 />
                 <span className={`text-xs font-bold transition-colors duration-200 group-hover:text-brand ${
                   isDark ? 'text-slate-200' : 'text-slate-600'
@@ -350,8 +378,9 @@ export default function LoginPage() {
           isDark ? 'text-content-secondary' : 'text-content-muted'
         }`}
       >
-        <div>{t.forgotToast}</div>
-        <div className="opacity-75">{t.forgot} • วิทยาลัยเทคโนโลยีสยามบริหารธุรกิจ นนทบุรี (SBAC)</div>
+        {/* เดิมบรรทัดนี้เป็นข้อความเดียวกับ toast ของปุ่ม "ลืมรหัสผ่าน?" แบบคำต่อคำ
+            บวกกับคำว่า "ลืมรหัสผ่าน?" ซ้ำอีกรอบทั้งที่กดไม่ได้ — เหลือแค่ชื่อวิทยาลัยพอ */}
+        <div className="opacity-75">วิทยาลัยเทคโนโลยีสยามบริหารธุรกิจ นนทบุรี (SBAC)</div>
         <div className="opacity-60 font-medium">© 2026 Siam Business Administration Technological College. All rights reserved.</div>
       </motion.div>
     </div>

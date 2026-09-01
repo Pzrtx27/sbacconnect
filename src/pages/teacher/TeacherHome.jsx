@@ -451,10 +451,18 @@ export default function TeacherHome() {
               รายงานสถานะห้องเรียน ปวช. 3/6 วันนี้
             </span>
           </div>
-          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-white/5 text-content-muted' : 'bg-slate-200/50 text-content-muted'}`}>
-            ข้อมูลเรียลไทม์
+          {/* ป้ายเดิมเขียนว่า "ข้อมูลเรียลไทม์" ทั้งที่รายชื่อเป็นข้อมูลสมมติ 3 คน
+              และการเช็คชื่อบันทึกลง localStorage เครื่องเดียว ไม่ได้แตะ Supabase เลย
+              คนดูตอนนำเสนอจะเชื่อว่าเป็นของจริงแล้วถามต่อ — บอกตามจริงดีกว่า */}
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-accent-amber border border-amber-500/25">
+            ข้อมูลตัวอย่าง
           </span>
         </div>
+
+        <p className="text-[10px] font-semibold leading-relaxed text-content-muted">
+          รายชื่อชุดนี้เป็นข้อมูลสมมติสำหรับสาธิตหน้าจอ และผลการเช็คชื่อบันทึกไว้ในเครื่องนี้เท่านั้น
+          ยังไม่ได้เชื่อมกับรายชื่อนักเรียนจริงในฐานข้อมูล
+        </p>
 
         <div className="grid grid-cols-3 gap-3">
           <div className={`p-3 rounded-2xl border text-center transition-all ${isDark ? 'bg-neutral-900/60 border-white/10' : 'bg-surface-card border-slate-100 shadow-sm'}`}>
