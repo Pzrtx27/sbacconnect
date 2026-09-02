@@ -14,6 +14,8 @@ import { formatBaht } from '../../utils/identity';
 import { LEAVE_TYPE_LABELS } from '../../utils/leave';
 import { useLeaveRequests } from '../../hooks/useLeaveRequests';
 import LeaveRequestList from '../../components/leave/LeaveRequestList';
+import WalletHistory from '../../components/wallet/WalletHistory';
+import GateEntryLog from '../../components/gate/GateEntryLog';
 import {
   Clock,
   Award,
@@ -223,8 +225,8 @@ export default function StudentHome() {
           <div className="flex flex-col h-full justify-between min-h-[110px]">
             <div>
               <Clock className="text-brand mb-2" size={24} />
-              <div className={`text-sm font-extrabold ${textPrimary}`}>เวลาเข้า-ออก</div>
-              <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>เวลาผ่านประตู / Gate check times</div>
+              <div className={`text-sm font-extrabold ${textPrimary}`}>เวลาเข้าโรงเรียน</div>
+              <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>เวลาแตะบัตรผ่านประตู / Gate entry</div>
             </div>
             <div className="flex items-center text-xs font-bold text-brand mt-2">
               ดูข้อมูล <ArrowRight size={14} className="ml-1" />
@@ -427,6 +429,13 @@ export default function StudentHome() {
               อาคาร 1 ชั้น 1 — เจ้าหน้าที่จะแตะบัตรแล้วเติมให้ในระบบ ยอดขึ้นในแอปทันที
             </p>
           </div>
+
+          {/* ประวัติเงินเข้า-ออก วางไว้ในโมดัลยอดเงินเลย
+              เพราะคำถามที่ตามมาทันทีหลังเห็นยอดคือ "ยอดนี้มาจากไหน หายไปไหน" */}
+          <div className="space-y-2">
+            <span className={`text-xs font-extrabold block ${textPrimary}`}>ประวัติเงินเข้า-ออก</span>
+            <WalletHistory />
+          </div>
         </div>
       </Modal>
 
@@ -559,42 +568,11 @@ export default function StudentHome() {
       </Modal>
 
       {/* MODAL: Entrance Times */}
-      <Modal isOpen={activeModal === 'entry'} onClose={() => setActiveModal(null)} title="🕐 เวลาเข้า–ออก">
-        <div className="space-y-4">
-          <p className={`text-xs ${textMuted}`}>ภาคเรียน 1/2569 • ห้อง ปวช.3/6</p>
-          <div className={`border-l-2 pl-4 space-y-4 ml-2 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-            <div className="relative">
-              <div className={`absolute -left-[22px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-4 ${isDark ? 'ring-slate-800' : 'ring-white'}`} />
-              <div className="flex justify-between items-center">
-                <div>
-                  <div className={`text-sm font-bold ${isDark ? 'text-white' : 'text-ink'}`}>เข้าสถานศึกษา</div>
-                  <div className={`text-[10px] ${textMuted}`}>ประตูหน้า (Main Gate)</div>
-                </div>
-                <div className="text-sm font-extrabold text-accent-emerald">07:42</div>
-              </div>
-            </div>
-            <div className="relative">
-              <div className={`absolute -left-[22px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-rose-500 rounded-full ring-4 ${isDark ? 'ring-slate-800' : 'ring-white'}`} />
-              <div className="flex justify-between items-center">
-                <div>
-                  <div className={`text-sm font-bold ${isDark ? 'text-white' : 'text-ink'}`}>ออกนอกสถานศึกษา</div>
-                  <div className={`text-[10px] ${textMuted}`}>ประตูหลัง (Back Gate)</div>
-                </div>
-                <div className="text-sm font-extrabold text-accent-rose">16:30</div>
-              </div>
-            </div>
-            <div className="relative">
-              <div className={`absolute -left-[22px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-4 ${isDark ? 'ring-slate-800' : 'ring-white'}`} />
-              <div className="flex justify-between items-center">
-                <div>
-                  <div className={`text-sm font-bold ${isDark ? 'text-white' : 'text-ink'}`}>เข้าสถานศึกษา (เมื่อวาน)</div>
-                  <div className={`text-[10px] ${textMuted}`}>ประตูหน้า (Main Gate)</div>
-                </div>
-                <div className="text-sm font-extrabold text-accent-emerald">07:55</div>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* MODAL: เวลาเข้าโรงเรียน — ขาเข้าอย่างเดียว
+          ของเดิมเป็นเลขเขียนตายไว้ (เข้า 07:42 / ออก 16:30) ทุกคนเห็นเหมือนกันหมด
+          และมีบรรทัด "ออกนอกสถานศึกษา" ทั้งที่ของจริงไม่มีใครแตะบัตรตอนกลับ */}
+      <Modal isOpen={activeModal === 'entry'} onClose={() => setActiveModal(null)} title="🕐 เวลาเข้าโรงเรียน">
+        <GateEntryLog />
       </Modal>
 
       {/* MODAL: Debts */}

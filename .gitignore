@@ -56,3 +56,6 @@ supabase/migrations/08_seed_staff.sql
 
 # ผลตรวจของเครื่องมือ design review (impeccable) ไม่ใช่ซอร์สโค้ดของโปรเจกต์
 .impeccable/
+
+# ไฟล์รวมไว้รันครั้งเดียว ไม่ใช่ migration จริง (ตัวจริงแยกไฟล์อยู่แล้ว)
+supabase/migrations/RUN_NEXT.sql
