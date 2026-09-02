@@ -16,6 +16,7 @@ import { useLeaveRequests } from '../../hooks/useLeaveRequests';
 import LeaveRequestList from '../../components/leave/LeaveRequestList';
 import WalletHistory from '../../components/wallet/WalletHistory';
 import GateEntryLog from '../../components/gate/GateEntryLog';
+import { useIsDesktop } from '../../hooks/useMediaQuery';
 import {
   Clock,
   Award,
@@ -30,7 +31,9 @@ import {
   History,
   Receipt,
   QrCode,
-  Coffee
+  Coffee,
+  CalendarDays,
+  ChevronDown
 } from 'lucide-react';
 
 /** คะแนนเก็บภาคเรียน 1/2569 — mock data ของหน้าคะแนนระหว่างภาค */
@@ -107,6 +110,11 @@ export default function StudentHome() {
 
   // Modal states
   const [activeModal, setActiveModal] = useState(null);
+
+  /* ปฏิทินพับไว้เป็นค่าเริ่มต้นบนมือถือ เพราะเป็น element ที่สูงที่สุดในหน้า
+     บนคอมไม่ต้องพับ ปฏิทินอยู่รางขวาที่ตรึงไว้ ไม่ได้ดันเนื้อหาหลักลงไปไหน */
+  const isDesktop = useIsDesktop();
+  const [calendarOpen, setCalendarOpen] = useState(false);
   
   // Leave Request Form States
   const [leaveType, setLeaveType] = useState('sick');
@@ -204,20 +212,54 @@ export default function StudentHome() {
         </div>
       </div>
 
-      {/* บนมือถืออ่านไล่ลงมาตามลำดับใน DOM: กิจกรรม -> ปฏิทิน -> เมนู
-          บนคอมแยกเป็นสองคอลัมน์ เมนูอยู่ซ้าย ปฏิทินเป็นรางขวาที่ตรึงไว้
-          สลับตำแหน่งด้วย order ไม่ใช่ย้าย DOM เพื่อไม่ให้ลำดับบนมือถือเปลี่ยน */}
+      {/* ลำดับบนมือถือ: เมนู -> กิจกรรม -> ปฏิทิน (พับไว้)
+          ของเดิมเรียง กิจกรรม -> ปฏิทิน -> เมนู ซึ่งแปลว่าเปิดแอปมาต้องเลื่อนผ่าน
+          ปฏิทินเต็มเดือน (สูงราว 400px บนจอ 375) ก่อนจะเจอเมนูสักปุ่ม
+          ทั้งที่เมนูคือเหตุผลที่เปิดแอป ส่วนปฏิทินคือของที่เปิดดูเป็นครั้งคราว
+
+          บนคอมยังเป็นสองคอลัมน์เหมือนเดิม เมนูซ้าย ปฏิทินเป็นรางขวาที่ตรึงไว้
+          ซึ่งไม่กินพื้นที่แนวตั้งของเนื้อหาหลักอยู่แล้ว จึงไม่ต้องพับ */}
       <div className="grid gap-6 xl:grid-cols-[1fr_380px] items-start">
-        <div className="space-y-6 xl:order-2 xl:sticky xl:top-24">
-          {/* กิจกรรมที่กำลังจะมาถึง — วางเหนือปฏิทิน เพราะเป็นสิ่งที่ต้องเห็นโดยไม่ต้องกดอะไรเลย */}
+        <div className="order-2 xl:order-2 space-y-6 xl:sticky xl:top-24">
+          {/* กิจกรรมที่กำลังจะมาถึง — สั้นและต้องเห็นโดยไม่ต้องกดอะไรเลย */}
           <UpcomingEvents />
 
-          {/* Academic Calendar */}
-          <AcademicCalendar />
+          {/* ปฏิทินการศึกษา — บนคอมแสดงเสมอ บนมือถือพับไว้เพราะเป็นตัวที่ทำให้หน้ายาวที่สุด */}
+          {!isDesktop && (
+            <button
+              type="button"
+              onClick={() => setCalendarOpen((v) => !v)}
+              aria-expanded={calendarOpen}
+              aria-controls="student-calendar"
+              className={`w-full min-h-[48px] px-4 rounded-2xl border flex items-center justify-between gap-2 text-sm font-extrabold transition-colors ${
+                isDark
+                  ? 'bg-white/[0.04] border-white/5 text-white hover:bg-white/[0.07]'
+                  : 'bg-surface-card border-slate-100 text-ink hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <CalendarDays size={17} className="text-brand" aria-hidden="true" />
+                ปฏิทินการศึกษา
+              </span>
+              <ChevronDown
+                size={17}
+                aria-hidden="true"
+                className={`text-content-muted transition-transform duration-200 ${calendarOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+          )}
+
+          {/* instance เดียว ไม่ render ซ้ำสองชุดแล้วซ่อนด้วย CSS
+              ไม่งั้นจะโหลดกิจกรรมจากฐานข้อมูลสองรอบโดยเปล่าประโยชน์ */}
+          {(isDesktop || calendarOpen) && (
+            <div id="student-calendar">
+              <AcademicCalendar />
+            </div>
+          )}
         </div>
 
         {/* Dashboard Grid */}
-        <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 xl:order-1">
+        <div className="order-1 xl:order-1 grid grid-cols-2 xl:grid-cols-3 gap-4">
         {/* Entrance Times */}
         <GlassCard onClick={() => setActiveModal('entry')}>
           <div className="flex flex-col h-full justify-between min-h-[110px]">
