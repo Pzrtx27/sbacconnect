@@ -38,6 +38,7 @@ import {
   DAY_LABELS,
   PERIODS,
   fetchTimetable,
+  fetchClassIds,
   subscribeTimetable,
   saveSlot,
   clearSubstitution,
@@ -45,10 +46,6 @@ import {
   isSheetConfigured,
 } from '../../utils/timetable';
 
-/* ป้ายบอกตรง ๆ ว่าส่วนไหนยังต่อฐานข้อมูลไม่ได้
-   ก่อนหน้านี้ปุ่มพวกนี้กดได้ปกติแล้วเด้ง toast กลาง ๆ ว่า "อัปเดตตาราง­ล้มเหลว"
-   คนกดจะเข้าใจว่าแอปพัง ทั้งที่จริงคือฟีเจอร์ยังย้ายมาไม่เสร็จ — คนละเรื่องกัน
-   โดยเฉพาะตอนนำเสนอที่คนดูจะกดทุกปุ่มที่เห็น */
 /** m3_6 -> ม.3/6 — ใช้หลายที่ในหน้านี้ เขียนครั้งเดียวจะได้ไม่เพี้ยนกันเอง */
 function classLabel(classId) {
   return String(classId || '').replace('m', 'ม.').replace('_', '/');
@@ -90,7 +87,10 @@ export default function AcademicDashboard() {
 
   // Selected class room/branch states
   const [selectedClassId, setSelectedClassId] = useState('m3_6');
-  const [selectedBranch, setSelectedBranch] = useState('เทคโนโลยีสารสนเทศ');
+
+  /* ห้องที่มีตารางอยู่จริง อ่านจาก DB ไม่ใช่รายชื่อ 20 ห้องที่เขียนตายไว้ในโค้ด */
+  const [classIds, setClassIds] = useState([]);
+  const [classIdsLoading, setClassIdsLoading] = useState(true);
 
   // Preview State
   const [timetableData, setTimetableData] = useState({});
@@ -372,6 +372,30 @@ export default function AcademicDashboard() {
     return subscribeTimetable(selectedClassId, setTimetableData);
   }, [selectedClassId, reloadTimetable]);
 
+  /* โหลดรายชื่อห้องครั้งเดียวตอนเข้าหน้า
+     ถ้าห้องที่เลือกไว้ (ค่าเริ่มต้น m3_6) ไม่มีอยู่จริง ให้เด้งไปห้องแรกที่มี
+     ไม่งั้นเปิดหน้ามาเจอตารางว่างทั้งที่ห้องอื่นมีข้อมูล */
+  const loadClassIds = useCallback(async () => {
+    setClassIdsLoading(true);
+    try {
+      const ids = await fetchClassIds();
+      setClassIds(ids);
+      if (ids.length > 0 && !ids.includes(selectedClassId)) setSelectedClassId(ids[0]);
+    } catch (err) {
+      console.error('[academic] โหลดรายชื่อห้องไม่สำเร็จ:', err);
+      setClassIds([]);
+    } finally {
+      setClassIdsLoading(false);
+    }
+    // เจตนาไม่ใส่ selectedClassId ใน deps — ต้องการให้เช็คแค่ตอนโหลดครั้งแรก
+    // ถ้าใส่ไป การกดเลือกห้องแต่ละครั้งจะไปยิงโหลดรายชื่อห้องใหม่ทุกครั้ง
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    loadClassIds();
+  }, [loadClassIds]);
+
   /* ย้ายค่าของคาบที่เลือกเข้าฟอร์ม
      ต้องเคลียร์ช่องครูสอนแทนเมื่อคาบนั้นไม่ได้ถูกสั่งสอนแทน ไม่งั้นชื่อครูจากคาบก่อนหน้า
      จะค้างอยู่ในช่อง แล้วกดบันทึกทีเดียวกลายเป็นสั่งสอนแทนคาบที่ไม่ได้ตั้งใจ */
@@ -485,7 +509,7 @@ export default function AcademicDashboard() {
         </h2>
         <span className={`text-xs font-bold px-3 py-1 rounded-lg transition-colors duration-300 ${isDark ? 'bg-white/10 text-content-secondary' : 'bg-slate-100 text-ink-secondary'
           }`}>
-          ห้อง {classLabel(selectedClassId)} ({selectedBranch})
+          ห้อง {classLabel(selectedClassId)}
         </span>
       </div>
 
@@ -545,78 +569,62 @@ export default function AcademicDashboard() {
           tabIndex={-1}
           className="space-y-6"
         >
-            {/* Select Branch and Class Room */}
-        <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
+            {/* เลือกห้อง
+                เดิมเป็น dropdown สาขา 12 สาขา + ห้อง 20 ห้อง ทั้งที่:
+                  - ตัวเลือกสาขาไม่เคยถูกใช้กรองหรือบันทึกอะไรเลย เอาไปโชว์เป็นข้อความบนหัวอย่างเดียว
+                  - มีตารางจริงแค่สองห้อง อีก 18 ห้องเลือกไปก็เจอหน้าว่างโดยไม่มีคำอธิบาย
+                    ซึ่งดูเหมือนระบบพัง ทั้งที่คือห้องนั้นยังไม่มีใครใส่ตาราง
+                ตอนนี้แสดงเฉพาะห้องที่มีตารางอยู่จริงในฐานข้อมูล */}
+        <div className={`rounded-3xl border p-5 shadow-sm space-y-3 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
           }`}>
-          <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
-            }`}>
-            <Settings size={18} className="text-brand" />
-            เลือกห้องเรียนและสาขาวิชาที่จะจัดการ
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>สาขาวิชา (12 สาขา)</label>
-              <select
-                value={selectedBranch}
-                onChange={e => setSelectedBranch(e.target.value)}
-                className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
-                  ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                  : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-surface-card'
-                  }`}
-              >
-                <option value="เทคโนโลยีสารสนเทศ">เทคโนโลยีสารสนเทศ (IT)</option>
-                <option value="คอมพิวเตอร์ธุรกิจ">คอมพิวเตอร์ธุรกิจ</option>
-                <option value="ดิจิทัลมีเดีย">ดิจิทัลมีเดีย</option>
-                <option value="กราฟิกดีไซน์">กราฟิกดีไซน์</option>
-                <option value="การบัญชี">การบัญชี</option>
-                <option value="การตลาด">การตลาด</option>
-                <option value="โลจิสติกส์">โลจิสติกส์</option>
-                <option value="การท่องเที่ยว">การท่องเที่ยว</option>
-                <option value="การโรงแรม">การโรงแรม</option>
-                <option value="อาหารและโภชนาการ">อาหารและโภชนาการ</option>
-                <option value="ช่างยนต์">ช่างยนต์</option>
-                <option value="ไฟฟ้ากำลัง">ไฟฟ้ากำลัง</option>
-              </select>
-            </div>
-            <div>
-              <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>ห้องเรียน (20 ห้อง)</label>
-              <select
-                value={selectedClassId}
-                onChange={e => setSelectedClassId(e.target.value)}
-                className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
-                  ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                  : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-surface-card'
-                  }`}
-              >
-                <optgroup label="มัธยมศึกษาปีที่ 1">
-                  <option value="m1_1">ม.1/1</option>
-                  <option value="m1_2">ม.1/2</option>
-                  <option value="m1_3">ม.1/3</option>
-                  <option value="m1_4">ม.1/4</option>
-                </optgroup>
-                <optgroup label="มัธยมศึกษาปีที่ 2">
-                  <option value="m2_1">ม.2/1</option>
-                  <option value="m2_2">ม.2/2</option>
-                  <option value="m2_3">ม.2/3</option>
-                  <option value="m2_4">ม.2/4</option>
-                </optgroup>
-                <optgroup label="มัธยมศึกษาปีที่ 3">
-                  <option value="m3_1">ม.3/1</option>
-                  <option value="m3_2">ม.3/2</option>
-                  <option value="m3_3">ม.3/3</option>
-                  <option value="m3_4">ม.3/4</option>
-                  <option value="m3_5">ม.3/5</option>
-                  <option value="m3_6">ม.3/6</option>
-                  <option value="m3_7">ม.3/7</option>
-                  <option value="m3_8">ม.3/8</option>
-                  <option value="m3_9">ม.3/9</option>
-                  <option value="m3_10">ม.3/10</option>
-                  <option value="m3_11">ม.3/11</option>
-                  <option value="m3_12">ม.3/12</option>
-                </optgroup>
-              </select>
-            </div>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
+              }`}>
+              <Settings size={18} className="text-brand" />
+              ห้องที่กำลังจัดการ
+            </h3>
+            <span className="text-[10px] font-bold text-content-muted">
+              {classIds.length > 0 ? `${classIds.length} ห้อง` : ''}
+            </span>
           </div>
+
+          {classIdsLoading ? (
+            <div className="flex gap-2">
+              {[0, 1].map((i) => (
+                <div
+                  key={i}
+                  className={`h-11 w-24 rounded-xl animate-pulse ${isDark ? 'bg-white/5' : 'bg-slate-100'}`}
+                />
+              ))}
+            </div>
+          ) : classIds.length === 0 ? (
+            /* ยังไม่มีห้องไหนมีตารางเลย — บอกทางออกไปเลย ไม่ใช่ปล่อยให้หน้าว่าง */
+            <p className="text-xs font-semibold text-content-muted leading-relaxed">
+              ยังไม่มีห้องไหนมีตารางสอนในระบบ — กดปุ่ม
+              <span className="font-extrabold"> นำเข้าตารางทั้งเทอมจาก Google Sheet </span>
+              ด้านล่าง หรือรัน <code className="font-mono">25_timetables.sql</code> เพื่อใส่ข้อมูลตั้งต้น
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {classIds.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setSelectedClassId(id)}
+                  aria-pressed={selectedClassId === id}
+                  className={`min-h-[44px] px-5 rounded-xl text-sm font-extrabold border transition-all active:scale-95 ${
+                    selectedClassId === id
+                      ? 'bg-sbac-blue text-white border-sbac-blue shadow-button'
+                      : isDark
+                        ? 'bg-white/5 text-content-secondary border-white/10 hover:bg-white/10'
+                        : 'bg-slate-50 text-ink-secondary border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {classLabel(id)}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Timetable modification form */}

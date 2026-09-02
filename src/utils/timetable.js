@@ -80,6 +80,31 @@ export async function fetchTimetable(classId) {
   return rowsToTimetable(data || []);
 }
 
+/** รายชื่อห้องที่มีตารางสอนอยู่จริงในฐานข้อมูล
+ *
+ *  ที่ต้องอ่านจาก DB ไม่ใช่เขียนรายชื่อห้องไว้ในโค้ด:
+ *  ของเดิมหน้าวิชาการมี dropdown 20 ห้อง (ม.1/1 ถึง ม.3/12) ทั้งที่มีข้อมูลจริงแค่สองห้อง
+ *  เลือกห้องที่เหลือไปก็เจอตารางว่างโดยไม่มีคำอธิบาย เหมือนระบบพัง
+ *  ทั้งที่จริงคือห้องนั้นยังไม่เคยมีใครใส่ตาราง
+ *
+ *  เรียงตามระดับชั้นแล้วเลขห้อง ไม่ใช่เรียงตามตัวอักษร (ไม่งั้น m3_10 มาก่อน m3_4) */
+export async function fetchClassIds() {
+  const { data, error } = await supabase
+    .from('timetables')
+    .select('class_id');
+
+  if (error) throw error;
+
+  const ids = [...new Set((data || []).map((r) => r.class_id))];
+
+  return ids.sort((a, b) => {
+    const [, la, ra] = a.match(/^m(\d+)_(\d+)$/) || [];
+    const [, lb, rb] = b.match(/^m(\d+)_(\d+)$/) || [];
+    if (!la || !lb) return a.localeCompare(b);
+    return Number(la) - Number(lb) || Number(ra) - Number(rb);
+  });
+}
+
 /** ติดตามการแก้ไขตารางของห้องนี้แบบ realtime
  *
  *  กรองที่ฝั่ง server ด้วย filter class_id — ไม่ใช่รับทุกห้องมาแล้วค่อยกรองในเบราว์เซอร์

@@ -126,6 +126,17 @@ create policy timetables_write_academic on public.timetables
   using (public.app_is_academic_staff())
   with check (public.app_is_academic_staff());
 
+-- grant คือ "ประตูชั้นนอก" ส่วน policy คือ "ยามที่ตรวจทีละแถว" ต้องเปิดทั้งคู่ถึงจะผ่าน
+-- (แนวเดียวกับ 10_events.sql และ 20_behavior_and_notifications.sql ทุกตาราง)
+--
+-- ที่ต้อง revoke anon ทั้งที่ policy เขียน "to authenticated" อยู่แล้ว:
+--   Supabase ให้สิทธิ์ anon กับตารางใหม่ใน public โดยอัตโนมัติ ถ้าไม่ถอน
+--   คนที่ยังไม่ล็อกอินจะยิง /rest/v1/timetables แล้วได้ 200 กลับไป (แม้ได้ผลลัพธ์ว่าง)
+--   ตอนนี้ยังไม่รั่วเพราะไม่มี policy ให้ anon แต่ถ้าวันหลังมีใครเผลอเพิ่ม policy
+--   ที่ไม่ระบุ role ข้อมูลจะหลุดทันทีโดยไม่มีใครรู้ — ปิดประตูชั้นนอกไว้เลยดีกว่า
+grant select, insert, update, delete on public.timetables to authenticated;
+revoke all on public.timetables from anon;
+
 -- ============================================================
 -- Realtime — หัวใจของฟีเจอร์นี้
 -- ถ้าไม่เพิ่มเข้า publication หน้าเว็บ subscribe แล้วจะไม่มี event ส่งมาเลย
