@@ -36,6 +36,7 @@ import TabNav from '../../components/layout/TabNav';
 import {
   DAYS,
   DAY_LABELS,
+  DAY_LABELS_SHORT,
   PERIODS,
   fetchTimetable,
   fetchClassIds,
@@ -656,7 +657,7 @@ export default function AcademicDashboard() {
                         : 'bg-slate-50 text-ink-secondary border-slate-200 hover:bg-slate-100'
                   }`}
                 >
-                  {DAY_LABELS[d].slice(0, 2)}
+                  {DAY_LABELS_SHORT[d]}
                 </button>
               ))}
             </div>
