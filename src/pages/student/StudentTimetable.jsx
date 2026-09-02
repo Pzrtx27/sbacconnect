@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Calendar, AlertCircle } from 'lucide-react';
-import { fetchTimetableForClass, isSheetConfigured, TIMETABLE_POLL_INTERVAL_MS } from '../../config/sheets';
+import { fetchTimetable, subscribeTimetable } from '../../utils/timetable';
 
 /* ตารางสอนจริง ภาคเรียน 1/2569 — ทำหน้าที่เป็นข้อมูลตัวอย่าง/สำรอง
    ก่อนตั้งค่า Google Sheet (ดู src/config/sheets.js) เมื่อเชื่อมชีตแล้ว
@@ -127,43 +127,56 @@ export default function StudentTimetable() {
   const isDark = theme === 'dark';
   const classId = user?.class_id || 'm3_6';
 
-  const [timetable, setTimetable] = useState(SEED_TIMETABLE_BY_CLASS[classId] || {});
-  const [source, setSource] = useState('seed'); // 'seed' | 'sheet' | 'sheet-error'
+  const [timetable, setTimetable] = useState({});
+  const [source, setSource] = useState('loading'); // 'loading' | 'live' | 'seed' | 'error'
   const [lastUpdated, setLastUpdated] = useState('');
 
-  const loadFromSheet = useCallback(async () => {
+  const stamp = () =>
+    setLastUpdated(new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }));
+
+  /* อ่านจากตาราง timetables ใน Supabase แล้วเปิด realtime ค้างไว้ (25_timetables.sql)
+     ของเดิม poll ทั้งไฟล์ csv จาก Google Sheet ทุก 20 วินาที ซึ่งแปลว่า
+     ถ้าฝ่ายวิชาการสั่งสอนแทนตอนคาบกำลังจะเริ่ม นักเรียนอาจรู้ช้าไปถึง 20 วินาที
+     และชีตเขียนกลับไม่ได้ ฝ่ายวิชาการจึงไม่มีทางแก้ให้เห็นผลที่หน้านี้ได้เลย
+
+     ตอนนี้ฝ่ายวิชาการกดบันทึก เซิร์ฟเวอร์ส่งเฉพาะแถวที่เปลี่ยนมาที่เครื่องนี้ทันที */
+  const load = useCallback(async () => {
     try {
-      const data = await fetchTimetableForClass(classId);
-      if (data && Object.keys(data).length > 0) {
+      const data = await fetchTimetable(classId);
+      if (Object.keys(data).length > 0) {
         setTimetable(data);
-        setSource('sheet');
-        setLastUpdated(new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }));
+        setSource('live');
+      } else {
+        // ห้องนี้ยังไม่มีข้อมูลใน DB — แสดงตารางตัวอย่างไว้ก่อน และบอกตรง ๆ ว่านี่คือตัวอย่าง
+        setTimetable(SEED_TIMETABLE_BY_CLASS[classId] || {});
+        setSource('seed');
       }
+      stamp();
     } catch (err) {
-      console.warn('[timetable] โหลดจาก Google Sheet ไม่สำเร็จ, ใช้ข้อมูลตัวอย่างแทน', err);
-      setSource((prev) => (prev === 'sheet' ? prev : 'sheet-error'));
+      console.error('[timetable] โหลดตารางสอนไม่สำเร็จ:', err);
+      setTimetable(SEED_TIMETABLE_BY_CLASS[classId] || {});
+      setSource('error');
     }
   }, [classId]);
 
   useEffect(() => {
-    setTimetable(SEED_TIMETABLE_BY_CLASS[classId] || {});
-    setSource('seed');
+    setSource('loading');
+    load();
 
-    if (!isSheetConfigured(classId)) return;
+    return subscribeTimetable(classId, (next) => {
+      setTimetable(next);
+      setSource('live');
+      stamp();
+    });
+  }, [classId, load]);
 
-    loadFromSheet();
-    const interval = setInterval(loadFromSheet, TIMETABLE_POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [classId, loadFromSheet]);
-
-  const statusLabel =
-    source === 'sheet' ? 'Real-time' : source === 'sheet-error' ? 'เชื่อมชีตไม่สำเร็จ' : 'ตัวอย่าง (ยังไม่เชื่อมชีต)';
-  const statusColor =
-    source === 'sheet'
-      ? isDark ? 'bg-emerald-950/30 text-accent-emerald' : 'bg-emerald-50 text-accent-emerald'
-      : source === 'sheet-error'
-      ? isDark ? 'bg-rose-950/30 text-accent-rose' : 'bg-rose-50 text-accent-rose'
-      : isDark ? 'bg-amber-950/30 text-accent-amber' : 'bg-amber-50 text-accent-amber';
+  const STATUS = {
+    loading: { label: 'กำลังโหลด...', dot: 'bg-slate-400', tone: isDark ? 'bg-white/10 text-content-secondary' : 'bg-slate-100 text-ink-secondary' },
+    live: { label: 'อัปเดตสด', dot: 'bg-emerald-500 animate-pulse', tone: isDark ? 'bg-emerald-950/30 text-accent-emerald' : 'bg-emerald-50 text-accent-emerald' },
+    seed: { label: 'ตัวอย่าง (ห้องนี้ยังไม่มีข้อมูล)', dot: 'bg-amber-500', tone: isDark ? 'bg-amber-950/30 text-accent-amber' : 'bg-amber-50 text-accent-amber' },
+    error: { label: 'เชื่อมต่อไม่สำเร็จ', dot: 'bg-rose-500', tone: isDark ? 'bg-rose-950/30 text-accent-rose' : 'bg-rose-50 text-accent-rose' },
+  };
+  const status = STATUS[source] || STATUS.loading;
 
   return (
     <div className="space-y-6 xl:max-w-4xl">
@@ -173,9 +186,14 @@ export default function StudentTimetable() {
           <Calendar size={24} className="text-brand" />
           ตารางสอน
         </h2>
-        <span className={`text-xs font-bold flex items-center gap-1 px-3 py-1 rounded-full transition-colors duration-300 ${statusColor}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${source === 'sheet' ? 'bg-emerald-500 animate-pulse' : source === 'sheet-error' ? 'bg-rose-500' : 'bg-amber-500'}`} />
-          {statusLabel}
+        {/* aria-live ให้ screen reader ประกาศเองตอนตารางถูกแก้ระหว่างเปิดหน้าอยู่
+            ไม่งั้นคนที่มองไม่เห็นจะไม่รู้เลยว่าคาบเปลี่ยนไปแล้ว */}
+        <span
+          aria-live="polite"
+          className={`text-xs font-bold flex items-center gap-1 px-3 py-1 rounded-full transition-colors duration-300 ${status.tone}`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+          {status.label}
         </span>
       </div>
 
@@ -202,9 +220,9 @@ export default function StudentTimetable() {
         </div>
         <div className={`text-[10px] border-t pt-2 flex justify-between transition-colors duration-300 ${isDark ? 'text-content-secondary border-white/10' : 'text-ink-muted border-slate-200/50'
           }`}>
-          <span>{lastUpdated ? `อัปเดตล่าสุด: ${lastUpdated} น.` : 'ยังไม่ได้ซิงก์จาก Google Sheets'}</span>
-          <span className={source === 'sheet' ? 'text-accent-emerald font-bold' : 'text-content-muted font-bold'}>
-            {source === 'sheet' ? '● Connected' : '○ Offline'}
+          <span>{lastUpdated ? `อัปเดตล่าสุด: ${lastUpdated} น.` : 'กำลังเชื่อมต่อ...'}</span>
+          <span className={source === 'live' ? 'text-accent-emerald font-bold' : 'text-content-muted font-bold'}>
+            {source === 'live' ? '● Connected' : '○ Offline'}
           </span>
         </div>
       </div>
@@ -299,7 +317,7 @@ export default function StudentTimetable() {
         <AlertCircle className="text-accent-rose flex-shrink-0" size={16} />
         <p className={`text-[10px] leading-relaxed transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-muted'
           }`}>
-          <strong>หมายเหตุ:</strong> คาบเรียนแถบสีแดงกระพริบ มีการปรับเปลี่ยนการเรียนการสอน (มีอาจารย์สอนแทนหรือเปลี่ยนห้องเรียน) ซิงก์จาก Google Sheets ทุก {TIMETABLE_POLL_INTERVAL_MS / 1000} วินาที
+          <strong>หมายเหตุ:</strong> คาบเรียนแถบสีแดงกระพริบ มีการปรับเปลี่ยนการเรียนการสอน (มีอาจารย์สอนแทนหรือเปลี่ยนห้องเรียน) เมื่อฝ่ายวิชาการแก้ตาราง หน้านี้จะเปลี่ยนตามทันทีโดยไม่ต้องรีเฟรช
         </p>
       </div>
     </div>
