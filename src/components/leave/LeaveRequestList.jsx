@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { CheckCircle2, XCircle, Check, X } from 'lucide-react';
+import { CheckCircle2, XCircle, Check } from 'lucide-react';
 import { LEAVE_TYPE_LABELS, LEAVE_STATUS_TEXT, LEAVE_STATUS_COLOR } from '../../utils/leave';
 
 /* รายการใบลา ใช้ร่วมกัน 3 ที่:
