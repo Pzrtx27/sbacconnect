@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Calendar, AlertCircle } from 'lucide-react';
-import { fetchTimetable, subscribeTimetable, fetchClassIds } from '../../utils/timetable';
+import { fetchTimetable, subscribeTimetable, fetchClassIds, classLabel } from '../../utils/timetable';
 
 /* ตารางสอนจริง ภาคเรียน 1/2569 — ทำหน้าที่เป็นข้อมูลตัวอย่าง/สำรอง
    ก่อนตั้งค่า Google Sheet (ดู src/config/sheets.js) เมื่อเชื่อมชีตแล้ว
@@ -104,9 +104,6 @@ const DAYS_TH = {
   Thursday: 'พฤหัสฯ',
   Friday: 'ศุกร์'
 };
-
-/** m3_6 -> ม.3/6 */
-const classLabel = (id) => String(id || '').replace('m', 'ม.').replace('_', '/');
 
 /* ครูที่ปรึกษาแต่ละห้อง ยังไม่มีตารางใน DB จึงเขียนไว้ที่นี่ก่อน
    ห้องที่ไม่อยู่ในรายการจะขึ้น "ยังไม่ระบุ" แทนการเดาชื่อครูมั่ว ๆ
@@ -302,7 +299,7 @@ export default function StudentTimetable() {
         <div className="flex justify-between">
           <span className={isDark ? 'text-content-secondary' : 'text-ink-muted'}>ระดับชั้น / ห้อง</span>
           <span className={`font-bold transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
-            ปวช. {classLabel(viewClassId).replace('ม.', '')}
+            {classLabel(viewClassId)}
             {viewClassId === myClassId && user?.branch ? ` (${user.branch})` : ''}
           </span>
         </div>

@@ -44,12 +44,8 @@ import {
   clearSubstitution,
   importFromSheet,
   isSheetConfigured,
+  classLabel,
 } from '../../utils/timetable';
-
-/** m3_6 -> ม.3/6 — ใช้หลายที่ในหน้านี้ เขียนครั้งเดียวจะได้ไม่เพี้ยนกันเอง */
-function classLabel(classId) {
-  return String(classId || '').replace('m', 'ม.').replace('_', '/');
-}
 
 /** กล่องอธิบายขั้นตอนการทำงานที่ต้องรู้ก่อนกดปุ่ม
  *  ไม่ใช่คำเตือนว่าพัง — ของที่พังถูกแก้หรือถอดออกไปหมดแล้ว */

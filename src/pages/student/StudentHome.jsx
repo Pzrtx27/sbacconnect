@@ -561,7 +561,7 @@ export default function StudentHome() {
       {/* MODAL: Entrance Times */}
       <Modal isOpen={activeModal === 'entry'} onClose={() => setActiveModal(null)} title="🕐 เวลาเข้า–ออก">
         <div className="space-y-4">
-          <p className={`text-xs ${textMuted}`}>ภาคเรียน 1/2569 • ห้อง ม.3/6</p>
+          <p className={`text-xs ${textMuted}`}>ภาคเรียน 1/2569 • ห้อง ปวช.3/6</p>
           <div className={`border-l-2 pl-4 space-y-4 ml-2 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
             <div className="relative">
               <div className={`absolute -left-[22px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-4 ${isDark ? 'ring-slate-800' : 'ring-white'}`} />

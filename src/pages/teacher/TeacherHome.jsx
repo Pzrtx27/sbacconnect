@@ -267,7 +267,7 @@ export default function TeacherHome() {
             </span>
             <h2 className="text-2xl font-extrabold truncate">{user?.name}</h2>
             <p className="text-xs text-white/80">
-              อาจารย์ผู้ดูแลแผนกวิชาคอมพิวเตอร์ประจำชั้น ม.3/6 • SBAC Nonthaburi
+              อาจารย์ผู้ดูแลแผนกวิชาคอมพิวเตอร์ประจำชั้น ปวช.3/6 • SBAC Nonthaburi
             </p>
           </div>
 
@@ -490,7 +490,7 @@ export default function TeacherHome() {
       <Modal 
         isOpen={activeModal === 'homeroom'} 
         onClose={() => setActiveModal(null)} 
-        title="เช็คชื่อเข้าแถวโฮมรูม ม.3/6"
+        title="เช็คชื่อเข้าแถวโฮมรูม ปวช.3/6"
       >
         <div className="space-y-5">
           <p className={`text-xs ${textMuted}`}>
