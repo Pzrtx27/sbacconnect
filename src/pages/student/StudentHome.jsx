@@ -122,13 +122,11 @@ export default function StudentHome() {
                   toast ว่ายังไม่เปิดให้บริการอย่างเดียว
      ตั้งใจให้เป็นแบบนี้ ไม่งั้นนักเรียนเสกเงินให้ตัวเองได้
 
-     ทางเข้าที่เพิ่มมาใหม่ (18_topup_requests.sql, 19_topup_qr_instant.sql): เติมเงินด้วย
-     QR พร้อมเพย์ + แนบสลิป ผ่าน <TopUpSlipForm /> — เรียก RPC topup_qr_instant() ซึ่งเป็น
-     security definer ที่เขียน wallet_entries ให้เอง (หน้าเว็บเองยัง insert ตรง ๆ ไม่ได้เหมือนเดิม)
-     จุดนี้ "ขัดกับหลักการข้างบนโดยตั้งใจ": เติมเงินทันทีไม่มีเจ้าหน้าที่ตรวจสลิปก่อนเลย
-     เป็นความเสี่ยงที่ทีมงานรับทราบและเลือกใช้เอง (แลกความเร็ว) อ่านคำเตือนเต็มในคอมเมนต์
-     หัวไฟล์ 19_topup_qr_instant.sql — ถ้าจะกลับไปให้ตรวจก่อนเหมือนเดิม (ปลอดภัยกว่า)
-     ไฟล์ 18_topup_requests.sql ยังมี approve_topup_request()/reject_topup_request() ให้ใช้อยู่ */
+     ทางเข้าที่เพิ่มมาใหม่ (18_topup_requests.sql): เติมเงินด้วย QR พร้อมเพย์ + แนบสลิป
+     ผ่าน <TopUpSlipForm /> ซึ่ง insert เข้า topup_requests เป็นสถานะ pending
+     RLS บังคับว่าต้องเป็นของตัวเองและต้องเป็น pending เท่านั้น และไม่มี policy for update
+     จึงแก้ยอดหรือดันสถานะเป็น approved เองไม่ได้ เงินเข้าจริงตอนเจ้าหน้าที่เรียก
+     approve_topup_request() เท่านั้น — หลักการเดียวกับข้างบน ไม่มีข้อยกเว้น */
   // ยื่นใบลาจริงผ่าน RPC submit_leave_request (22_leave_requests.sql)
   const handleLeaveSubmit = async () => {
     if (!leaveStartDate) {
@@ -408,9 +406,8 @@ export default function StudentHome() {
           </div>
 
           {/* ปุ่มเติมเงินแบบเดิม (เขียน wallet_entries ตรง ๆ จากหน้าเว็บ) ถูกเอาออกไปแล้ว
-              ไม่ใช่แค่ซ่อน — RLS revoke สิทธิ์เขียนทิ้งทั้งหมด แต่ปุ่มนี้เปิดโมดัลที่เรียก
-              topup_qr_instant() (19_topup_qr_instant.sql) ซึ่งเติมเงินทันทีไม่มีใครตรวจสลิป
-              ก่อนเลย — เป็นข้อยกเว้นที่ทีมงานเลือกเอง อ่านคำเตือนในไฟล์นั้น */}
+              ไม่ใช่แค่ซ่อน — RLS revoke สิทธิ์เขียนทิ้งทั้งหมด
+              ปุ่มนี้เปิดฟอร์มที่ส่งคำขอเข้า topup_requests ให้เจ้าหน้าที่ตรวจสลิปก่อน */}
           <button
             type="button"
             onClick={() => setActiveModal('topup')}

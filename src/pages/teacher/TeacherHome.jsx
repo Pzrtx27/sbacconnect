@@ -762,7 +762,7 @@ export default function TeacherHome() {
         </div>
       </Modal>
 
-      {/* MODAL: เติมเงินด้วย QR พร้อมเพย์ + แนบสลิป — คอมโพเนนต์เดียวกับฝั่งนักเรียนเป๊ะ (topup_qr_instant ไม่แยก role) */}
+      {/* MODAL: เติมเงินด้วย QR พร้อมเพย์ + แนบสลิป — คอมโพเนนต์เดียวกับฝั่งนักเรียนเป๊ะ (คำขอเติมเงินไม่แยก role) */}
       <Modal
         isOpen={activeModal === 'topup'}
         onClose={() => setActiveModal(null)}

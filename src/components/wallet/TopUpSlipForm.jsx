@@ -13,18 +13,17 @@ import { Camera, UploadCloud, X, Loader2, CheckCircle2, AlertTriangle, RefreshCw
 const STORAGE_BUCKET = 'topup-slips';
 const MAX_TOPUP_BAHT = 20000; // เพดานกันพิมพ์ผิด/ทดสอบ ไม่ใช่ข้อจำกัดทางธุรกิจตายตัว
 
-/* ฟอร์มเติมเงินด้วย QR พร้อมเพย์ + แนบสลิปโอนเงิน (18_topup_requests.sql, 19_topup_qr_instant.sql)
+/* ฟอร์มเติมเงินด้วย QR พร้อมเพย์ + แนบสลิปโอนเงิน (18_topup_requests.sql)
 
    ขั้นตอน: กรอกจำนวนเงิน -> สแกน QR ด้วยแอปธนาคารแล้วโอนจริง -> ถ่าย/เลือกรูปสลิป
-   -> กดส่ง ยอดเงินเข้าบัตรทันที (เรียก RPC topup_qr_instant) ไม่มีเจ้าหน้าที่ตรวจสอบสลิปก่อน
+   -> กดส่ง = ส่งเป็น "คำขอ" สถานะ pending -> เจ้าหน้าที่การเงินตรวจสลิปแล้วกดอนุมัติ
+   -> เงินเข้าบัตรตอนนั้น
 
-   คำเตือน: นี่คือทางลัดที่ทีมงานเลือกเอง (แลกความเร็วกับความเสี่ยง) — เพราะไม่มีการตรวจสลิป
-   กับธนาคารจริง ระบบเชื่อยอดที่ผู้ใช้พิมพ์เอง 100% ใครก็แนบรูปอะไรก็ได้แล้วได้เงินตามยอด
-   ที่พิมพ์ทันที อ่านคำเตือนเต็มในคอมเมนต์หัวไฟล์ supabase/migrations/19_topup_qr_instant.sql
-   ถ้าจะกลับไปให้เจ้าหน้าที่ตรวจก่อนเหมือนเดิม (ปลอดภัยกว่า) ดูวิธีในคอมเมนต์ไฟล์เดียวกัน —
-   สรุปคือแก้ handleSubmit ด้านล่างนี้ให้ insert ตรงเข้า topup_requests แทนการเรียก RPC นี้ */
+   เดิมฟอร์มนี้เรียก topup_qr_instant() ซึ่งเติมเงินทันทีโดยเชื่อยอดที่ผู้ใช้พิมพ์เอง
+   ไม่มีใครตรวจ ถอดออกแล้วเพราะนักเรียนยิง RPC ตรงจาก DevTools วนลูปได้เงินไม่จำกัด
+   ฟังก์ชันนั้นยังอยู่ใน DB แต่ไม่มีอะไรในแอปเรียกใช้แล้ว */
 export default function TopUpSlipForm() {
-  const { user, updateBalance } = useAuth();
+  const { user } = useAuth();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
@@ -136,22 +135,31 @@ export default function TopUpSlipForm() {
         .upload(path, selectedFile, { contentType: fileMeta.mime, upsert: false });
       if (uploadError) throw uploadError;
 
-      // เติมเงินทันที ไม่มีเจ้าหน้าที่ตรวจสอบ (topup_qr_instant ใน 19_topup_qr_instant.sql)
-      // ทีมงานเลือกแลกความเร็วกับความเสี่ยงเรื่องสลิปปลอม/ยอดปลอมเอง — อ่านคำเตือนเต็ม
-      // ในคอมเมนต์หัวไฟล์นั้น ถ้าจะกลับไปให้เจ้าหน้าที่ตรวจก่อนเหมือนเดิม ดูคอมเมนต์ในไฟล์เดียวกัน
-      const { data: rpcData, error: rpcError } = await supabase.rpc('topup_qr_instant', {
-        p_amount_baht: amountValue,
-        p_slip_path: path,
-        p_slip_mime: fileMeta.mime,
-      });
-      if (rpcError) throw rpcError;
-      if (!rpcData?.ok) throw new Error(rpcData?.error || 'INSTANT_TOPUP_FAILED');
+      /* ส่งเป็น "คำขอ" ให้เจ้าหน้าที่ตรวจสลิปก่อน ไม่เติมเงินทันที
 
-      showToast('เติมเงินสำเร็จ! ยอดเข้าบัตรแล้ว', 'success');
+         ของเดิมเรียก topup_qr_instant() ซึ่งเชื่อยอดที่ผู้ใช้พิมพ์เองทั้งหมด
+         ไม่ตรวจสลิปกับธนาคาร และไม่มีใครอนุมัติ — นักเรียนเปิด DevTools
+         ยิง RPC วนลูปใส่ยอดสูงสุดก็ได้เงินไม่จำกัด แล้วเอาไปซื้อของจริงได้
+         (ไม่ต้องอัปโหลดไฟล์ด้วยซ้ำ เพราะ RPC ตรวจแค่ว่า path ขึ้นต้นด้วย uid ตัวเอง)
+
+         ทางนี้ปลอดภัยเพราะ RLS บังคับไว้แล้วที่ 18_topup_requests.sql:91-93
+           with check (user_id = app_current_user_id() and status = 'pending')
+         ส่งเป็นของคนอื่นไม่ได้ และยัด status='approved' มาเองจาก DevTools ก็ไม่ผ่าน
+         ทั้งตารางไม่มี policy for update เลย จึงแก้ยอดหลังส่งไม่ได้ด้วย
+         เงินเข้าจริงตอนเจ้าหน้าที่เรียก approve_topup_request() เท่านั้น */
+      const { error: insertError } = await supabase.from('topup_requests').insert({
+        user_id: user.uid,
+        amount_baht: amountValue,
+        slip_path: path,
+        slip_mime: fileMeta.mime,
+        status: 'pending',
+      });
+      if (insertError) throw insertError;
+
+      showToast('ส่งคำขอเติมเงินแล้ว รอเจ้าหน้าที่ตรวจสลิป', 'success');
       setAmountBaht('');
       resetFile();
       loadRecentRequests();
-      updateBalance();
     } catch (err) {
       console.error('[topup] ส่งคำขอไม่สำเร็จ', err);
       showToast(topupErrorText(err), 'error');
@@ -282,12 +290,14 @@ export default function TopUpSlipForm() {
             <Loader2 className="animate-spin" size={18} aria-hidden="true" /> กำลังส่งคำขอ...
           </>
         ) : (
-          'เติมเงินทันที'
+          'ส่งคำขอเติมเงิน'
         )}
       </button>
+      {/* บอกตามจริงว่าเงินยังไม่เข้า ไม่งั้นผู้ใช้กดแล้วไปดูยอดทันที เห็นเท่าเดิม
+          แล้วเข้าใจว่าระบบพัง จึงกดส่งซ้ำอีกหลายรอบ */}
       <p className={`text-[10px] text-center leading-relaxed ${textMuted}`}>
-        ยอดเงินเข้าบัตรทันทีตามจำนวนที่กรอก ระบบไม่ได้ตรวจสลิปกับธนาคารจริง —
-        กรอกให้ตรงกับยอดที่โอนจริงเท่านั้น
+        เจ้าหน้าที่การเงินจะตรวจสลิปก่อนแล้วจึงเติมเข้าบัตร ยอดจะยังไม่ขึ้นทันที
+        ติดตามสถานะได้จากรายการด้านล่าง
       </p>
 
       {/* คำขอล่าสุดของฉัน */}
