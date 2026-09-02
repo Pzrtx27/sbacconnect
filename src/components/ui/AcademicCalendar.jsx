@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Calendar, ChevronLeft, ChevronRight, X, MapPin, Clock as ClockIcon, CalendarCheck, RefreshCw, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -76,11 +76,16 @@ export default function AcademicCalendar() {
 
   const eventCount = events.length;
 
-  /* ลบกิจกรรมจนหมดเดือนแล้ว การเลือกวันที่ค้างไว้ไม่มีความหมายอีก
-     ปล่อยไว้จะเหลือขอบสีลอยอยู่บนปฏิทินว่าง ๆ ซึ่งชวนเข้าใจผิดว่ายังมีของค้าง */
-  useEffect(() => {
-    if (!loading && events.length === 0 && selectedDate !== null) setSelectedDate(null);
-  }, [loading, events.length, selectedDate]);
+  /* เคยมี effect ตรงนี้ที่ล้าง selectedDate ทิ้งเมื่อเดือนนั้นไม่มีกิจกรรมเลย
+     ตั้งใจไว้กันการเลือกค้างหลังลบกิจกรรมจนหมดเดือน แต่เงื่อนไขกว้างเกินไป
+
+     ผลคือเดือนไหนที่ยังไม่มีกิจกรรม (เช่นเดือนถัด ๆ ไปที่ยังไม่ได้ลงปฏิทิน)
+     พอผู้ใช้กดวัน setSelectedDate จะถูกล้างทิ้งทันทีในรอบ effect ถัดมา
+     กล่องรายละเอียดจึงแวบขึ้นมาแล้วหายไป เหมือนกดแล้วไม่มีอะไรเกิดขึ้น
+
+     ไม่ต้องมี effect นี้เลย เพราะการเปลี่ยนเดือนล้าง selectedDate อยู่แล้ว (goToMonth)
+     ซึ่งเป็นกรณีเดียวที่การเลือกค้างไว้แล้วผิดจริง ส่วนการกดดูวันที่ไม่มีกิจกรรม
+     แล้วเห็นข้อความ "ไม่มีกิจกรรมในวันนี้" เป็นคำตอบที่ถูกต้อง ไม่ใช่สถานะค้าง */
 
   const textPrimary = isDark ? 'text-white' : 'text-sbac-navy';
   const textMuted = 'text-content-muted';
