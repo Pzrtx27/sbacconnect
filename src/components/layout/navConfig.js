@@ -1,4 +1,4 @@
-import { Home, Calendar, Coffee, ShoppingCart, Settings } from 'lucide-react';
+import { Home, Calendar, Coffee, ShoppingCart } from 'lucide-react';
 
 /* เมนูนำทาง แยกออกมาจาก BottomNav เพราะตอนนี้มีสองที่ที่ต้องใช้ชุดเดียวกัน:
      มือถือ  -> BottomNav (แถบล่าง)
@@ -18,15 +18,33 @@ const navConfigs = {
     { id: 'coffee', path: '/coffee', icon: Coffee, label: 'กาแฟ' },
     { id: 'orders', path: '/orders', icon: ShoppingCart, label: 'คำสั่งซื้อ' },
   ],
+  /* เดิมมี 'จัดการ' ที่ path '/academic' ซ้ำกับ 'หน้าหลัก' เป๊ะ ๆ
+     เมนูสองอันไปหน้าเดียวกัน isNavItemActive จึงตอบว่า active ทั้งคู่
+     ผลคือกดอันเดียวแต่สว่างสองอัน
+
+     เอา 'จัดการ' ออกเพราะเป็นทางเข้าซ้ำ ไม่ได้พาไปไหนใหม่
+     งานจัดการทั้งหมดอยู่ในแท็บของหน้า /academic อยู่แล้ว */
   academic: [
     { id: 'home', path: '/academic', icon: Home, label: 'หน้าหลัก' },
     { id: 'timetable', path: '/timetable', icon: Calendar, label: 'ตารางสอน' },
-    { id: 'manage', path: '/academic', icon: Settings, label: 'จัดการ' },
   ],
   barista: [
     { id: 'barista', path: '/barista', icon: Coffee, label: 'ร้านกาแฟ' },
   ],
 };
+
+/* เตือนตอนพัฒนาถ้ามีเมนูสอง path ซ้ำกันอีก
+   บั๊ก "กดอันเดียวสว่างสองอัน" มองข้ามง่ายมากเพราะหน้าที่เปิดถูกต้อง แค่ไฟติดเกิน
+   ให้มันดังตั้งแต่ตอนเขียน ดีกว่ารอให้คนใช้มาบอก */
+if (import.meta.env?.DEV) {
+  for (const [role, items] of Object.entries(navConfigs)) {
+    const paths = items.map((i) => i.path);
+    const dupes = paths.filter((p, i) => paths.indexOf(p) !== i);
+    if (dupes.length > 0) {
+      console.warn(`[navConfig] role "${role}" มีเมนู path ซ้ำ: ${[...new Set(dupes)].join(', ')} — เมนูจะ active พร้อมกันหลายอัน`);
+    }
+  }
+}
 
 export function navItemsFor(role) {
   const key = String(role || 'student').toLowerCase().trim();
