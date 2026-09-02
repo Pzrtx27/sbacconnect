@@ -1037,12 +1037,17 @@ export default function AcademicDashboard() {
                       }`}
                     placeholder="ป้อนรหัสผ่านคีย์ส่วนตัวของคุณ..."
                   />
+                  {/* ปุ่มไอคอนล้วนต้องมี aria-label ไม่งั้น screen reader อ่านว่า "ปุ่ม" เฉย ๆ
+                      และ p-1 กับไอคอน 14px ได้พื้นที่กดราว 22px ครึ่งเดียวของขั้นต่ำ 44px
+                      ขยายพื้นที่กดโดยไม่ขยายไอคอน หน้าตาจึงเหมือนเดิม */}
                   <button
                     type="button"
                     onClick={() => setShowSecretKey(!showSecretKey)}
-                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 text-content-muted hover:text-slate-600`}
+                    aria-label={showSecretKey ? 'ซ่อนคีย์' : 'แสดงคีย์'}
+                    aria-pressed={showSecretKey}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-xl text-content-muted hover:text-ink-secondary transition-colors"
                   >
-                    {showSecretKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {showSecretKey ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
                   </button>
                 </div>
               </div>

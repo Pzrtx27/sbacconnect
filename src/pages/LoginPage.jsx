@@ -125,7 +125,7 @@ export default function LoginPage() {
         {/* Language Toggler */}
         <button
           onClick={toggleLanguage}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-300 ${
+          className={`flex items-center gap-1.5 px-3 min-h-[44px] rounded-xl text-xs font-bold transition-all duration-300 ${
             isDark 
               ? 'bg-neutral-900 hover:bg-neutral-800 text-slate-200 border border-neutral-800' 
               : 'bg-surface-card hover:bg-slate-50 text-slate-700 border border-slate-200/80 shadow-sm'
@@ -139,7 +139,7 @@ export default function LoginPage() {
         {/* Theme Toggle Button */}
         <button
           onClick={toggleTheme}
-          className={`p-2 rounded-xl transition-all duration-300 border ${
+          className={`w-11 h-11 flex items-center justify-center rounded-xl transition-all duration-300 border ${
             isDark 
               ? 'bg-neutral-900 hover:bg-neutral-800 text-accent-amber border-neutral-800' 
               : 'bg-surface-card hover:bg-slate-50 text-sbac-navy border-slate-200/80 shadow-sm'
@@ -210,7 +210,7 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-5">
             {/* User ID field */}
             <div className="space-y-1.5">
-              <label className={`text-[11px] font-extrabold uppercase tracking-wide block transition-colors duration-300 ${
+              <label htmlFor="login-user-id" className={`text-[11px] font-extrabold uppercase tracking-wide block transition-colors duration-300 ${
                 isDark ? 'text-slate-200' : 'text-slate-600'
               }`}>
                 {t.labelUser}
@@ -242,7 +242,7 @@ export default function LoginPage() {
 
             {/* National ID / Password field */}
             <div className="space-y-1.5">
-              <label className={`text-[11px] font-extrabold uppercase tracking-wide block transition-colors duration-300 ${
+              <label htmlFor="login-national-id" className={`text-[11px] font-extrabold uppercase tracking-wide block transition-colors duration-300 ${
                 isDark ? 'text-slate-200' : 'text-slate-600'
               }`}>
                 {t.labelPass}
@@ -276,7 +276,7 @@ export default function LoginPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'ซ่อนรหัสประจำตัว' : 'แสดงรหัสประจำตัว'}
                   aria-pressed={showPassword}
-                  className={`absolute right-3.5 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-colors ${
+                  className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-xl transition-colors ${
                     isDark ? 'text-content-muted hover:text-white hover:bg-white/5' : 'text-content-muted hover:text-slate-700 hover:bg-slate-100'
                   }`}
                 >
@@ -305,7 +305,7 @@ export default function LoginPage() {
               <button 
                 type="button" 
                 onClick={() => showToast(t.forgotToast, 'info')}
-                className="text-xs font-extrabold text-brand hover:text-brand hover:underline transition-colors"
+                className="text-xs font-extrabold text-brand hover:underline transition-colors min-h-[44px] px-1 -mr-1 inline-flex items-center"
               >
                 {t.forgot}
               </button>

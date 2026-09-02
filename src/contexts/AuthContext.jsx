@@ -94,12 +94,28 @@ export function AuthProvider({ children }) {
 
     let active = true;
 
-    // ตรวจ session ที่ค้างอยู่ตอนเปิดแอป
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!active) return;
-      if (data.session) await refreshProfile();
-      if (active) setLoading(false);
-    });
+    /* ตรวจ session ที่ค้างอยู่ตอนเปิดแอป
+       ต้องมี catch และต้องปิด loading ใน finally เสมอ
+
+       ของเดิม setLoading(false) อยู่ใน .then อย่างเดียว ไม่มี .catch เลย
+       ถ้า getSession() reject (เน็ตหลุด เซิร์ฟเวอร์ล่ม DNS พัง ซึ่งเกิดได้จริง
+       บนไวไฟโรงเรียน) loading จะค้างเป็น true ตลอดกาล
+       ผู้ใช้เห็นหน้า "กำลังโหลด..." หมุนไม่จบ ไม่มีข้อความ ไม่มีทางออก
+       ต้องปิดแอปเปิดใหม่อย่างเดียว และเปิดใหม่ก็เจอเหมือนเดิมถ้าเน็ตยังไม่มา
+
+       ตอนนี้ล้มแล้วตกไปหน้า login ซึ่งกดลองใหม่ได้ ดีกว่าค้างแบบไม่บอกอะไร */
+    supabase.auth
+      .getSession()
+      .then(async ({ data }) => {
+        if (!active) return;
+        if (data?.session) await refreshProfile();
+      })
+      .catch((err) => {
+        console.error('[auth] อ่าน session ตอนเปิดแอปไม่สำเร็จ:', err);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
     // ติดตามการเปลี่ยนสถานะ (ล็อกอิน/ออก/ต่ออายุ token) จากทุกแท็บ
     const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
