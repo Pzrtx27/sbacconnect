@@ -15,24 +15,30 @@
    3) พาไปหน้าที่ทำงานจริง แทนที่จะอธิบายว่าปุ่มอยู่ตรงไหน
 */
 
-/** ปุ่มลัดใต้ช่องพิมพ์ — ต่างกันตาม role เพราะเมนูของแต่ละ role ไม่เหมือนกัน */
+/** ปุ่มลัดใต้ช่องพิมพ์ — ต่างกันตาม role เพราะเมนูของแต่ละ role ไม่เหมือนกัน
+ *
+ *  ป้ายต้องสั้น: กล่องแชทกว้างราว 360px ป้ายยาวอย่าง 'ใบแจ้งซ่อมของฉัน' หรือ
+ *  'คะแนนความประพฤติ' ทำให้ปุ่มล้นออกนอกจอ ต้องเลื่อนซ้ายขวาถึงจะเห็นครบ
+ *  ซึ่งไม่มีอะไรบอกด้วยว่ายังมีต่อ คนใช้จึงไม่รู้ว่ามีปุ่มที่เหลืออยู่
+ *  ตอนนี้ปุ่มขึ้นบรรทัดใหม่แทนการเลื่อน (ดู AssistantFAB) ป้ายจึงต้องสั้นพอ
+ *  ให้สองบรรทัดจบ ไม่ใช่สี่บรรทัดจนดันช่องพิมพ์ตกจอ */
 export function quickActionsFor(role) {
   const repair = { label: 'แจ้งซ่อม', intent: 'repair' };
-  const myRepairs = { label: 'ใบแจ้งซ่อมของฉัน', intent: 'repair_status' };
+  const myRepairs = { label: 'ใบซ่อมของฉัน', intent: 'repair_status' };
 
   if (role === 'academic') {
     return [
       { label: 'คิวแจ้งซ่อม', intent: 'repair_status' },
-      { label: 'ใบลาที่รออนุมัติ', intent: 'leave' },
-      { label: 'กิจกรรมที่จะถึง', intent: 'events' },
+      { label: 'ใบลารออนุมัติ', intent: 'leave' },
+      { label: 'กิจกรรม', intent: 'events' },
       repair,
     ];
   }
 
   if (role === 'teacher') {
     return [
-      { label: 'ใบลาที่รออนุมัติ', intent: 'leave' },
-      { label: 'กิจกรรมที่จะถึง', intent: 'events' },
+      { label: 'ใบลารออนุมัติ', intent: 'leave' },
+      { label: 'กิจกรรม', intent: 'events' },
       repair,
       myRepairs,
     ];
@@ -43,9 +49,9 @@ export function quickActionsFor(role) {
   }
 
   return [
-    { label: 'ยอดเงินคงเหลือ', intent: 'balance' },
-    { label: 'คะแนนความประพฤติ', intent: 'behavior' },
-    { label: 'กิจกรรมที่จะถึง', intent: 'events' },
+    { label: 'ยอดเงิน', intent: 'balance' },
+    { label: 'คะแนนพฤติกรรม', intent: 'behavior' },
+    { label: 'กิจกรรม', intent: 'events' },
     { label: 'สถานะใบลา', intent: 'leave' },
     repair,
     myRepairs,

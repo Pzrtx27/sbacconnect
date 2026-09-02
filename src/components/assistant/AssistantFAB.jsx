@@ -528,9 +528,14 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
                     <div ref={listEndRef} />
                   </div>
 
+                  {/* ปุ่มลัดขึ้นบรรทัดใหม่แทนการเลื่อนซ้ายขวา
+                      ของเดิมเป็น overflow-x-auto + whitespace-nowrap ปุ่มจึงล้นออกนอกจอ
+                      กล่องแชทกว้างราว 360px แต่ปุ่มของนักเรียนมีหกอัน รวมกันยาวเกินสองเท่า
+                      และไม่มีอะไรบอกว่ายังมีต่อ คนใช้เลยไม่รู้ว่ามีปุ่มที่เหลืออยู่
+                      แบบ wrap เห็นครบทุกปุ่มในครั้งเดียว ไม่ต้องเลื่อนอะไรเลย */}
                   {flow === FLOW.IDLE && (
-                    <div className={`px-4 py-2.5 border-t overflow-x-auto scrollbar-hide shrink-0 ${isDark ? 'border-white/10' : 'border-border'}`}>
-                      <div className="flex gap-2 whitespace-nowrap">
+                    <div className={`px-4 py-2.5 border-t shrink-0 ${isDark ? 'border-white/10' : 'border-border'}`}>
+                      <div className="flex flex-wrap gap-1.5">
                         {quickActions.map((action) => (
                           <button
                             key={action.intent + action.label}
@@ -539,7 +544,7 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
                               pushUser(action.label);
                               handleIntent(action.intent);
                             }}
-                            className={`px-3 py-1.5 rounded-full text-[11px] font-bold border shrink-0 transition-colors ${
+                            className={`px-3 py-1.5 rounded-full text-[11px] font-bold border transition-colors ${
                               isDark
                                 ? 'border-white/15 text-slate-200 hover:bg-white/10'
                                 : 'border-border text-ink-secondary hover:bg-slate-50'
