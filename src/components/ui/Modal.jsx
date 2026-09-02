@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
@@ -99,6 +99,33 @@ export default function Modal({ isOpen, onClose, title, children, footer = null 
      กล่องแคบ ๆ แปะก้นจอโดยมีเนื้อหาแค่สี่บรรทัด เหลือที่ว่างครึ่งจอ ดูเหมือนหลุด */
   const isDesktop = useIsDesktop();
 
+  /* ห้ามผูก "การมองเห็น" ไว้กับแอนิเมชันที่ต้องวิ่งจนจบ
+
+     บนมือถือแผ่นโมดัลเริ่มที่ y:'100%' (อยู่ใต้จอ) แล้วค่อยเลื่อนขึ้นมา y:0
+     ถ้าแอนิเมชันไม่จบ ตำแหน่งจะค้างอยู่ใต้จอ = เปิดโมดัลแล้วไม่เห็นอะไรเลย
+     วัดจริงบนเครื่องที่ตั้ง prefers-reduced-motion: reduce ได้ transform ค้างที่
+     translateY(457px) จากความสูง 568px คือโผล่มาแค่ขอบบนนิดเดียว
+
+     เครื่องที่ขอลดการเคลื่อนไหวจึงต้องไม่เลื่อนตำแหน่งเลย ใช้เฟดเข้าอย่างเดียว
+     ตำแหน่งอยู่ที่ปลายทางตั้งแต่เฟรมแรก ไม่มีทางค้างนอกจอไม่ว่าแอนิเมชันจะจบหรือไม่ */
+  const reduceMotion = useReducedMotion();
+
+  const sheetMotion = reduceMotion
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.12 } }
+    : isDesktop
+      ? {
+          initial: { opacity: 0, scale: 0.97 },
+          animate: { opacity: 1, scale: 1 },
+          exit: { opacity: 0, scale: 0.97 },
+          transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] },
+        }
+      : {
+          initial: { y: '100%' },
+          animate: { y: 0 },
+          exit: { y: '100%' },
+          transition: { type: 'spring', damping: 30, stiffness: 400 },
+        };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -118,14 +145,7 @@ export default function Modal({ isOpen, onClose, title, children, footer = null 
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            initial={isDesktop ? { opacity: 0, scale: 0.97 } : { y: '100%' }}
-            animate={isDesktop ? { opacity: 1, scale: 1 } : { y: 0 }}
-            exit={isDesktop ? { opacity: 0, scale: 0.97 } : { y: '100%' }}
-            transition={
-              isDesktop
-                ? { duration: 0.2, ease: [0.16, 1, 0.3, 1] }
-                : { type: 'spring', damping: 30, stiffness: 400 }
-            }
+            {...sheetMotion}
             className="fixed bottom-0 left-0 right-0 z-[61] max-w-lg mx-auto h-[70vh]
                        xl:inset-0 xl:left-64 xl:h-auto xl:max-w-2xl xl:max-h-[80vh] xl:m-auto"
           >
