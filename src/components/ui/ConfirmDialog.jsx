@@ -34,14 +34,23 @@ function ConfirmDialog({
   const confirmRef = useRef(null);
   const panelRef = useRef(null);
 
+  /* onCancel กับ busy อ่านผ่าน ref ไม่ใส่ใน deps
+     onCancel มาจาก useConfirm เป็น arrow inline (onCancel={() => settle(false)})
+     จึงเปลี่ยน identity ทุก render ถ้าใส่ใน deps effect จะรันใหม่ทุกครั้งที่หน้าแม่ re-render
+     แล้วสั่ง focus ปุ่มยืนยันซ้ำ ๆ ดึงโฟกัสออกจากที่ผู้ใช้กำลังทำอยู่
+     (บั๊กเดียวกับที่เจอใน Modal.jsx) */
+  const onCancelRef = useRef(onCancel);
+  const busyRef = useRef(busy);
+  useEffect(() => { onCancelRef.current = onCancel; busyRef.current = busy; });
+
   // Esc = ยกเลิก และล็อกไม่ให้พื้นหลังเลื่อนขณะกล่องเปิดอยู่
   useEffect(() => {
     if (!open) return undefined;
 
     const onKeyDown = (e) => {
-      if (e.key === 'Escape' && !busy) {
+      if (e.key === 'Escape' && !busyRef.current) {
         e.preventDefault();
-        onCancel();
+        onCancelRef.current?.();
         return;
       }
       // กัก Tab ไว้ในกล่อง ไม่ให้หลุดไปโฟกัสของข้างหลัง
@@ -74,7 +83,8 @@ function ConfirmDialog({
       cancelAnimationFrame(raf);
       if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
     };
-  }, [open, busy, onCancel]);
+  // เจตนาไม่ใส่ busy/onCancel — อ่านผ่าน ref (ดูเหตุผลด้านบน)
+  }, [open]);
 
   const accent = danger ? 'text-accent-rose' : 'text-brand';
   const confirmBtn = danger

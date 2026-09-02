@@ -438,6 +438,8 @@ export default function AcademicDashboard() {
         substitute_teacher: substituting ? subTeacher.trim() : '',
         substitute_room: substituting && roomMode === 'new' ? room.trim() : '',
       });
+      // เหตุผลเดียวกับ handleClearSubstitution — ไม่รอ realtime สำหรับการกระทำของตัวเอง
+      await reloadTimetable();
       showToast(
         substituting
           ? `สั่งสอนแทน ${DAY_LABELS[day]} คาบ ${period} เรียบร้อย นักเรียนเห็นแล้ว`
@@ -461,6 +463,12 @@ export default function AcademicDashboard() {
     setSavingSlot(true);
     try {
       await clearSubstitution(selectedClassId, day, period);
+      /* โหลดตารางใหม่เองทันที ไม่รอ realtime
+         ของเดิมพึ่ง realtime อย่างเดียว ถ้า event ไม่มา (ยังไม่ได้เพิ่มตารางเข้า publication,
+         ช่องสัญญาณยังไม่ subscribe เสร็จ หรือเน็ตหลุดชั่วขณะ) ค่าบนจอจะค้างของเดิม
+         ผู้ใช้กดยกเลิกสอนแทนแล้วเห็นชื่อครูสอนแทนอยู่เหมือนเดิม เข้าใจว่ากดไม่ติด
+         การกระทำของตัวเองไม่ควรต้องวิ่งอ้อมผ่าน realtime ก่อนถึงจะเห็นผล */
+      await reloadTimetable();
       showToast(`ยกเลิกการสอนแทน ${DAY_LABELS[day]} คาบ ${period} แล้ว`, 'success');
     } catch (err) {
       console.error('[academic] ยกเลิกการสอนแทนไม่สำเร็จ:', err);
@@ -487,6 +495,8 @@ export default function AcademicDashboard() {
     setImporting(true);
     try {
       const count = await importFromSheet(selectedClassId);
+      // เหตุผลเดียวกับข้างบน — นำเข้าทีเดียวหลายสิบคาบ ยิ่งต้องเห็นผลทันที
+      await reloadTimetable();
       showToast(`นำเข้าตารางสอน ${count} คาบเรียบร้อย`, 'success');
     } catch (err) {
       console.error('[academic] นำเข้าจากชีตไม่สำเร็จ:', err);

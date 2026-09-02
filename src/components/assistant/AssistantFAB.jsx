@@ -178,12 +178,18 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
     listEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, thinking]);
 
-  /* กล่องสนทนาเป็น dialog จริง: Esc ปิด, Tab วนอยู่ข้างใน, คืนโฟกัสให้ปุ่มเดิมตอนปิด */
+  /* กล่องสนทนาเป็น dialog จริง: Esc ปิด, Tab วนอยู่ข้างใน, คืนโฟกัสให้ปุ่มเดิมตอนปิด
+     onClose อ่านผ่าน ref ไม่ใส่ใน deps — ผู้เรียกส่งมาเป็น arrow inline
+     ถ้าใส่ effect จะรันใหม่ทุกตัวอักษรที่พิมพ์ในช่องแชท แล้วดึงโฟกัสซ้ำ ๆ
+     (บั๊กเดียวกับที่เจอใน Modal.jsx) */
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+
   useEffect(() => {
     const onKeyDown = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        onCloseRef.current?.();
         return;
       }
       if (e.key !== 'Tab' || !panelRef.current) return;
@@ -213,7 +219,8 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
       if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
       else openerRef.current?.focus();
     };
-  }, [onClose, openerRef]);
+    // เจตนาไม่ใส่ onClose — อ่านผ่าน onCloseRef (ดูเหตุผลด้านบน)
+  }, [openerRef]);
 
   const goTo = (path) => {
     onClose();

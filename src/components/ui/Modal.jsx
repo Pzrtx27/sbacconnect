@@ -21,19 +21,31 @@ export default function Modal({ isOpen, onClose, title, children, footer = null 
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const panelRef = useRef(null);
+  // อ้างถึงเฉพาะส่วนเนื้อหา เพื่อไม่ให้โฟกัสแรกไปตกที่ปุ่มปิดใน header
+  const contentRef = useRef(null);
   const titleId = useId();
 
   /* Esc ปิด + โฟกัสวนอยู่ในกล่อง + คืนโฟกัสให้ปุ่มที่เปิดตอนปิด + ล็อกไม่ให้พื้นหลังเลื่อน
      ConfirmDialog ทำครบสี่ข้อนี้มาตั้งแต่แรก แต่ Modal ซึ่งใช้เยอะกว่ามาก
      (ตะกร้ากาแฟ กระเป๋าเงิน ฟอร์มใบลา แก้ไขคะแนน แจ้งเตือน) กลับไม่มีสักข้อ
      คนที่ใช้คีย์บอร์ดล้วนจึงเปิดโมดัลแล้ว Tab หลุดไปโดนปุ่มข้างหลังที่มองไม่เห็น */
+  /* เก็บ onClose ไว้ใน ref เพราะทุกที่ที่เรียก Modal ส่งมาเป็น arrow function inline
+     (23 จุดทั้งแอป เช่น onClose={() => setActiveModal(null)}) ซึ่งได้ identity ใหม่ทุก render
+
+     ถ้าใส่ onClose ไว้ใน deps ของ effect ด้านล่าง effect จะรันใหม่ทุกครั้งที่หน้าแม่ re-render
+     ซึ่งเกิดทุกตัวอักษรที่พิมพ์ในช่องค้นหาที่อยู่ในโมดัล
+     รอบใหม่แต่ละรอบสั่ง focus() ตัวแรกในกล่อง = ปุ่มปิด (X) ที่อยู่ใน header
+     ผลคือพิมพ์ทีเดียวโฟกัสกระโดดไปปุ่มปิดทันที พิมพ์ต่อไม่ได้เลย */
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+
   useEffect(() => {
     if (!isOpen) return undefined;
 
     const onKeyDown = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        onCloseRef.current?.();
         return;
       }
       if (e.key !== 'Tab' || !panelRef.current) return;
@@ -58,12 +70,18 @@ export default function Modal({ isOpen, onClose, title, children, footer = null 
     document.body.style.overflow = 'hidden';
     document.addEventListener('keydown', onKeyDown);
 
-    // โฟกัสตัวแรกในกล่องหลังแอนิเมชันเริ่มแล้ว ไม่งั้นจะไปโฟกัส element ที่ยังไม่อยู่บนจอ
+    /* โฟกัสตัวแรก "ในเนื้อหา" ไม่ใช่ตัวแรกในกล่อง
+       querySelector คืน element ตามลำดับใน DOM ไม่ใช่ตามลำดับที่เขียน selector
+       ปุ่มปิด (X) อยู่ใน header ซึ่งมาก่อน children เสมอ ถ้าค้นจากทั้งกล่อง
+       จะได้ปุ่มปิดทุกครั้ง = เปิดโมดัลมาแล้วโฟกัสจ่ออยู่ที่ปุ่มปิด ซึ่งไม่มีใครอยากได้
+       ค้นเฉพาะใน contentRef จึงได้ช่องกรอกช่องแรกจริง ๆ */
     const raf = requestAnimationFrame(() => {
-      const target = panelRef.current?.querySelector(
-        'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
+      const target = contentRef.current?.querySelector(
+        'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
       );
-      target?.focus();
+      // ไม่มีอะไรให้โฟกัสก็โฟกัสตัวกล่องเอง เพื่อให้ Esc และ Tab trap ทำงาน
+      if (target) target.focus();
+      else panelRef.current?.focus();
     });
 
     return () => {
@@ -72,7 +90,8 @@ export default function Modal({ isOpen, onClose, title, children, footer = null 
       cancelAnimationFrame(raf);
       if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
     };
-  }, [isOpen, onClose]);
+    // เจตนาไม่ใส่ onClose ใน deps — อ่านผ่าน onCloseRef แทน (ดูเหตุผลด้านบน)
+  }, [isOpen]);
 
   /* บนมือถือเป็น bottom sheet: เลื่อนขึ้นจากขอบล่าง สูงตายตัว 70vh ทุกอัน
      บนคอมเป็น dialog กลางจอ: สูงตามเนื้อหา สูงสุด 80vh กว้างขึ้นเป็น 2xl
@@ -169,7 +188,7 @@ export default function Modal({ isOpen, onClose, title, children, footer = null 
               />
 
               {/* Content — เติมพื้นที่ที่เหลือเสมอ (flex-1) และ scroll เองเมื่อเนื้อหายาวเกิน 70vh */}
-              <div className="relative px-6 py-5 overflow-y-auto flex-1 xl:px-7">{children}</div>
+              <div ref={contentRef} className="relative px-6 py-5 overflow-y-auto flex-1 xl:px-7">{children}</div>
 
               {/* footer อยู่ "นอก" พื้นที่ scroll จึงตรึงติดก้น sheet เสมอ
                   ที่ต้องมี: บนมือถือ 375x812 sheet สูง 568px หักหัว-ท้ายเหลือที่อ่านราว 428px
