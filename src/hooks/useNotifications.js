@@ -81,7 +81,33 @@ export function useNotifications() {
     if (error) console.error('[notifications] mark_all_notifications_read ล้มเหลว:', error);
   }, []);
 
-  return { notifications, loading, unreadCount, markRead, markAllRead, reload: load };
+  /* ลบแบบมองเห็นผลทันที (optimistic) แล้วค่อยยิงไปที่ DB
+     ถ้าล้มเหลวค่อยดึงรายการใหม่ทั้งชุดเพื่อคืนสภาพให้ตรงกับของจริง
+     ไม่เก็บสำเนาไว้ใส่กลับเอง เพราะระหว่างนั้นอาจมีแจ้งเตือนใหม่เข้ามาทาง realtime
+     การโหลดใหม่จึงถูกต้องกว่าการย้อนสถานะเดิม */
+  const remove = useCallback(async (id) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    const { data, error } = await supabase.rpc('delete_notification', { p_id: id });
+    if (error || !data?.ok) {
+      console.error('[notifications] delete_notification ล้มเหลว:', error || data?.error);
+      load();
+      return false;
+    }
+    return true;
+  }, [load]);
+
+  const removeAll = useCallback(async () => {
+    setNotifications([]);
+    const { data, error } = await supabase.rpc('delete_all_notifications', { p_only_read: false });
+    if (error || !data?.ok) {
+      console.error('[notifications] delete_all_notifications ล้มเหลว:', error || data?.error);
+      load();
+      return false;
+    }
+    return true;
+  }, [load]);
+
+  return { notifications, loading, unreadCount, markRead, markAllRead, remove, removeAll, reload: load };
 }
 
 export default useNotifications;

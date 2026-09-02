@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, X, Send, ArrowRight, Loader2 } from 'lucide-react';
+import { MessageSquare, X, Send, ArrowRight, Loader2, Trash2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useUpcomingEvents } from '../../hooks/useEvents';
@@ -177,6 +177,17 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, thinking]);
+
+  /* ล้างบทสนทนาแล้วเริ่มใหม่ด้วยคำทักทาย ไม่ปล่อยกล่องว่างเปล่า
+     ต้องรีเซ็ต flow กับ draft ด้วย ไม่งั้นถ้าล้างตอนกำลังกรอกใบแจ้งซ่อมค้างอยู่
+     ข้อความถัดไปที่พิมพ์จะถูกตีความว่าเป็นคำตอบของขั้นตอนที่หายไปแล้ว */
+  const handleClearChat = useCallback(() => {
+    setFlow(FLOW.IDLE);
+    setDraft({ room: '', equipment: '', problem: '' });
+    setInputValue('');
+    setThinking(false);
+    setMessages([{ id: nextId(), sender: 'bot', ...greetingFor(user) }]);
+  }, [setMessages, user]);
 
   /* กล่องสนทนาเป็น dialog จริง: Esc ปิด, Tab วนอยู่ข้างใน, คืนโฟกัสให้ปุ่มเดิมตอนปิด
      onClose อ่านผ่าน ref ไม่ใส่ใน deps — ผู้เรียกส่งมาเป็น arrow inline
@@ -439,14 +450,30 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
                         ตอบจากข้อมูลจริงในระบบ
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      aria-label="ปิดผู้ช่วย"
-                      className={`-mr-1 p-2 rounded-xl transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
-                    >
-                      <X size={18} className="text-content-muted" aria-hidden="true" />
-                    </button>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      {/* ล้างบทสนทนา — บทสนทนาเก็บไว้ที่ AssistantFAB จึงไม่หายตอนปิด-เปิดใหม่
+                          ถ้าไม่มีปุ่มนี้ ข้อความจะกองสะสมจนต้องรีเฟรชทั้งหน้าถึงจะหาย
+                          โผล่เฉพาะตอนมีข้อความจริงมากกว่าคำทักทายใบเดียว */}
+                      {messages.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={handleClearChat}
+                          aria-label="ล้างบทสนทนา"
+                          title="ล้างบทสนทนา"
+                          className={`p-2 rounded-xl transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
+                        >
+                          <Trash2 size={17} className="text-content-muted" aria-hidden="true" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label="ปิดผู้ช่วย"
+                        className={`-mr-1 p-2 rounded-xl transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
+                      >
+                        <X size={18} className="text-content-muted" aria-hidden="true" />
+                      </button>
+                    </div>
                   </header>
 
                   <div
