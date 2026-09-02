@@ -6,24 +6,29 @@ import { supabase } from '../../config/supabase';
 import { showToast } from '../ui/Toast';
 import { PROMPTPAY_ID, PROMPTPAY_ACCOUNT_NAME, isPromptPayConfigured } from '../../config/promptpay';
 import { buildPromptPayPayload } from '../../utils/promptpay';
-import { validateSlipFile, anonymousFileName, slipErrorText, MAX_SLIP_BYTES } from '../../utils/slipFile';
-import { TOPUP_STATUS_TEXT, TOPUP_STATUS_COLOR, topupErrorText } from '../../utils/topup';
+import { validateSlipFile, anonymousFileName, slipErrorText, sha256File, MAX_SLIP_BYTES } from '../../utils/slipFile';
+import { TOPUP_STATUS_TEXT, TOPUP_STATUS_COLOR, topupErrorText, instantTopupErrorText } from '../../utils/topup';
 import { Camera, UploadCloud, X, Loader2, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
 
 const STORAGE_BUCKET = 'topup-slips';
 const MAX_TOPUP_BAHT = 20000; // เพดานกันพิมพ์ผิด/ทดสอบ ไม่ใช่ข้อจำกัดทางธุรกิจตายตัว
 
-/* ฟอร์มเติมเงินด้วย QR พร้อมเพย์ + แนบสลิปโอนเงิน (18_topup_requests.sql)
+/* ฟอร์มเติมเงินด้วย QR พร้อมเพย์ + แนบสลิป (30_topup_instant_guarded.sql)
 
    ขั้นตอน: กรอกจำนวนเงิน -> สแกน QR ด้วยแอปธนาคารแล้วโอนจริง -> ถ่าย/เลือกรูปสลิป
-   -> กดส่ง = ส่งเป็น "คำขอ" สถานะ pending -> เจ้าหน้าที่การเงินตรวจสลิปแล้วกดอนุมัติ
-   -> เงินเข้าบัตรตอนนั้น
+   -> กดส่ง -> เงินเข้าบัตรทันที
 
-   เดิมฟอร์มนี้เรียก topup_qr_instant() ซึ่งเติมเงินทันทีโดยเชื่อยอดที่ผู้ใช้พิมพ์เอง
-   ไม่มีใครตรวจ ถอดออกแล้วเพราะนักเรียนยิง RPC ตรงจาก DevTools วนลูปได้เงินไม่จำกัด
-   ฟังก์ชันนั้นยังอยู่ใน DB แต่ไม่มีอะไรในแอปเรียกใช้แล้ว */
+   ยังไม่ได้ตรวจสลิปกับธนาคารจริง (ต้องใช้ API ที่มีค่าใช้จ่าย) แต่ไม่ได้ปล่อยฟรี
+   เหมือน topup_qr_instant() ตัวเดิมที่ถูกถอนสิทธิ์เรียกไปแล้ว ตัวใหม่มีสี่ด่านฝั่ง DB:
+     1. path ของสลิปต้องอยู่ใต้โฟลเดอร์ของคนเรียกเอง
+     2. ไฟล์ต้องมีอยู่จริงใน bucket (ตัวเดิมข้ามข้อนี้ ยิง RPC ได้โดยไม่ต้องอัปโหลด)
+     3. sha256 ของไฟล์ต้องไม่ซ้ำกับที่เคยใช้ — สลิปใบเดียวเติมได้ครั้งเดียวทั้งระบบ
+     4. รวมทั้งวันต้องไม่เกินเพดานต่อคน
+
+   ด่านที่ 3 คือตัวที่ปิดช่อง "ยิงวนลูป" จริง ๆ เพราะการจะเติมรอบใหม่
+   ต้องมีรูปสลิปที่ไม่เคยใช้มาก่อน ไม่ใช่แค่กดปุ่มซ้ำ */
 export default function TopUpSlipForm() {
-  const { user } = useAuth();
+  const { user, updateBalance } = useAuth();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
@@ -135,31 +140,37 @@ export default function TopUpSlipForm() {
         .upload(path, selectedFile, { contentType: fileMeta.mime, upsert: false });
       if (uploadError) throw uploadError;
 
-      /* ส่งเป็น "คำขอ" ให้เจ้าหน้าที่ตรวจสลิปก่อน ไม่เติมเงินทันที
+      /* เติมเงินทันทีผ่าน topup_qr_instant_v2 (30_topup_instant_guarded.sql)
 
-         ของเดิมเรียก topup_qr_instant() ซึ่งเชื่อยอดที่ผู้ใช้พิมพ์เองทั้งหมด
-         ไม่ตรวจสลิปกับธนาคาร และไม่มีใครอนุมัติ — นักเรียนเปิด DevTools
-         ยิง RPC วนลูปใส่ยอดสูงสุดก็ได้เงินไม่จำกัด แล้วเอาไปซื้อของจริงได้
-         (ไม่ต้องอัปโหลดไฟล์ด้วยซ้ำ เพราะ RPC ตรวจแค่ว่า path ขึ้นต้นด้วย uid ตัวเอง)
+         ตัวเก่า topup_qr_instant() ถูกถอนสิทธิ์เรียกไปแล้ว เพราะไม่มีด่านอะไรเลย
+         ยิงวนลูปได้เงินไม่จำกัด และไม่ต้องอัปโหลดไฟล์ด้วยซ้ำ
 
-         ทางนี้ปลอดภัยเพราะ RLS บังคับไว้แล้วที่ 18_topup_requests.sql:91-93
-           with check (user_id = app_current_user_id() and status = 'pending')
-         ส่งเป็นของคนอื่นไม่ได้ และยัด status='approved' มาเองจาก DevTools ก็ไม่ผ่าน
-         ทั้งตารางไม่มี policy for update เลย จึงแก้ยอดหลังส่งไม่ได้ด้วย
-         เงินเข้าจริงตอนเจ้าหน้าที่เรียก approve_topup_request() เท่านั้น */
-      const { error: insertError } = await supabase.from('topup_requests').insert({
-        user_id: user.uid,
-        amount_baht: amountValue,
-        slip_path: path,
-        slip_mime: fileMeta.mime,
-        status: 'pending',
+         ตัวใหม่ยังเติมทันทีเหมือนเดิม แต่ต้องผ่านสี่ด่านฝั่ง DB:
+           path เป็นของตัวเอง / ไฟล์มีอยู่จริงใน bucket /
+           สลิปใบนี้ยังไม่เคยถูกใช้ (unique sha256) / ไม่เกินเพดานต่อวัน
+
+         แฮชคำนวณจากไบต์ของไฟล์ที่ผู้ใช้เลือก ไม่ใช่จากชื่อไฟล์
+         จึงเปลี่ยนชื่อไฟล์แล้วเอาสลิปใบเดิมมายิงซ้ำไม่ได้ */
+      const slipHash = await sha256File(selectedFile);
+
+      const { data: rpcData, error: rpcError } = await supabase.rpc('topup_qr_instant_v2', {
+        p_amount_baht: amountValue,
+        p_slip_path: path,
+        p_slip_mime: fileMeta.mime,
+        p_slip_sha256: slipHash,
       });
-      if (insertError) throw insertError;
+      if (rpcError) throw rpcError;
 
-      showToast('ส่งคำขอเติมเงินแล้ว รอเจ้าหน้าที่ตรวจสลิป', 'success');
+      if (!rpcData?.ok) {
+        showToast(instantTopupErrorText(rpcData), 'error');
+        return;
+      }
+
+      showToast(`เติมเงิน ${amountValue.toLocaleString('th-TH')} บาทเข้าบัตรแล้ว`, 'success');
       setAmountBaht('');
       resetFile();
       loadRecentRequests();
+      updateBalance();
     } catch (err) {
       console.error('[topup] ส่งคำขอไม่สำเร็จ', err);
       showToast(topupErrorText(err), 'error');
@@ -290,14 +301,14 @@ export default function TopUpSlipForm() {
             <Loader2 className="animate-spin" size={18} aria-hidden="true" /> กำลังส่งคำขอ...
           </>
         ) : (
-          'ส่งคำขอเติมเงิน'
+          'เติมเงินเข้าบัตร'
         )}
       </button>
-      {/* บอกตามจริงว่าเงินยังไม่เข้า ไม่งั้นผู้ใช้กดแล้วไปดูยอดทันที เห็นเท่าเดิม
-          แล้วเข้าใจว่าระบบพัง จึงกดส่งซ้ำอีกหลายรอบ */}
+      {/* บอกกติกาที่ผู้ใช้จะชนจริง ก่อนที่เขาจะชน
+          ไม่งั้นแนบสลิปใบเดิมซ้ำแล้วโดนปฏิเสธ จะงงว่าทำไม */}
       <p className={`text-[10px] text-center leading-relaxed ${textMuted}`}>
-        เจ้าหน้าที่การเงินจะตรวจสลิปก่อนแล้วจึงเติมเข้าบัตร ยอดจะยังไม่ขึ้นทันที
-        ติดตามสถานะได้จากรายการด้านล่าง
+        ยอดเข้าบัตรทันทีหลังแนบสลิป — สลิปหนึ่งใบใช้ได้ครั้งเดียว
+        และรวมทั้งวันไม่เกินเพดานที่กำหนด
       </p>
 
       {/* คำขอล่าสุดของฉัน */}

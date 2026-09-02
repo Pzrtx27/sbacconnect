@@ -45,6 +45,25 @@ export async function validateSlipFile(file) {
 /** ชื่อไฟล์นิรนามที่ไม่ซ้ำกัน: <timestamp>-<เลขสุ่ม>.<นามสกุลจริงที่ตรวจได้>
  *  ใช้ crypto.getRandomValues (สุ่มปลอดภัยกว่า Math.random) พร้อม fallback
  *  เผื่อเบราว์เซอร์เก่า/ไม่ใช่ secure context (ดูเหตุผลเดียวกับ utils/crypto.js) */
+/** sha256 ของไฟล์สลิป — ใช้เป็นลายนิ้วมือกันเอาสลิปใบเดิมมาเติมเงินซ้ำ
+ *
+ *  แฮชจากไบต์ของไฟล์ตรง ๆ ไม่ใช่จากชื่อไฟล์ (ชื่อเปลี่ยนได้ง่าย ๆ)
+ *  ฝั่ง DB ตั้ง unique ไว้ทั้งตาราง สลิปใบเดียวจึงใช้ได้ครั้งเดียวทั้งระบบ
+ *
+ *  crypto.subtle ใช้ได้เฉพาะ secure context (https หรือ localhost)
+ *  ถ้าเปิดผ่าน http://192.168.x.x จะไม่มี ต้องบอกผู้ใช้ให้ชัดว่าเพราะอะไร
+ *  ไม่ใช่ปล่อยให้ error ดิบ ๆ เด้งมา */
+export async function sha256File(file) {
+  if (!globalThis.crypto?.subtle) {
+    throw new Error('SLIP_HASH_UNSUPPORTED');
+  }
+  const buffer = await file.arrayBuffer();
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', buffer);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 export function anonymousFileName(ext) {
   const rand = globalThis.crypto?.getRandomValues
     ? Array.from(globalThis.crypto.getRandomValues(new Uint8Array(6)))

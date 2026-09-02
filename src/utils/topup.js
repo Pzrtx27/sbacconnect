@@ -17,8 +17,33 @@ export const TOPUP_STATUS_COLOR = {
 };
 
 /** แปลงข้อความ error จากการอัปโหลด/ส่งคำขอเติมเงินให้เป็นภาษาคนอ่าน */
+/** แปลรหัสผิดพลาดจาก topup_qr_instant_v2 เป็นข้อความที่บอกทางแก้ได้
+ *  ทุกตัวต้องตอบว่า "แล้วต้องทำยังไงต่อ" ไม่ใช่แค่บอกว่าไม่สำเร็จ */
+const INSTANT_TOPUP_ERRORS = {
+  SLIP_ALREADY_USED:
+    'สลิปใบนี้ถูกใช้เติมเงินไปแล้ว กรุณาแนบสลิปของรายการโอนใหม่',
+  SLIP_NOT_UPLOADED:
+    'ไม่พบไฟล์สลิปบนระบบ กรุณาแนบรูปใหม่แล้วลองอีกครั้ง',
+  SLIP_HASH_REQUIRED:
+    'ตรวจสอบไฟล์สลิปไม่สำเร็จ กรุณาแนบรูปใหม่อีกครั้ง',
+  SLIP_HASH_UNSUPPORTED:
+    'เบราว์เซอร์นี้ตรวจไฟล์สลิปไม่ได้ กรุณาเปิดผ่าน https แล้วลองใหม่',
+  INVALID_SLIP_PATH: 'ไฟล์สลิปไม่ถูกต้อง กรุณาแนบรูปใหม่',
+  INVALID_AMOUNT: 'จำนวนเงินไม่ถูกต้อง',
+  AMOUNT_TOO_LARGE: 'จำนวนเงินเกินเพดานต่อครั้ง',
+  NOT_AUTHENTICATED: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่',
+};
+
+export function instantTopupErrorText(data) {
+  if (data?.error === 'DAILY_LIMIT') {
+    return `วันนี้เติมไปแล้ว ${data.used_baht} บาท เกินเพดาน ${data.limit_baht} บาทต่อวัน กรุณาลองใหม่พรุ่งนี้`;
+  }
+  return INSTANT_TOPUP_ERRORS[data?.error] || 'เติมเงินไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+}
+
 export function topupErrorText(err) {
   const msg = String(err?.message || err || '');
+  if (INSTANT_TOPUP_ERRORS[msg]) return INSTANT_TOPUP_ERRORS[msg];
   if (/exceeded the maximum allowed size|too large/i.test(msg)) {
     return 'ไฟล์ใหญ่เกินไป (จำกัดไม่เกิน 5MB)';
   }
