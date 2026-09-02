@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -126,7 +127,18 @@ export default function Modal({ isOpen, onClose, title, children, footer = null 
           transition: { type: 'spring', damping: 30, stiffness: 400 },
         };
 
-  return (
+  /* ต้อง portal ออกไปที่ body ไม่ใช่ render ไว้ในตำแหน่งที่ถูกเรียก
+     (ConfirmDialog ทำแบบนี้มาตั้งแต่แรก Modal ตกไปตัวเดียว)
+
+     เหตุผล: ทุกหน้าถูกห่อด้วย PageWrapper ซึ่งเป็น motion.div ที่ animate y/scale
+     element ที่มี transform จะกลายเป็น containing block ของลูกที่เป็น position:fixed
+     แปลว่า bottom-0 ของแผ่นโมดัลไม่ได้หมายถึง "ก้นจอ" อีกต่อไป
+     แต่หมายถึง "ก้นกล่องเนื้อหาของหน้า" ซึ่งบนหน้าที่ยาว ๆ อยู่ต่ำกว่าจอไปหลายพันพิกเซล
+
+     วัดจริง: เลื่อนหน้าลง 600px แล้วเปิดโมดัล ได้ top 1187 / bottom 1745
+     ทั้งที่จอสูง 812 คือหลุดออกนอกจอทั้งแผ่น กดกระดิ่งแล้วจึงเหมือนไม่มีอะไรเกิดขึ้น
+     พอ portal ไป body แล้วไม่มีบรรพบุรุษที่มี transform อีก fixed จึงยึดกับจอตามที่ควรเป็น */
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -227,6 +239,7 @@ export default function Modal({ isOpen, onClose, title, children, footer = null 
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
