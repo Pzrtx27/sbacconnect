@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Calendar, AlertCircle } from 'lucide-react';
-import { fetchTimetable, subscribeTimetable } from '../../utils/timetable';
+import { fetchTimetable, subscribeTimetable, fetchClassIds } from '../../utils/timetable';
 
 /* ตารางสอนจริง ภาคเรียน 1/2569 — ทำหน้าที่เป็นข้อมูลตัวอย่าง/สำรอง
    ก่อนตั้งค่า Google Sheet (ดู src/config/sheets.js) เมื่อเชื่อมชีตแล้ว
@@ -105,7 +105,22 @@ const DAYS_TH = {
   Friday: 'ศุกร์'
 };
 
-const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+/** m3_6 -> ม.3/6 */
+const classLabel = (id) => String(id || '').replace('m', 'ม.').replace('_', '/');
+
+/* ครูที่ปรึกษาแต่ละห้อง ยังไม่มีตารางใน DB จึงเขียนไว้ที่นี่ก่อน
+   ห้องที่ไม่อยู่ในรายการจะขึ้น "ยังไม่ระบุ" แทนการเดาชื่อครูมั่ว ๆ
+   ซึ่งของเดิมทำอยู่ (ห้องไหนที่ไม่ใช่ 3/4 ถูกยัดชื่อ อ.ปิยะนุช ให้หมด) */
+const ADVISOR_BY_CLASS = {
+  m3_4: 'อ.ธีรวัฒน์ สุทธิธรรมฐากูร',
+  m3_6: 'อ.ปิยะนุช พูลศิริ',
+};
+
+/* คาบทั้งหมดที่โรงเรียนมี ใช้เป็นเพดานเท่านั้น
+   ตารางจริงจะแสดงเฉพาะคาบที่มีวิชาอยู่จริง (ดู visiblePeriods ด้านล่าง)
+   ของเดิมโชว์ครบ 11 คาบตายตัว ทำให้คาบ 9-11 เป็นช่องขีดกลางเปล่า ๆ ทุกวัน
+   กินความกว้างไปเปล่า ๆ สามคอลัมน์ และดันให้ต้องเลื่อนตารางแนวนอนโดยไม่จำเป็น */
+const ALL_PERIODS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
 const PERIOD_TIMES = {
   1: '08:30-09:30',
@@ -125,7 +140,20 @@ export default function StudentTimetable() {
   const { user } = useAuth();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const classId = user?.class_id || 'm3_6';
+  /* ฝ่ายวิชาการไม่มี student_profile จึงไม่มี class_id เป็นของตัวเอง
+     ต้องแยกกับกรณีนักเรียน ไม่งั้นค่า fallback 'm3_6' จะถูกติดป้ายว่า "ห้องฉัน"
+     ให้คนที่ไม่ได้อยู่ห้องนั้น */
+  const myClassId = user?.class_id || '';
+  const initialClassId = myClassId || 'm3_6';
+
+  /* สลับดูห้องอื่นได้เฉพาะฝ่ายวิชาการ ไว้เช็คว่าที่เพิ่งแก้ไปขึ้นจริงไหม
+     โดยไม่ต้องออกจากหน้านี้ไปเปิดหน้าจัดการอีกที
+     นักเรียนกับครูเห็นแค่ห้องตัวเองเหมือนเดิม — ไม่ใช่เรื่องความลับ
+     (RLS เปิดให้อ่านได้ทุกคนอยู่แล้ว) แต่เป็นปุ่มที่ไม่มีเหตุผลให้นักเรียนต้องใช้ */
+  const isAcademic = (user?.role || '').toLowerCase().trim() === 'academic';
+
+  const [viewClassId, setViewClassId] = useState(initialClassId);
+  const [classIds, setClassIds] = useState([]);
 
   const [timetable, setTimetable] = useState({});
   const [source, setSource] = useState('loading'); // 'loading' | 'live' | 'seed' | 'error'
@@ -142,33 +170,65 @@ export default function StudentTimetable() {
      ตอนนี้ฝ่ายวิชาการกดบันทึก เซิร์ฟเวอร์ส่งเฉพาะแถวที่เปลี่ยนมาที่เครื่องนี้ทันที */
   const load = useCallback(async () => {
     try {
-      const data = await fetchTimetable(classId);
+      const data = await fetchTimetable(viewClassId);
       if (Object.keys(data).length > 0) {
         setTimetable(data);
         setSource('live');
       } else {
         // ห้องนี้ยังไม่มีข้อมูลใน DB — แสดงตารางตัวอย่างไว้ก่อน และบอกตรง ๆ ว่านี่คือตัวอย่าง
-        setTimetable(SEED_TIMETABLE_BY_CLASS[classId] || {});
+        setTimetable(SEED_TIMETABLE_BY_CLASS[viewClassId] || {});
         setSource('seed');
       }
       stamp();
     } catch (err) {
       console.error('[timetable] โหลดตารางสอนไม่สำเร็จ:', err);
-      setTimetable(SEED_TIMETABLE_BY_CLASS[classId] || {});
+      setTimetable(SEED_TIMETABLE_BY_CLASS[viewClassId] || {});
       setSource('error');
     }
-  }, [classId]);
+  }, [viewClassId]);
 
   useEffect(() => {
     setSource('loading');
     load();
 
-    return subscribeTimetable(classId, (next) => {
+    return subscribeTimetable(viewClassId, (next) => {
       setTimetable(next);
       setSource('live');
       stamp();
     });
-  }, [classId, load]);
+  }, [viewClassId, load]);
+
+  /* รายชื่อห้องที่มีตารางอยู่จริง — ปุ่มสลับห้องสร้างจากอันนี้
+     ถ้าโหลดไม่ได้ก็ไม่เป็นไร ปุ่มสลับหายไปเฉย ๆ ตารางห้องตัวเองยังแสดงปกติ */
+  useEffect(() => {
+    if (!isAcademic) return undefined; // นักเรียนไม่มีปุ่มสลับ จึงไม่ต้องยิงขอรายชื่อห้อง
+    let alive = true;
+    fetchClassIds()
+      .then((ids) => {
+        if (!alive) return;
+        setClassIds(ids);
+        // ฝ่ายวิชาการไม่มีห้องของตัวเอง ถ้าห้องที่เปิดมาไม่มีข้อมูลให้เด้งไปห้องแรกที่มี
+        if (!myClassId && ids.length > 0 && !ids.includes(viewClassId)) setViewClassId(ids[0]);
+      })
+      .catch((err) => console.error('[timetable] โหลดรายชื่อห้องไม่สำเร็จ:', err));
+    // เจตนาเช็ค viewClassId แค่ตอนโหลดรายชื่อครั้งแรก ไม่ใช่ทุกครั้งที่กดสลับห้อง
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => { alive = false; };
+  }, [isAcademic]);
+
+  /* แสดงเฉพาะคาบที่มีวิชาจริงสักวันหนึ่ง
+     ห้อง 3/4 เลิกคาบ 6 ส่วน 3/6 มีถึงคาบ 8 — ตารางจึงกว้างไม่เท่ากันตามจริง
+     ไม่ใช่ลากยาวถึงคาบ 11 เปล่า ๆ ทั้งสองห้อง
+     ถ้ายังไม่มีข้อมูลเลย ใช้ 1-8 ไว้ก่อนไม่ให้หัวตารางหาย */
+  const visiblePeriods = (() => {
+    const used = new Set();
+    for (const periods of Object.values(timetable)) {
+      for (const p of Object.keys(periods)) used.add(Number(p));
+    }
+    if (used.size === 0) return ALL_PERIODS.slice(0, 8);
+    const max = Math.max(...used);
+    return ALL_PERIODS.filter((p) => p <= max);
+  })();
 
   const STATUS = {
     loading: { label: 'กำลังโหลด...', dot: 'bg-slate-400', tone: isDark ? 'bg-white/10 text-content-secondary' : 'bg-slate-100 text-ink-secondary' },
@@ -197,19 +257,59 @@ export default function StudentTimetable() {
         </span>
       </div>
 
+      {/* สลับดูตารางห้องอื่น — เฉพาะฝ่ายวิชาการ และเฉพาะเมื่อมีมากกว่าหนึ่งห้อง
+          ปุ่มเดียวที่กดแล้วไม่มีอะไรให้เลือกคือปุ่มที่ไม่ควรมี */}
+      {isAcademic && classIds.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`text-xs font-bold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+            ดูตารางห้อง
+          </span>
+          {classIds.map((id) => {
+            const selected = viewClassId === id;
+            const mine = id === myClassId;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setViewClassId(id)}
+                aria-pressed={selected}
+                className={`min-h-[44px] px-4 rounded-xl text-sm font-extrabold border transition-all active:scale-95 ${
+                  selected
+                    ? 'bg-sbac-blue text-white border-sbac-blue shadow-button'
+                    : isDark
+                      ? 'bg-white/5 text-content-secondary border-white/10 hover:bg-white/10'
+                      : 'bg-slate-50 text-ink-secondary border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                {classLabel(id)}
+                {/* ป้ายนี้ขึ้นเฉพาะคนที่มีห้องของตัวเองจริง ๆ (ฝ่ายวิชาการไม่มี) */}
+                {mine && myClassId && (
+                  <span className={`ml-1.5 text-[10px] font-bold ${selected ? 'text-white/70' : 'text-content-muted'}`}>
+                    ห้องฉัน
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Meta details */}
       <div className={`p-4 rounded-2xl border space-y-2 text-sm font-semibold transition-colors duration-300 ${isDark ? 'bg-white/[0.06] border-white/10 text-slate-200' : 'bg-slate-50 border-slate-100 text-ink-secondary'
         }`}>
+        {/* แสดงห้องที่กำลังดูอยู่ ไม่ใช่ห้องของคนที่ล็อกอิน
+            ไม่งั้นฝ่ายวิชาการกดดูห้อง 3/4 แล้วบรรทัดนี้ยังขึ้น 3/6 ค้างอยู่ */}
         <div className="flex justify-between">
           <span className={isDark ? 'text-content-secondary' : 'text-ink-muted'}>ระดับชั้น / ห้อง</span>
           <span className={`font-bold transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
-            ปวช. {user?.year || '3'}/{user?.room || '6'} ({user?.branch || 'เทคโนโลยีสารสนเทศ'})
+            ปวช. {classLabel(viewClassId).replace('ม.', '')}
+            {viewClassId === myClassId && user?.branch ? ` (${user.branch})` : ''}
           </span>
         </div>
         <div className="flex justify-between">
           <span className={isDark ? 'text-content-secondary' : 'text-ink-muted'}>อาจารย์ที่ปรึกษา</span>
           <span className={`font-bold transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
-            {classId === 'm3_4' ? 'อ.ธีรวัฒน์ สุทธิธรรมฐากูร' : 'อ.ปิยะนุช พูลศิริ'}
+            {ADVISOR_BY_CLASS[viewClassId] || 'ยังไม่ระบุ'}
           </span>
         </div>
         <div className="flex justify-between">
@@ -238,7 +338,7 @@ export default function StudentTimetable() {
                 }`}>
                 <th className={`p-3 text-xs font-extrabold w-16 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
                   }`}>วัน</th>
-                {PERIODS.map(p => (
+                {visiblePeriods.map(p => (
                   <th key={p} className={`p-3 text-xs font-extrabold text-center transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
                     }`}>
                     คาบ {p}
@@ -261,7 +361,7 @@ export default function StudentTimetable() {
                       }`}>
                       {DAYS_TH[day] || day}
                     </td>
-                    {PERIODS.map(p => {
+                    {visiblePeriods.map(p => {
                       const period = (periods && typeof periods === 'object' && periods[p]) || { subject: '', teacher: '', room: '' };
                       const isSubstituted = Boolean(period.is_substituted);
                     return (
