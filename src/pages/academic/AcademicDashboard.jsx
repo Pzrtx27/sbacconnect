@@ -446,12 +446,15 @@ export default function AcademicDashboard() {
       showToast(`สั่งสอนแทน ${describeDate(subDate)} คาบ ${period} เรียบร้อย นักเรียนเห็นแล้ว`, 'success');
     } catch (err) {
       console.error('[academic] สั่งสอนแทนไม่สำเร็จ:', err);
+      /* ต่อรหัสกับข้อความจริงของ DB ไว้ท้าย toast ด้วย
+         ของเดิมเหลือ "ลองใหม่อีกครั้ง" ลอย ๆ ทุกกรณีที่ไม่ได้ดักไว้
+         ซึ่งแปลว่าคนใช้ต้องเปิด DevTools ถึงจะรู้ว่าเกิดอะไรขึ้น */
       showToast(
         err?.code === '42501'
           ? 'บัญชีนี้ไม่มีสิทธิ์สั่งสอนแทน (เฉพาะฝ่ายวิชาการ)'
           : err?.code === '42P01'
             ? 'ยังไม่ได้สร้างตาราง substitutions — รัน 31_substitutions.sql ก่อน'
-            : 'บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง',
+            : `บันทึกไม่สำเร็จ (${err?.code || 'ไม่ทราบรหัส'}) ${err?.message || ''}`.trim(),
         'error'
       );
     } finally {

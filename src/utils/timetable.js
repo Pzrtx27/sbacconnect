@@ -330,14 +330,18 @@ export async function fetchSubstitutionsForDate(dateISO) {
 /** บันทึกสอนแทน 1 คาบ ของ 1 วัน
  *
  *  upsert บน (class_id, sub_date, period) ตาม unique constraint ในไฟล์ 31
- *  ตั้งซ้ำคาบเดิมวันเดิม = แก้ของเดิม ไม่ใช่เพิ่มแถวใหม่ */
+ *  ตั้งซ้ำคาบเดิมวันเดิม = แก้ของเดิม ไม่ใช่เพิ่มแถวใหม่
+ *
+ *  ไม่ส่ง created_by มาจากฝั่งเว็บ — ให้ DB เติมเองจาก auth.uid() (ไฟล์ 32)
+ *  เหตุผล: ค่าที่ getUser() คืนมาเคยทำให้ชน foreign key (23503 "Key is not present
+ *  in table users") ซึ่งบล็อกการบันทึกทั้งก้อน ทั้งที่ created_by เป็นแค่ข้อมูลกำกับ
+ *  ว่าใครสั่ง ไม่ใช่ข้อมูลที่ระบบต้องใช้ทำงาน — ของกำกับไม่ควรทำให้ของหลักพัง
+ *  และค่าที่ DB อ่านจาก JWT เองก็เชื่อถือได้กว่าค่าที่เบราว์เซอร์ส่งมาอยู่แล้ว */
 export async function saveSubstitution({
   classId, date, period,
   subject = '', originalTeacher = '', substituteTeacher = '',
   substituteRoom = '', note = '',
 }) {
-  const { data: auth } = await supabase.auth.getUser();
-
   const { error } = await supabase.from('substitutions').upsert(
     {
       class_id: classId,
@@ -348,7 +352,6 @@ export async function saveSubstitution({
       substitute_teacher: substituteTeacher,
       substitute_room: substituteRoom,
       note,
-      created_by: auth?.user?.id ?? null,
     },
     { onConflict: 'class_id,sub_date,period' }
   );
