@@ -325,33 +325,70 @@ export default function StudentTimetable() {
                     return (
                       <td
                         key={p}
-                        className={`p-2.5 text-center transition-all duration-300 ${isSubstituted
-                          ? (isDark ? 'bg-rose-950/30 border border-rose-900/40 animate-pulse' : 'bg-rose-50 border border-rose-100 animate-pulse')
+                        /* ไม่ใช้ animate-pulse — ของเดิมช่องกระพริบไม่หยุดตลอดเวลาที่เปิดหน้าอยู่
+                           กวนสายตาและอ่านยากกว่าเดิม ใช้กรอบแดงหนา + ป้ายซึ่งบอกชัดกว่าและอยู่นิ่ง */
+                        className={`p-2.5 text-center align-top transition-colors duration-300 ${isSubstituted
+                          ? (isDark ? 'bg-rose-950/30 border-2 border-rose-800/60' : 'bg-rose-50 border-2 border-rose-300')
                           : period.subject === 'พักกลางวัน'
                             ? (isDark ? 'bg-white/5 text-content-muted' : 'bg-slate-50/70 text-ink-muted')
                             : ''
                           }`}
                       >
                         {period.subject ? (
-                          <div className="space-y-0.5 animate-fade-in">
-                            <div className={`text-xs font-extrabold transition-colors duration-300 ${isSubstituted
-                              ? (isDark ? 'text-accent-rose' : 'text-accent-rose')
+                          <div className="space-y-1">
+                            {/* ป้ายมาก่อนชื่อวิชา เพราะเป็นสิ่งที่ต้องเห็นก่อนว่าคาบนี้เปลี่ยน */}
+                            {isSubstituted && (
+                              <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-extrabold bg-accent-rose text-white">
+                                <CalendarClock size={8} aria-hidden="true" />
+                                สอนแทน
+                              </div>
+                            )}
+
+                            <div className={`text-xs font-extrabold ${isSubstituted
+                              ? 'text-accent-rose'
                               : (isDark ? 'text-white' : 'text-sbac-navy')
                               }`}>
                               {period.subject}
                             </div>
-                            {period.teacher && (
-                              <div className={`text-[9px] font-semibold transition-colors duration-300 ${isDark ? 'text-slate-200' : 'text-ink-secondary'
-                                }`}>
-                                {isSubstituted ? `สอนแทน: ${period.substitute_teacher || period.teacher}` : period.teacher}
+
+                            {/* บอกให้ครบว่าใครสอน และเดิมใครควรสอน
+                               ของเดิมพอสั่งสอนแทนแล้วชื่อครูเดิมหายไปเลย นักเรียนจึงไม่รู้ว่า
+                               คาบนี้เปลี่ยนจากใคร และถ้าจำผิดว่าครูคนนี้สอนอยู่แล้วก็ไม่มีอะไรบอก */}
+                            {(period.teacher || period.substitute_teacher) && (
+                              <div className={`text-[9px] font-semibold leading-tight ${isDark ? 'text-slate-200' : 'text-ink-secondary'}`}>
+                                {isSubstituted ? (
+                                  <>
+                                    <span className="block font-extrabold text-accent-rose">
+                                      สอนโดย {period.substitute_teacher || 'ยังไม่ระบุ'}
+                                    </span>
+                                    {period.teacher && (
+                                      <span className={`block ${isDark ? 'text-content-muted' : 'text-ink-muted'}`}>
+                                        แทน {period.teacher}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>สอนโดย {period.teacher}</>
+                                )}
                               </div>
                             )}
-                            {period.room && (
-                              <div className={`text-[8px] font-bold inline-block px-1.5 py-0.5 rounded transition-colors duration-300 ${isSubstituted
+
+                            {/* ห้องเปลี่ยน = โชว์ทั้งห้องเดิมและห้องใหม่ ไม่ใช่ทับเงียบ ๆ
+                               นักเรียนที่เดินไปห้องเดิมตามความเคยชินจะได้เห็นว่าย้ายไปไหน */}
+                            {(period.room || period.substitute_room) && (
+                              <div className={`text-[8px] font-bold inline-block px-1.5 py-0.5 rounded ${isSubstituted
                                 ? (isDark ? 'bg-rose-900/40 text-accent-rose' : 'bg-rose-100 text-accent-rose')
                                 : (isDark ? 'bg-white/15 text-slate-200' : 'bg-slate-100 text-ink-secondary')
                                 }`}>
-                                {isSubstituted && period.substitute_room ? period.substitute_room : period.room}
+                                {isSubstituted && period.substitute_room && period.substitute_room !== period.room ? (
+                                  <>
+                                    <span className="line-through opacity-60">{period.room}</span>
+                                    {' → '}
+                                    {period.substitute_room}
+                                  </>
+                                ) : (
+                                  period.substitute_room || period.room
+                                )}
                               </div>
                             )}
                             {/* ย้ำว่าเป็นของวันนี้วันเดียว จะได้ไม่เข้าใจว่าเปลี่ยนครูถาวร */}
@@ -379,7 +416,9 @@ export default function StudentTimetable() {
         <AlertCircle className="text-accent-rose flex-shrink-0 mt-0.5" size={16} />
         <p className={`text-[10px] leading-relaxed transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-muted'
           }`}>
-          <strong>หมายเหตุ:</strong> ช่องแถบสีแดงกระพริบคือคาบที่ฝ่ายวิชาการสั่งครูสอนแทนหรือย้ายห้องไว้
+          <strong>หมายเหตุ:</strong> ช่องที่มีป้าย <span className="font-extrabold text-accent-rose">สอนแทน</span> และกรอบสีแดง
+          คือคาบที่ฝ่ายวิชาการสั่งครูสอนแทนหรือย้ายห้องไว้ ในช่องบอกทั้งครูที่มาสอนแทนและครูเดิม
+          ถ้าย้ายห้องจะขึ้นเป็น ห้องเดิม → ห้องใหม่
           <strong> เฉพาะวันที่ {formatThaiDate(today)} เท่านั้น</strong> — สัปดาห์ถัดไปตารางจะกลับเป็นปกติเอง
           สั่งสอนแทนเมื่อไหร่หน้านี้เปลี่ยนตามทันทีโดยไม่ต้องรีเฟรช ส่วนตารางประจำเทอมอ่านจาก Google Sheet
         </p>

@@ -81,12 +81,19 @@ export default function StudentHome() {
     if (!user?.uid) return undefined;
     loadBehavior();
 
-    // ครูบันทึกปุ๊บ คะแนน/ประวัติหน้านี้ต้องขยับตามทันที ไม่ต้องรอปิดเปิดโมดัลใหม่
+    /* ครูบันทึกปุ๊บ คะแนน/ประวัติหน้านี้ต้องขยับตามทันที ไม่ต้องรอปิดเปิดโมดัลใหม่
+
+       ต้องเป็น '*' ไม่ใช่ 'INSERT' เท่านั้น
+       ของเดิมฟังแค่ INSERT ครูจึงแก้รายการเดิม (UPDATE) หรือลบทิ้ง (soft delete = UPDATE)
+       แล้วหน้านักเรียนไม่ขยับเลย ตัวอย่างที่เจอจริง: ครูตัด 10 คะแนน แล้วมาแก้เป็น 5
+       ฝั่ง DB คิดถูกแล้ว (behavior_score รวมสด ๆ และกรอง is_deleted ตั้งแต่ไฟล์ 21)
+       แต่นักเรียนยังเห็น -10 ค้างอยู่จนกว่าจะปิดแอปเปิดใหม่
+       ฝั่งครู/วิชาการใช้ '*' ถูกต้องอยู่แล้วใน useBehaviorLogs.js — ตกไปแค่ฝั่งนักเรียน */
     const channel = supabase
       .channel(`behavior-${user.uid}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'behavior_logs', filter: `student_user_id=eq.${user.uid}` },
+        { event: '*', schema: 'public', table: 'behavior_logs', filter: `student_user_id=eq.${user.uid}` },
         loadBehavior
       )
       .subscribe();

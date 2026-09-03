@@ -81,6 +81,10 @@ export default function CoffeePage() {
   const [cart, setCart] = useState([]);
   const [orderNote, setOrderNote] = useState('');
   const [cartOpen, setCartOpen] = useState(false);
+
+  /* ผลการสั่งซื้อ — เก็บไว้โชว์ในกล่องยืนยันหลังกดสั่งสำเร็จ
+     ค้างไว้จนผู้ใช้กดปิดเอง ไม่หายไปเองเหมือน toast เพราะรหัสรับของต้องเอาไปใช้ที่ร้าน */
+  const [orderResult, setOrderResult] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   const loadMenu = useCallback(async () => {
@@ -249,13 +253,22 @@ export default function CoffeePage() {
       setCart([]);
       setOrderNote('');
       setCartOpen(false);
-      showToast(
-        data.duplicate
-          ? 'รายการนี้ถูกบันทึกไว้แล้ว ไม่ถูกตัดเงินซ้ำ'
-          : `สั่งซื้อสำเร็จ! รหัสรับของ ${data.pickup_code}`,
-        'success'
-      );
-      navigate('/orders');
+
+      /* แสดงกล่องยืนยันแทนการเด้ง toast แล้วเปลี่ยนหน้าทันที
+
+         ของเดิมโชว์ toast "สั่งซื้อสำเร็จ! รหัสรับของ XXXX" แล้ว navigate ออกไปเลย
+         ในจังหวะเดียวกัน toast จึงถูกกลืนหายไปพร้อมการเปลี่ยนหน้าบ่อยครั้ง
+         นักเรียนไม่ทันอ่านรหัสรับของ ซึ่งเป็นสิ่งเดียวที่ต้องใช้ไปยื่นที่ร้าน
+         และไม่มีที่ไหนบอกว่าถูกตัดเงินไปเท่าไร เหลือเท่าไร
+
+         RPC คืน total กับ balance มาให้แล้ว ใช้ค่าจาก DB ตรง ๆ
+         ไม่คำนวณเองฝั่งหน้าเว็บ ตัวเลขจึงตรงกับที่ถูกหักจริงเสมอ */
+      setOrderResult({
+        duplicate: Boolean(data.duplicate),
+        pickupCode: data.pickup_code || null,
+        totalSatang: typeof data.total === 'number' ? data.total : null,
+        balanceSatang: typeof data.balance === 'number' ? data.balance : null,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -739,6 +752,78 @@ export default function CoffeePage() {
             </>
           )}
         </div>
+      </Modal>
+
+      {/* ยืนยันการสั่งซื้อ — ปิดเองไม่ได้ ต้องกดปุ่ม เพราะรหัสรับของต้องเอาไปยื่นที่ร้าน */}
+      <Modal
+        isOpen={orderResult !== null}
+        onClose={() => {
+          setOrderResult(null);
+          navigate('/orders');
+        }}
+        title={orderResult?.duplicate ? 'รายการนี้บันทึกไว้แล้ว' : 'สั่งซื้อสำเร็จ'}
+      >
+        {orderResult && (
+          <div className="space-y-5">
+            <div className="text-center space-y-2">
+              <div
+                className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center ${
+                  isDark ? 'bg-emerald-500/15' : 'bg-emerald-500/10'
+                }`}
+                aria-hidden="true"
+              >
+                <Check size={30} className="text-accent-emerald" strokeWidth={3} />
+              </div>
+              <p className={`text-sm font-extrabold ${textPrimary}`}>
+                {orderResult.duplicate ? 'ไม่ถูกตัดเงินซ้ำ' : 'ร้านได้รับออเดอร์แล้ว'}
+              </p>
+            </div>
+
+            {/* รหัสรับของตัวใหญ่สุดในกล่อง เพราะเป็นสิ่งเดียวที่ต้องใช้จริงที่หน้าร้าน */}
+            {orderResult.pickupCode && (
+              <div className={`rounded-2xl border p-4 text-center ${panel}`}>
+                <span className={`text-[10px] font-extrabold block ${textMuted}`}>รหัสรับของ</span>
+                <span className={`text-4xl font-extrabold tracking-[0.2em] block mt-1 ${textPrimary}`}>
+                  {orderResult.pickupCode}
+                </span>
+                <span className={`text-[10px] font-semibold block mt-1.5 ${textMuted}`}>
+                  แจ้งรหัสนี้ที่เคาน์เตอร์เพื่อรับเครื่องดื่ม
+                </span>
+              </div>
+            )}
+
+            {/* ยอดที่จ่ายกับเงินคงเหลือ ใช้ค่าที่ DB ส่งกลับมา ไม่ได้คำนวณเองในหน้าเว็บ */}
+            <div className={`rounded-2xl border divide-y ${panel} ${isDark ? 'divide-white/5' : 'divide-slate-100'}`}>
+              {orderResult.totalSatang !== null && (
+                <div className="flex justify-between items-center px-4 py-3">
+                  <span className={`text-xs font-bold ${textMuted}`}>ยอดที่จ่าย</span>
+                  <span className="text-sm font-extrabold text-accent-rose tabular-nums">
+                    -{formatBaht(orderResult.totalSatang)} ฿
+                  </span>
+                </div>
+              )}
+              {orderResult.balanceSatang !== null && (
+                <div className="flex justify-between items-center px-4 py-3">
+                  <span className={`text-xs font-bold ${textMuted}`}>เงินคงเหลือ</span>
+                  <span className={`text-lg font-extrabold tabular-nums ${textPrimary}`}>
+                    {formatBaht(orderResult.balanceSatang)} ฿
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setOrderResult(null);
+                navigate('/orders');
+              }}
+              className="w-full min-h-[48px] bg-sbac-blue hover:bg-sbac-navy text-white text-sm font-extrabold rounded-2xl shadow-button active:scale-[0.98] transition-all"
+            >
+              ดูคำสั่งซื้อของฉัน
+            </button>
+          </div>
+        )}
       </Modal>
     </div>
   );

@@ -3,6 +3,21 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { CheckCircle2, XCircle, Check } from 'lucide-react';
 import { LEAVE_TYPE_LABELS, LEAVE_STATUS_TEXT, LEAVE_STATUS_COLOR } from '../../utils/leave';
 
+/** วันที่ + เวลาที่ยื่นใบลา
+ *
+ *  ของเดิมแสดงแค่วันที่ ซึ่งไม่พอสำหรับการอนุมัติจริง
+ *  ใบลาที่ยื่นตอนเช้าก่อนเข้าเรียนกับยื่นตอนเย็นหลังเลิกเรียน ต่างกันมาก
+ *  ครูต้องรู้ว่ายื่นก่อนหรือหลังคาบที่ขาดไป ถึงจะตัดสินได้ว่าลาล่วงหน้าหรือลาย้อนหลัง */
+function formatSubmittedAt(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '-';
+  return `${d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('th-TH', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })} น.`;
+}
+
 /* รายการใบลา ใช้ร่วมกัน 3 ที่:
    - StudentHome.jsx  (mode="student" — อ่านอย่างเดียว ดูสถานะของตัวเอง)
    - TeacherHome.jsx  (mode="teacher" — อนุมัติ/ไม่อนุมัติขั้นที่ 1 เฉพาะสถานะ pending_teacher)
@@ -75,7 +90,7 @@ export default function LeaveRequestList({ requests, loading, mode = 'student', 
                 )}
                 <span className={`text-[9px] font-semibold block ${textMuted}`}>
                   {mode !== 'student' && req.class_label ? `${req.class_label} • ` : ''}
-                  ยื่นเมื่อ {new Date(req.created_at).toLocaleDateString('th-TH')}
+                  ยื่นเมื่อ {formatSubmittedAt(req.created_at)}
                 </span>
               </div>
               <span
