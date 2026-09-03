@@ -26,7 +26,7 @@ import {
   ClipboardCheck,
   CalendarDays,
   Users,
-  CloudDownload
+  Trash2
 } from 'lucide-react';
 import { sha256, encryptAES } from '../../utils/crypto';
 import EventManager from './EventManager';
@@ -34,17 +34,20 @@ import BehaviorDeductionWizard from './BehaviorDeductionWizard';
 import HomeroomAssignmentPanel from './HomeroomAssignmentPanel';
 import TabNav from '../../components/layout/TabNav';
 import {
-  DAYS,
   DAY_LABELS,
-  DAY_LABELS_SHORT,
   PERIODS,
-  fetchTimetable,
-  fetchClassIds,
-  subscribeTimetable,
-  saveSlot,
+  PERIOD_TIMES,
+  fetchBaseTimetable,
+  listClassIds,
+  fetchSubstitutions,
+  saveSubstitution,
   clearSubstitution,
-  importFromSheet,
-  isSheetConfigured,
+  subscribeSubstitutions,
+  todayISO,
+  weekdayKeyOf,
+  isSchoolDay,
+  describeDate,
+  formatThaiDate,
   classLabel,
 } from '../../utils/timetable';
 
@@ -69,14 +72,18 @@ export default function AcademicDashboard() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
-  // Substitution Form State
-  const [day, setDay] = useState('Monday');
+  /* ฟอร์มสอนแทน — ผูกกับ "วันที่" ไม่ใช่ชื่อวัน
+     การสอนแทนคือการเปลี่ยนตัวชั่วคราวแค่วันเดียว พ้นวันนั้นตารางกลับเป็นปกติเอง
+     ถ้าเก็บเป็นชื่อวัน ('Monday') มันจะกลายเป็น "ทุกวันจันทร์" ซึ่งไม่ใช่ความจริง
+     ชื่อวันจึงคำนวณจากวันที่ (weekdayKeyOf) ไม่ให้ผู้ใช้เลือกเอง จะได้ขัดกันไม่ได้ */
+  const [subDate, setSubDate] = useState(todayISO());
   const [period, setPeriod] = useState(3);
-  const [subject, setSubject] = useState('');
-  const [origTeacher, setOrigTeacher] = useState('');
   const [subTeacher, setSubTeacher] = useState('');
   const [roomMode, setRoomMode] = useState('same'); // 'same' or 'new'
   const [room, setRoom] = useState('');
+
+  // ชื่อวันของ subDate — ใช้หาคาบในตารางฐาน และบอกผู้ใช้ว่ากำลังแก้วันอะไร
+  const dayKey = weekdayKeyOf(subDate);
 
   /* ฟอร์มประกาศกิจกรรมเดิมถูกย้ายไป <EventManager /> ทั้งก้อน
      ของเดิมเขียนลง Firebase collection 'events' ซึ่งปิดไปแล้ว และเป็นคนละที่กับ
@@ -85,21 +92,23 @@ export default function AcademicDashboard() {
   // Selected class room/branch states
   const [selectedClassId, setSelectedClassId] = useState('m3_6');
 
-  /* ห้องที่มีตารางอยู่จริง อ่านจาก DB ไม่ใช่รายชื่อ 20 ห้องที่เขียนตายไว้ในโค้ด */
-  const [classIds, setClassIds] = useState([]);
-  const [classIdsLoading, setClassIdsLoading] = useState(true);
+  /* ห้องที่จัดการได้ = ห้องที่ตั้งค่าแท็บ Google Sheet ไว้แล้ว
+     ไม่ต้องยิง DB เพราะรายชื่อมาจากไฟล์ config ตรง ๆ */
+  const classIds = listClassIds();
 
-  // Preview State
+  /* ตารางประจำเทอมจากชีต (อ่านอย่างเดียว) + รายการสอนแทนของวันที่เลือกจาก Supabase
+     คนละแหล่ง คนละอายุข้อมูล จงใจไม่เอามารวมเป็นก้อนเดียว */
   const [timetableData, setTimetableData] = useState({});
+  const [timetableSource, setTimetableSource] = useState('loading');
   const [timetableLoading, setTimetableLoading] = useState(true);
+  const [daySubs, setDaySubs] = useState([]);
   const [savingSlot, setSavingSlot] = useState(false);
-  const [importing, setImporting] = useState(false);
 
   /* แท็บที่เปิดอยู่ — เริ่มที่ "รอดำเนินการ" เพราะเป็นคำถามแรกของทุกเช้า
      ว่ามีใบลา/ใบแจ้งซ่อมค้างอยู่กี่รายการ ไม่ใช่การมาแก้ตารางสอน */
   const [activeTab, setActiveTab] = useState('inbox');
 
-  const { confirm: confirmImport, confirmDialog: importConfirmDialog } = useConfirm();
+  const { confirm: confirmClearSub, confirmDialog: clearSubConfirmDialog } = useConfirm();
 
   // Excel Sync and Encryption States
   const [encryptionMode, setEncryptionMode] = useState('sha256'); // 'sha256' | 'aes256' | 'none'
@@ -347,65 +356,52 @@ export default function AcademicDashboard() {
     }
   };
 
-  /* ตารางสอนอ่านจาก Supabase แล้ว subscribe realtime ต่อ (25_timetables.sql)
-     ของเดิมเป็น onSnapshot ของ Firestore ที่ throw ทันทีเพราะ config ถูกปิดไป
-     ตอนนี้ที่ฝ่ายวิชาการกดบันทึก นักเรียนที่เปิดหน้าตารางอยู่จะเห็นทันที
-     เพราะทั้งสองฝั่ง subscribe แถวชุดเดียวกัน */
+  /* ตารางประจำเทอมอ่านสดจาก Google Sheet — ชีตคือต้นฉบับ ที่นี่อ่านอย่างเดียว
+     ฝ่ายวิชาการจะเปลี่ยนวิชา/ครู/ห้องถาวร ต้องไปแก้ในชีต ไม่ใช่ในหน้านี้
+     (หน้านี้ทำได้อย่างเดียวคือสั่งสอนแทนรายวัน ซึ่งชีตทำไม่ได้เพราะอ่านได้อย่างเดียว) */
   const reloadTimetable = useCallback(async () => {
     setTimetableLoading(true);
-    try {
-      setTimetableData(await fetchTimetable(selectedClassId));
-    } catch (err) {
-      console.error('[academic] โหลดตารางสอนไม่สำเร็จ:', err);
-      showToast('โหลดตารางสอนไม่สำเร็จ ลองใหม่อีกครั้ง', 'error');
-      setTimetableData({});
-    } finally {
-      setTimetableLoading(false);
-    }
+    const { timetable, source } = await fetchBaseTimetable(selectedClassId);
+    setTimetableData(timetable);
+    setTimetableSource(source);
+    setTimetableLoading(false);
   }, [selectedClassId]);
 
   useEffect(() => {
     reloadTimetable();
-    return subscribeTimetable(selectedClassId, setTimetableData);
-  }, [selectedClassId, reloadTimetable]);
+  }, [reloadTimetable]);
 
-  /* โหลดรายชื่อห้องครั้งเดียวตอนเข้าหน้า
-     ถ้าห้องที่เลือกไว้ (ค่าเริ่มต้น m3_6) ไม่มีอยู่จริง ให้เด้งไปห้องแรกที่มี
-     ไม่งั้นเปิดหน้ามาเจอตารางว่างทั้งที่ห้องอื่นมีข้อมูล */
-  const loadClassIds = useCallback(async () => {
-    setClassIdsLoading(true);
-    try {
-      const ids = await fetchClassIds();
-      setClassIds(ids);
-      if (ids.length > 0 && !ids.includes(selectedClassId)) setSelectedClassId(ids[0]);
-    } catch (err) {
-      console.error('[academic] โหลดรายชื่อห้องไม่สำเร็จ:', err);
-      setClassIds([]);
-    } finally {
-      setClassIdsLoading(false);
+  /* รายการสอนแทนของห้อง+วันที่ที่เลือก
+     แยกเป็นฟังก์ชันเพราะต้องเรียกซ้ำหลังบันทึก/ยกเลิก ไม่ใช่แค่ตอนเปลี่ยนวันที่ */
+  const reloadDaySubs = useCallback(async () => {
+    setDaySubs(await fetchSubstitutions(selectedClassId, subDate));
+  }, [selectedClassId, subDate]);
+
+  useEffect(() => {
+    reloadDaySubs();
+    // ห้องเดียวกันอาจมีฝ่ายวิชาการอีกคนแก้อยู่พร้อมกัน — ให้เห็นตรงกัน
+    return subscribeSubstitutions(selectedClassId, reloadDaySubs);
+  }, [selectedClassId, reloadDaySubs]);
+
+  /* คาบนี้ของวันนี้ในตารางประจำเทอม (อ่านอย่างเดียว) และแถวสอนแทนถ้ามี */
+  const baseSlot = timetableData[dayKey]?.[period] || null;
+  const currentSub = daySubs.find((s) => Number(s.period) === Number(period)) || null;
+
+  /* ย้ายค่าเข้าฟอร์ม
+     ถ้าคาบนั้นวันนั้นตั้งสอนแทนไว้แล้ว ดึงของเดิมมาแก้ต่อ
+     ถ้ายังไม่มี เว้นช่องครูสอนแทนให้ว่าง แล้วตั้งห้องเป็น "ห้องเดิมตามตาราง"
+     ต้องเคลียร์ทุกครั้งที่เปลี่ยนคาบ ไม่งั้นชื่อครูจากคาบก่อนหน้าจะค้างในช่อง
+     แล้วกดบันทึกทีเดียวกลายเป็นสั่งสอนแทนคาบที่ไม่ได้ตั้งใจ */
+  useEffect(() => {
+    setSubTeacher(currentSub?.substitute_teacher || '');
+    if (currentSub?.substitute_room) {
+      setRoomMode('new');
+      setRoom(currentSub.substitute_room);
+    } else {
+      setRoomMode('same');
+      setRoom('');
     }
-    // เจตนาไม่ใส่ selectedClassId ใน deps — ต้องการให้เช็คแค่ตอนโหลดครั้งแรก
-    // ถ้าใส่ไป การกดเลือกห้องแต่ละครั้งจะไปยิงโหลดรายชื่อห้องใหม่ทุกครั้ง
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    loadClassIds();
-  }, [loadClassIds]);
-
-  /* ย้ายค่าของคาบที่เลือกเข้าฟอร์ม
-     ต้องเคลียร์ช่องครูสอนแทนเมื่อคาบนั้นไม่ได้ถูกสั่งสอนแทน ไม่งั้นชื่อครูจากคาบก่อนหน้า
-     จะค้างอยู่ในช่อง แล้วกดบันทึกทีเดียวกลายเป็นสั่งสอนแทนคาบที่ไม่ได้ตั้งใจ */
-  useEffect(() => {
-    const slot = timetableData[day]?.[period] || {};
-    setSubject(slot.subject || '');
-    setOrigTeacher(slot.teacher || '');
-    setSubTeacher(slot.is_substituted ? slot.substitute_teacher || '' : '');
-    setRoom(slot.is_substituted && slot.substitute_room ? slot.substitute_room : slot.room || '');
-    setRoomMode(slot.is_substituted && slot.substitute_room ? 'new' : 'same');
-  }, [day, period, timetableData]);
-
-  const currentSlot = timetableData[day]?.[period] || null;
+  }, [currentSub, subDate, period, selectedClassId]);
 
   /* หมวดของหน้านี้ เรียงตามความถี่ที่ฝ่ายวิชาการต้องใช้จริง ไม่ใช่ตามลำดับที่โค้ดเคยเขียนไว้
      "รอดำเนินการ" มาก่อนเพราะเป็นคำถามแรกของทุกเช้าว่ามีอะไรค้างรออยู่บ้าง
@@ -418,40 +414,44 @@ export default function AcademicDashboard() {
     { id: 'import', label: 'นำเข้าข้อมูล', icon: FileSpreadsheet },
   ];
 
-  /* บันทึกคาบ — ทำได้สองอย่างในปุ่มเดียว
-     กรอกครูสอนแทน = สั่งสอนแทน / เว้นว่าง = แก้ตารางปกติ
-     แยกเป็นสองปุ่มแล้วผู้ใช้ต้องเดาว่าจะกดอันไหน ซึ่งไม่มีข้อมูลพอจะเดาถูก */
-  const handleSaveSlot = async () => {
-    if (!subject.trim()) {
-      showToast('กรุณากรอกชื่อวิชาก่อนบันทึก', 'error');
+  /* สั่งสอนแทน 1 คาบ ของ 1 วัน
+     ปุ่มนี้ทำได้อย่างเดียวคือสอนแทน ไม่มีทางแก้ตารางประจำเทอมโดยไม่ตั้งใจ
+     (ของเดิมปุ่มเดียวทำสองอย่าง เว้นช่องครูสอนแทนว่าง = เขียนทับตารางถาวร) */
+  const handleSaveSubstitution = async () => {
+    if (!subTeacher.trim()) {
+      showToast('กรุณาระบุชื่อครูสอนแทน', 'error');
+      return;
+    }
+    if (roomMode === 'new' && !room.trim()) {
+      showToast('เลือก "เปลี่ยนห้องใหม่" แล้วต้องระบุเลขห้อง', 'error');
       return;
     }
 
-    const substituting = Boolean(subTeacher.trim());
     setSavingSlot(true);
     try {
-      await saveSlot(selectedClassId, day, period, {
-        subject: subject.trim(),
-        teacher: origTeacher.trim(),
-        room: roomMode === 'new' ? room.trim() : currentSlot?.room || room.trim(),
-        is_substituted: substituting,
-        substitute_teacher: substituting ? subTeacher.trim() : '',
-        substitute_room: substituting && roomMode === 'new' ? room.trim() : '',
+      await saveSubstitution({
+        classId: selectedClassId,
+        date: subDate,
+        period,
+        // คัดลอกวิชา/ครูเดิมจากชีตไว้กับแถว เพื่อให้ประกาศของวันนั้นยังตรง
+        // แม้ชีตจะถูกแก้ทีหลัง
+        subject: baseSlot?.subject || '',
+        originalTeacher: baseSlot?.teacher || '',
+        substituteTeacher: subTeacher.trim(),
+        // โหมด 'same' ส่งค่าว่าง = ใช้ห้องเดิมตามตาราง ไม่ได้แปลว่าไม่มีห้อง
+        substituteRoom: roomMode === 'new' ? room.trim() : '',
       });
-      // เหตุผลเดียวกับ handleClearSubstitution — ไม่รอ realtime สำหรับการกระทำของตัวเอง
-      await reloadTimetable();
-      showToast(
-        substituting
-          ? `สั่งสอนแทน ${DAY_LABELS[day]} คาบ ${period} เรียบร้อย นักเรียนเห็นแล้ว`
-          : `บันทึก ${DAY_LABELS[day]} คาบ ${period} เรียบร้อย`,
-        'success'
-      );
+      // ไม่รอ realtime สำหรับการกระทำของตัวเอง — ถ้า event ไม่มา ผู้ใช้จะนึกว่ากดไม่ติด
+      await reloadDaySubs();
+      showToast(`สั่งสอนแทน ${describeDate(subDate)} คาบ ${period} เรียบร้อย นักเรียนเห็นแล้ว`, 'success');
     } catch (err) {
-      console.error('[academic] บันทึกตารางสอนไม่สำเร็จ:', err);
+      console.error('[academic] สั่งสอนแทนไม่สำเร็จ:', err);
       showToast(
         err?.code === '42501'
-          ? 'บัญชีนี้ไม่มีสิทธิ์แก้ตารางสอน (เฉพาะฝ่ายวิชาการ)'
-          : 'บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง',
+          ? 'บัญชีนี้ไม่มีสิทธิ์สั่งสอนแทน (เฉพาะฝ่ายวิชาการ)'
+          : err?.code === '42P01'
+            ? 'ยังไม่ได้สร้างตาราง substitutions — รัน 31_substitutions.sql ก่อน'
+            : 'บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง',
         'error'
       );
     } finally {
@@ -459,50 +459,29 @@ export default function AcademicDashboard() {
     }
   };
 
-  const handleClearSubstitution = async () => {
+  /* ยกเลิกสอนแทน = ลบแถวทิ้ง ตารางกลับไปใช้ของในชีตทันที
+     ปกติไม่ต้องกดเลย เพราะพ้นวันแล้วมันหายไปเอง — ปุ่มนี้ไว้ใช้ตอนตั้งผิด
+     หรือครูกลับมาสอนเองได้ */
+  const handleClearSubstitution = async (targetPeriod = period) => {
+    const ok = await confirmClearSub({
+      title: `ยกเลิกสอนแทนคาบ ${targetPeriod}?`,
+      message: `${describeDate(subDate)} ห้อง ${classLabel(selectedClassId)} คาบ ${targetPeriod}`,
+      detail: 'คาบนี้จะกลับไปใช้ครูและห้องเดิมตามตารางในชีต และนักเรียนจะเห็นทันที',
+      confirmLabel: 'ยกเลิกสอนแทน',
+      danger: true,
+    });
+    if (!ok) return;
+
     setSavingSlot(true);
     try {
-      await clearSubstitution(selectedClassId, day, period);
-      /* โหลดตารางใหม่เองทันที ไม่รอ realtime
-         ของเดิมพึ่ง realtime อย่างเดียว ถ้า event ไม่มา (ยังไม่ได้เพิ่มตารางเข้า publication,
-         ช่องสัญญาณยังไม่ subscribe เสร็จ หรือเน็ตหลุดชั่วขณะ) ค่าบนจอจะค้างของเดิม
-         ผู้ใช้กดยกเลิกสอนแทนแล้วเห็นชื่อครูสอนแทนอยู่เหมือนเดิม เข้าใจว่ากดไม่ติด
-         การกระทำของตัวเองไม่ควรต้องวิ่งอ้อมผ่าน realtime ก่อนถึงจะเห็นผล */
-      await reloadTimetable();
-      showToast(`ยกเลิกการสอนแทน ${DAY_LABELS[day]} คาบ ${period} แล้ว`, 'success');
+      await clearSubstitution(selectedClassId, subDate, targetPeriod);
+      await reloadDaySubs();
+      showToast(`ยกเลิกสอนแทน ${describeDate(subDate)} คาบ ${targetPeriod} แล้ว`, 'success');
     } catch (err) {
       console.error('[academic] ยกเลิกการสอนแทนไม่สำเร็จ:', err);
       showToast('ยกเลิกไม่สำเร็จ ลองใหม่อีกครั้ง', 'error');
     } finally {
       setSavingSlot(false);
-    }
-  };
-
-  /* ดูดทั้งเทอมจาก Google Sheet
-     ต้นเทอมตารางเปลี่ยนทั้งใบ กรอกทีละคาบ 35 คาบต่อห้องคือความทรมาน
-     แก้ในชีตแล้วกดปุ่มเดียวเร็วกว่ามาก ส่วนสั่งสอนแทนระหว่างเทอมค่อยใช้ฟอร์ม
-     (ชีตอ่านได้อย่างเดียว เขียนกลับไม่ได้ จึงสั่งสอนแทนผ่านชีตไม่ได้) */
-  const handleImportSheet = async () => {
-    const ok = await confirmImport({
-      title: `นำเข้าตารางห้อง ${classLabel(selectedClassId)}?`,
-      message: 'ระบบจะดึงตารางทั้งแท็บจาก Google Sheet มาทับของเดิมในฐานข้อมูล',
-      detail: 'คาบที่สั่งสอนแทนไว้ในห้องนี้จะถูกทับด้วยค่าจากชีต และนักเรียนจะเห็นตารางใหม่ทันที',
-      confirmLabel: 'นำเข้าทับ',
-      danger: true,
-    });
-    if (!ok) return;
-
-    setImporting(true);
-    try {
-      const count = await importFromSheet(selectedClassId);
-      // เหตุผลเดียวกับข้างบน — นำเข้าทีเดียวหลายสิบคาบ ยิ่งต้องเห็นผลทันที
-      await reloadTimetable();
-      showToast(`นำเข้าตารางสอน ${count} คาบเรียบร้อย`, 'success');
-    } catch (err) {
-      console.error('[academic] นำเข้าจากชีตไม่สำเร็จ:', err);
-      showToast(err.message || 'นำเข้าจากชีตไม่สำเร็จ', 'error');
-    } finally {
-      setImporting(false);
     }
   };
 
@@ -595,21 +574,12 @@ export default function AcademicDashboard() {
             </span>
           </div>
 
-          {classIdsLoading ? (
-            <div className="flex gap-2">
-              {[0, 1].map((i) => (
-                <div
-                  key={i}
-                  className={`h-11 w-24 rounded-xl animate-pulse ${isDark ? 'bg-white/5' : 'bg-slate-100'}`}
-                />
-              ))}
-            </div>
-          ) : classIds.length === 0 ? (
-            /* ยังไม่มีห้องไหนมีตารางเลย — บอกทางออกไปเลย ไม่ใช่ปล่อยให้หน้าว่าง */
+          {classIds.length === 0 ? (
+            /* ยังไม่มีห้องไหนตั้งค่าแท็บชีต — บอกทางออกไปเลย ไม่ใช่ปล่อยให้หน้าว่าง */
             <p className="text-xs font-semibold text-content-muted leading-relaxed">
-              ยังไม่มีห้องไหนมีตารางสอนในระบบ — กดปุ่ม
-              <span className="font-extrabold"> นำเข้าตารางทั้งเทอมจาก Google Sheet </span>
-              ด้านล่าง หรือรัน <code className="font-mono">25_timetables.sql</code> เพื่อใส่ข้อมูลตั้งต้น
+              ยังไม่มีห้องไหนผูกกับ Google Sheet — เพิ่ม gid ของแท็บใน
+              <code className="font-mono"> src/config/sheets.js </code>
+              ที่ <code className="font-mono">TIMETABLE_TAB_GID_BY_CLASS</code>
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">
@@ -640,37 +610,46 @@ export default function AcademicDashboard() {
           <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
             }`}>
             <Calendar size={18} className="text-brand" />
-            แก้ไขตารางสอน
-            {/* ป้ายนี้เคยเขียนว่า Real-time ทั้งที่เขียนลง Firebase ที่ปิดไปแล้ว
-                ตอนนี้เป็นของจริง จึงบอกให้ชัดว่าปลายทางคือใคร */}
+            สั่งสอนแทน (ชั่วคราว 1 วัน)
             <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-accent-emerald/15 text-accent-emerald border border-accent-emerald/25">
               นักเรียนเห็นทันที
             </span>
           </h3>
 
-          {/* เลือกวันแบบปุ่ม ไม่ใช่ dropdown — มีแค่ 5 ตัวเลือกและต้องสลับไปมาบ่อย
-              การกดสองครั้ง (เปิด dropdown แล้วเลือก) ทุกครั้งไม่คุ้มกับที่ประหยัดได้ */}
+          {/* บอกขอบเขตให้ชัดตั้งแต่บรรทัดแรก กันเข้าใจผิดว่าเป็นการแก้ตารางถาวร
+              ซึ่งเป็นสิ่งที่หน้านี้เคยทำได้และเป็นต้นเหตุของสอนแทนค้างข้ามสัปดาห์ */}
+          <WorkflowNotice isDark={isDark} title="มีผลเฉพาะวันที่เลือกเท่านั้น">
+            พ้นวันแล้วตารางกลับเป็นปกติเอง ไม่ต้องมากดคืนค่า
+            <br />
+            ถ้าจะเปลี่ยนวิชา/ครู/ห้อง <strong>แบบถาวร</strong> ให้แก้ที่ Google Sheet ของห้องนั้น
+            แล้วหน้านี้กับหน้านักเรียนจะอัปเดตตามเอง
+          </WorkflowNotice>
+
+          {/* เลือกเป็น "วันที่" ไม่ใช่ชื่อวัน — นี่คือหัวใจของการแก้บั๊กเดิม
+              ชื่อวันคำนวณจากวันที่ให้อัตโนมัติ ผู้ใช้จึงกรอกให้ขัดกันเองไม่ได้ */}
           <div>
-            <span className={`text-xs font-bold block mb-1.5 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>วัน</span>
-            <div className="grid grid-cols-5 gap-1.5">
-              {DAYS.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDay(d)}
-                  aria-pressed={day === d}
-                  className={`min-h-[44px] rounded-xl text-xs font-extrabold border transition-all active:scale-95 ${
-                    day === d
-                      ? 'bg-sbac-blue text-white border-sbac-blue shadow-button'
-                      : isDark
-                        ? 'bg-white/5 text-content-secondary border-white/10 hover:bg-white/10'
-                        : 'bg-slate-50 text-ink-secondary border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  {DAY_LABELS_SHORT[d]}
-                </button>
-              ))}
-            </div>
+            <label
+              htmlFor="sub-date"
+              className={`text-xs font-bold block mb-1.5 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}
+            >
+              วันที่สอนแทน
+            </label>
+            <input
+              id="sub-date"
+              type="date"
+              value={subDate}
+              min={todayISO()}
+              onChange={(e) => setSubDate(e.target.value || todayISO())}
+              className={`w-full min-h-[44px] rounded-xl px-4 text-sm font-extrabold focus:outline-none border transition-all ${isDark
+                ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50'
+                : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-surface-card'
+                }`}
+            />
+            <p className={`text-[11px] font-bold mt-1.5 ${isSchoolDay(subDate) ? 'text-content-muted' : 'text-accent-rose'}`}>
+              {isSchoolDay(subDate)
+                ? `วัน${DAY_LABELS[dayKey]} · ${describeDate(subDate)}`
+                : `วัน${DAY_LABELS[dayKey]} — ปกติไม่มีคาบเรียน`}
+            </p>
           </div>
 
           {/* คาบเรียนก็เช่นกัน แถมแต่ละปุ่มยังบอกได้ด้วยว่าคาบไหนมีวิชาแล้ว
@@ -679,7 +658,8 @@ export default function AcademicDashboard() {
             <span className={`text-xs font-bold block mb-1.5 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>คาบที่</span>
             <div className="grid grid-cols-8 gap-1.5">
               {PERIODS.map((p) => {
-                const slot = timetableData[day]?.[p];
+                const slot = timetableData[dayKey]?.[p];
+                const substituted = daySubs.some((s) => Number(s.period) === p);
                 const selected = period === p;
                 return (
                   <button
@@ -701,7 +681,7 @@ export default function AcademicDashboard() {
                     }`}
                   >
                     {p}
-                    {slot?.is_substituted && (
+                    {substituted && (
                       <span
                         className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-accent-rose"
                         aria-hidden="true"
@@ -723,61 +703,46 @@ export default function AcademicDashboard() {
           >
             {timetableLoading ? (
               <span className="text-content-muted font-semibold">กำลังโหลดตาราง...</span>
-            ) : currentSlot ? (
+            ) : baseSlot ? (
               <div className="space-y-1">
                 <div className={`font-extrabold ${isDark ? 'text-white' : 'text-ink'}`}>
-                  {currentSlot.subject || 'ยังไม่ระบุวิชา'}
+                  {baseSlot.subject || 'ยังไม่ระบุวิชา'}
+                  <span className="ml-2 text-[10px] font-bold text-content-muted">
+                    {PERIOD_TIMES[period] ? `${PERIOD_TIMES[period]} น.` : ''}
+                  </span>
                 </div>
                 <div className="text-content-muted font-semibold">
-                  {currentSlot.teacher || 'ไม่ระบุครู'}
-                  {currentSlot.room && ` · ห้อง ${currentSlot.room}`}
+                  {baseSlot.teacher || 'ไม่ระบุครู'}
+                  {baseSlot.room && ` · ห้อง ${baseSlot.room}`}
                 </div>
-                {currentSlot.is_substituted && (
+                {currentSub && (
                   <div className="text-accent-rose font-extrabold">
-                    สอนแทนโดย {currentSlot.substitute_teacher || 'ไม่ระบุ'}
-                    {currentSlot.substitute_room && ` · ย้ายไปห้อง ${currentSlot.substitute_room}`}
+                    {describeDate(subDate)}นี้ สอนแทนโดย {currentSub.substitute_teacher || 'ไม่ระบุ'}
+                    {currentSub.substitute_room && ` · ย้ายไปห้อง ${currentSub.substitute_room}`}
                   </div>
                 )}
               </div>
             ) : (
               <span className="text-content-muted font-semibold">
-                {DAY_LABELS[day]} คาบ {period} ยังว่าง — กรอกด้านล่างเพื่อเพิ่มวิชา
+                วัน{DAY_LABELS[dayKey]} คาบ {period} ไม่มีคาบเรียนในตาราง
+                {timetableSource === 'error' && ' (อ่านชีตไม่สำเร็จ กำลังใช้ข้อมูลสำรอง)'}
               </span>
             )}
           </div>
 
           <div className="space-y-3">
+            {/* ไม่มีช่องแก้วิชา/ครูประจำวิชาแล้ว — สองอย่างนั้นเป็นของตารางประจำเทอม
+                ซึ่งต้นฉบับอยู่ในชีต การให้แก้ได้สองที่แปลว่ามีสองความจริงที่ขัดกันได้
+                ค่าที่เห็นด้านบนคือของจริงจากชีต และจะถูกคัดลอกไปกับแถวสอนแทนให้เอง */}
             <div>
-              <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>ชื่อวิชา</label>
+              <label
+                htmlFor="sub-teacher"
+                className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}
+              >
+                ครูสอนแทน
+              </label>
               <input
-                type="text"
-                value={subject}
-                onChange={e => setSubject(e.target.value)}
-                className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
-                  ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                  : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-surface-card'
-                  }`}
-                placeholder="ระบุวิชาเรียน"
-              />
-            </div>
-
-            <div>
-              <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>ครูประจำวิชา (เดิม)</label>
-              <input
-                type="text"
-                value={origTeacher}
-                onChange={e => setOrigTeacher(e.target.value)}
-                className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
-                  ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                  : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-surface-card'
-                  }`}
-                placeholder="ระบุครูผู้สอนเดิม"
-              />
-            </div>
-
-            <div>
-              <label className={`text-xs font-bold block mb-1 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>ครูสอนแทน</label>
-              <input
+                id="sub-teacher"
                 type="text"
                 value={subTeacher}
                 onChange={e => setSubTeacher(e.target.value)}
@@ -832,24 +797,24 @@ export default function AcademicDashboard() {
 
           <div className="flex flex-col gap-2 pt-2">
             <button
-              onClick={handleSaveSlot}
+              onClick={handleSaveSubstitution}
               disabled={savingSlot}
               className="w-full bg-sbac-blue hover:bg-sbac-navy text-white font-extrabold py-3 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-sbac-blue"
             >
               <RefreshCw size={14} className={savingSlot ? 'animate-spin' : undefined} />
               {savingSlot
                 ? 'กำลังบันทึก...'
-                : subTeacher.trim()
-                  ? `สั่งสอนแทน ${DAY_LABELS[day]} คาบ ${period}`
-                  : `บันทึก ${DAY_LABELS[day]} คาบ ${period}`}
+                : currentSub
+                  ? `แก้สอนแทน ${describeDate(subDate)} คาบ ${period}`
+                  : `สั่งสอนแทน ${describeDate(subDate)} คาบ ${period}`}
             </button>
 
-            {/* ปุ่มยกเลิกสอนแทนโผล่เฉพาะตอนที่คาบนี้ถูกสั่งสอนแทนอยู่จริง
+            {/* ปุ่มยกเลิกโผล่เฉพาะตอนที่คาบนี้ของวันนี้ถูกสั่งสอนแทนอยู่จริง
                 เดิมปุ่ม "คืนค่าคาบนี้" ขึ้นตลอดเวลา กดตอนไม่มีอะไรให้คืนก็ไม่เกิดอะไร
                 ซึ่งทำให้คนกดไม่แน่ใจว่าระบบทำงานหรือเปล่า */}
-            {currentSlot?.is_substituted && (
+            {currentSub && (
               <button
-                onClick={handleClearSubstitution}
+                onClick={() => handleClearSubstitution()}
                 disabled={savingSlot}
                 className={`w-full border-2 font-extrabold py-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${isDark
                   ? 'border-white/10 text-content-secondary hover:bg-white/5'
@@ -857,28 +822,70 @@ export default function AcademicDashboard() {
                   }`}
               >
                 <Undo size={14} />
-                ยกเลิกการสอนแทน กลับเป็นครูเดิม
+                ยกเลิกสอนแทนคาบนี้ กลับเป็นครูเดิม
               </button>
             )}
+          </div>
 
-            {/* นำเข้าทั้งเทอมจากชีต — งานต้นเทอม ไม่ใช่งานประจำวัน
-                จึงวางไว้ล่างสุดและใช้สไตล์รอง ไม่แย่งความสนใจจากปุ่มบันทึก */}
-            <button
-              onClick={handleImportSheet}
-              disabled={importing || !isSheetConfigured(selectedClassId)}
-              title={
-                isSheetConfigured(selectedClassId)
-                  ? undefined
-                  : 'ห้องนี้ยังไม่ได้ตั้งค่า gid ของแท็บใน src/config/sheets.js'
-              }
-              className={`w-full border font-extrabold py-2.5 rounded-xl text-[11px] transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${isDark
-                ? 'border-white/10 text-content-muted hover:bg-white/5'
-                : 'border-slate-200 text-content-muted hover:bg-slate-50'
-                }`}
-            >
-              <CloudDownload size={13} className={importing ? 'animate-pulse' : undefined} />
-              {importing ? 'กำลังนำเข้า...' : 'นำเข้าตารางทั้งเทอมจาก Google Sheet'}
-            </button>
+          {/* รายการที่สั่งไว้แล้วของวันนั้น
+              ฟอร์มโชว์ได้ทีละคาบ ถ้าไม่มีรายการนี้ ฝ่ายวิชาการจะไม่มีทางรู้ว่าวันนั้น
+              สั่งอะไรค้างไว้บ้าง นอกจากไล่กดเปลี่ยนเลขคาบดูทีละอัน */}
+          <div className={`border-t pt-4 space-y-2 ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+            <div className="flex items-center justify-between">
+              <span className={`text-xs font-extrabold ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+                สอนแทนของ {formatThaiDate(subDate)}
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${daySubs.length > 0
+                ? 'bg-accent-rose/15 text-accent-rose'
+                : isDark ? 'bg-white/5 text-content-muted' : 'bg-slate-100 text-content-muted'
+                }`}>
+                {daySubs.length} คาบ
+              </span>
+            </div>
+
+            {daySubs.length === 0 ? (
+              <p className="text-[11px] font-semibold text-content-muted">
+                ยังไม่มีการสอนแทนในวันนี้ — ห้องนี้ใช้ตารางปกติตามชีต
+              </p>
+            ) : (
+              daySubs.map((sub) => (
+                <div
+                  key={sub.id}
+                  className={`flex items-center gap-3 p-2.5 rounded-xl border ${isDark ? 'bg-rose-950/20 border-rose-900/30' : 'bg-rose-50 border-rose-100'
+                    }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-[11px] font-extrabold truncate ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+                      คาบ {sub.period} · {sub.subject || 'ไม่ระบุวิชา'}
+                    </div>
+                    <div className="text-[10px] font-semibold text-content-muted truncate">
+                      {sub.original_teacher || 'ครูเดิมไม่ระบุ'} → {sub.substitute_teacher || 'ยังไม่ระบุ'}
+                      {' · '}
+                      {sub.substitute_room ? `ย้ายไปห้อง ${sub.substitute_room}` : 'ห้องเดิมตามตาราง'}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPeriod(Number(sub.period))}
+                    className={`text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg shrink-0 transition-all ${isDark
+                      ? 'bg-white/10 text-content-secondary hover:bg-white/20'
+                      : 'bg-surface-card text-ink-secondary hover:bg-slate-100'
+                      }`}
+                  >
+                    แก้ไข
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleClearSubstitution(Number(sub.period))}
+                    disabled={savingSlot}
+                    aria-label={`ยกเลิกสอนแทนคาบ ${sub.period}`}
+                    className="text-accent-rose hover:opacity-70 shrink-0 transition-opacity disabled:opacity-40"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
         </div>
@@ -1193,7 +1200,7 @@ export default function AcademicDashboard() {
       />
 
       {behaviorConfirmDialog}
-      {importConfirmDialog}
+      {clearSubConfirmDialog}
     </div>
   );
 }

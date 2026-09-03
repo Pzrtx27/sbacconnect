@@ -1,16 +1,30 @@
 import { supabase } from '../config/supabase';
-import { fetchTimetableForClass, isSheetConfigured } from '../config/sheets';
+import {
+  fetchTimetableForClass,
+  isSheetConfigured,
+  TIMETABLE_TAB_GID_BY_CLASS,
+  TIMETABLE_POLL_INTERVAL_MS,
+} from '../config/sheets';
 
 /* ============================================================
-   ชั้นข้อมูลของตารางสอน — ใช้ร่วมกันทั้งหน้าวิชาการและหน้านักเรียน
+   ตารางสอน — ของสองอายุที่จงใจแยกที่เก็บกัน
 
-   ก่อนหน้านี้สองหน้านี้ไม่เคยคุยกันเลย:
-     ฝ่ายวิชาการ -> เขียนลง Firestore (ที่ปิดไปแล้ว กดแล้ว error)
-     นักเรียน    -> อ่านจาก Google Sheet ผ่าน URL csv สาธารณะ (อ่านได้อย่างเดียว)
-   ต่อให้ฟอร์มฝั่งวิชาการทำงานได้ ผลก็ไม่มีทางไปโผล่ที่นักเรียนอยู่ดี
+     ตารางประจำเทอม (วิชา/ครู/ห้อง)  -> Google Sheet เป็นต้นฉบับ อ่านสดผ่าน csv
+     สอนแทนรายวัน                    -> ตาราง substitutions ใน Supabase (31_substitutions.sql)
 
-   ตอนนี้ทั้งคู่ใช้ตาราง timetables ใน Supabase (25_timetables.sql)
-   และ subscribe realtime ตัวเดียวกัน — วิชาการกดบันทึก นักเรียนเห็นทันที
+   ทำไมไม่เก็บรวมกันเหมือนเดิม:
+     ของเดิม (25_timetables.sql) ยัดธง is_substituted ไว้บนแถวตารางประจำเทอม
+     ซึ่ง key เป็น (class_id, day, period) โดย day คือชื่อวัน ไม่มีวันที่
+     สั่งสอนแทนวันจันทร์ครั้งเดียวจึงกลายเป็น "ทุกวันจันทร์ตลอดไป"
+     ทั้งที่ครูลาแค่วันเดียว — เป็นสถานะค้างที่ต้องมีคนจำมากดยกเลิกเอง
+
+     พอผูกกับ sub_date ที่เป็นวันที่จริง หน้าเว็บดึงเฉพาะแถวของวันนั้น
+     พ้นวันแล้วก็ไม่ถูกดึงมาแสดงอีก หมดอายุเองโดยไม่ต้องมีใครทำอะไร
+
+   ทำไมตารางประจำเทอมกลับไปอ่านจากชีต:
+     ต้นฉบับที่ฝ่ายวิชาการแก้จริงคือชีต การก๊อปเข้า DB แล้วให้แก้ได้สองที่
+     แปลว่ามีสองความจริงที่ไม่ตรงกันได้ ตัดปัญหาด้วยการมีต้นฉบับเดียว
+     แก้ในชีต -> เว็บเห็นเองใน TIMETABLE_POLL_INTERVAL_MS ไม่ต้องกดนำเข้า
    ============================================================ */
 
 /** m3_6 -> ปวช.3/6
@@ -55,199 +69,364 @@ export const DAY_LABELS_SHORT = {
  *  (m3_6 มีถึงคาบ 8 ในวันพฤหัส/ศุกร์) */
 export const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
 
-const EMPTY_SLOT = {
-  subject: '',
-  teacher: '',
-  room: '',
-  is_substituted: false,
-  substitute_teacher: '',
-  substitute_room: '',
+export const PERIOD_TIMES = {
+  1: '08:30-09:30',
+  2: '09:30-10:30',
+  3: '10:30-11:30',
+  4: '11:30-12:30',
+  5: '12:30-13:30',
+  6: '13:30-14:00',
+  7: '14:00-14:50',
+  8: '14:50-15:40',
+  9: '15:40-16:30',
+  10: '16:30-17:20',
+  11: '17:20-18:10',
 };
 
-/** แถวจาก DB -> รูปทรงที่หน้าเว็บใช้มาตั้งแต่แรก
- *  คงคีย์เดิมไว้ทุกตัว เพื่อไม่ต้องไล่แก้ StudentTimetable ทั้งไฟล์ */
-function rowToSlot(row) {
-  return {
-    subject: row.subject || '',
-    teacher: row.teacher || '',
-    room: row.room || '',
-    is_substituted: Boolean(row.is_substituted),
-    substitute_teacher: row.substitute_teacher || '',
-    substitute_room: row.substitute_room || '',
-  };
+/* ตารางสอนจริง ภาคเรียน 1/2569 — ทำหน้าที่เป็นข้อมูลตัวอย่าง/สำรอง
+   ก่อนตั้งค่า Google Sheet (ดู src/config/sheets.js) เมื่อเชื่อมชีตแล้ว
+   ข้อมูลจากชีตจะเขียนทับส่วนนี้ตาม class_id ของนักเรียนแต่ละคน */
+export const SEED_TIMETABLE_BY_CLASS = {
+  m3_4: {
+    Monday: {
+      1: { subject: 'การผลิตสื่อผสมเพื่องานการตลาด', teacher: 'อ.ธีรวัฒน์', room: '1606' },
+      2: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ธีรภาพ', room: '1606' },
+      3: { subject: 'การถ่ายภาพและการถ่ายทอดเพื่องานการตลาด', teacher: 'อ.พลศิต', room: 'สตูดิโอ' },
+      4: { subject: 'การถ่ายภาพและการถ่ายทอดเพื่องานการตลาด', teacher: 'อ.พลศิต', room: 'สตูดิโอ' },
+      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
+      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
+    },
+    Tuesday: {
+      1: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ธีรภาพ', room: '1406' },
+      2: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ธีรภาพ', room: '1406' },
+      3: { subject: 'โครงงานด้านการตลาด', teacher: 'อ.ศิริญากร', room: '1606' },
+      4: { subject: 'การผลิตสื่อผสมเพื่องานการตลาด', teacher: 'อ.ธีรวัฒน์', room: '1606' },
+      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
+      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
+    },
+    Wednesday: {
+      1: { subject: 'การถ่ายภาพและการถ่ายทอดเพื่องานการตลาด', teacher: 'อ.พลศิต', room: '1406' },
+      2: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ธีรภาพ', room: '1407' },
+      3: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ธีรภาพ', room: '1407' },
+      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
+      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
+    },
+    Thursday: {
+      1: { subject: 'โครงงานด้านการตลาด', teacher: 'อ.ศิริญากร', room: '1606' },
+      2: { subject: 'โครงงานด้านการตลาด', teacher: 'อ.ศิริญากร', room: '1606' },
+      3: { subject: 'การผลิตสื่อผสมเพื่องานการตลาด', teacher: 'อ.ธีรวัฒน์', room: '1606' },
+      4: { subject: 'การผลิตสื่อผสมเพื่องานการตลาด', teacher: 'อ.ธีรวัฒน์', room: '1606' },
+      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
+      6: { subject: 'กิจกรรมชมรม', teacher: '', room: '' },
+    },
+    Friday: {
+      1: { subject: 'การถ่ายภาพและการถ่ายทอดเพื่องานการตลาด', teacher: 'อ.พลศิต', room: '1606' },
+      2: { subject: 'การถ่ายภาพและการถ่ายทอดเพื่องานการตลาด', teacher: 'อ.พลศิต', room: '1606' },
+      3: { subject: 'การผลิตสื่อผสมเพื่องานการตลาด', teacher: 'อ.ธีรวัฒน์', room: '1606' },
+      4: { subject: 'การผลิตสื่อผสมเพื่องานการตลาด', teacher: 'อ.ธีรวัฒน์', room: '1606' },
+      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
+      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
+    },
+  },
+  m3_6: {
+    Monday: {
+      1: { subject: 'การสร้างเกมคอมพิวเตอร์', teacher: 'อ.ธีรภาพ', room: '1503' },
+      2: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ประภวิษณ์', room: '1503' },
+      3: { subject: 'เทคโนโลยีการนำเข้าข้อมูลสู่ระบบคอมพิวเตอร์', teacher: 'อ.ณัฐธิดา', room: '1503' },
+      4: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ประภวิษณ์', room: '1406' },
+      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
+      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
+    },
+    Tuesday: {
+      1: { subject: 'เทคโนโลยีการนำเข้าข้อมูลสู่ระบบคอมพิวเตอร์', teacher: 'อ.ณัฐธิดา', room: '1507' },
+      2: { subject: 'เทคโนโลยีการนำเข้าข้อมูลสู่ระบบคอมพิวเตอร์', teacher: 'อ.ณัฐธิดา', room: '1507' },
+      3: { subject: 'การออกแบบกราฟิกสิ่งพิมพ์ดิจิทัล', teacher: 'อ.ธีรภาพ', room: '1509' },
+      4: { subject: 'การออกแบบกราฟิกสิ่งพิมพ์ดิจิทัล', teacher: 'อ.ธีรภาพ', room: '1509' },
+      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
+      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
+    },
+    Wednesday: {
+      1: { subject: 'การออกแบบกราฟิกสิ่งพิมพ์ดิจิทัล', teacher: 'อ.ธีรภาพ', room: '1503' },
+      2: { subject: 'เทคโนโลยีการนำเข้าข้อมูลสู่ระบบคอมพิวเตอร์', teacher: 'อ.ณัฐธิดา', room: '1503' },
+      3: { subject: 'การติดตั้งระบบเครือข่ายคอมพิวเตอร์เบื้องต้น', teacher: 'อ.ทนงศักดิ์', room: '1506' },
+      4: { subject: 'การติดตั้งระบบเครือข่ายคอมพิวเตอร์เบื้องต้น', teacher: 'อ.ทนงศักดิ์', room: '1506' },
+      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
+      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
+    },
+    Thursday: {
+      1: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ประภวิษณ์', room: '1408' },
+      2: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ประภวิษณ์', room: '1408' },
+      3: { subject: 'โครงงานด้านเทคโนโลยีสารสนเทศ', teacher: 'อ.ทนงศักดิ์', room: '1503' },
+      4: { subject: 'โครงงานด้านเทคโนโลยีสารสนเทศ', teacher: 'อ.ทนงศักดิ์', room: '1503' },
+      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
+      6: { subject: 'กิจกรรมชมรม', teacher: '', room: '' },
+      7: { subject: 'การสร้างเกมคอมพิวเตอร์', teacher: 'ช.3/6', room: '1509' },
+      8: { subject: 'การสร้างเกมคอมพิวเตอร์', teacher: 'ช.3/6', room: '1509' },
+    },
+    Friday: {
+      1: { subject: 'การออกแบบกราฟิกสิ่งพิมพ์ดิจิทัล', teacher: 'อ.ธีรภาพ', room: '1408' },
+      2: { subject: 'การออกแบบกราฟิกสิ่งพิมพ์ดิจิทัล', teacher: 'อ.ธีรภาพ', room: '1408' },
+      3: { subject: 'การติดตั้งระบบเครือข่ายคอมพิวเตอร์เบื้องต้น', teacher: 'อ.ทนงศักดิ์', room: '1506' },
+      4: { subject: 'การติดตั้งระบบเครือข่ายคอมพิวเตอร์เบื้องต้น', teacher: 'อ.ทนงศักดิ์', room: '1506' },
+      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
+      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
+      7: { subject: 'การสร้างเกมคอมพิวเตอร์', teacher: 'ช.3/6', room: '1509' },
+      8: { subject: 'การสร้างเกมคอมพิวเตอร์', teacher: 'ช.3/6', room: '1509' },
+    },
+  },
+};
+
+/* ============================================================
+   ตารางประจำเทอม — อ่านจาก Google Sheet
+   ============================================================ */
+
+/** ห้องที่เปิดให้จัดการ = ห้องที่ตั้งค่าแท็บชีตไว้แล้ว
+ *
+ *  ของเดิมอ่านรายชื่อห้องจากตาราง timetables ใน DB ซึ่งตอนนี้เลิกใช้แล้ว
+ *  แหล่งความจริงใหม่คือ TIMETABLE_TAB_GID_BY_CLASS — เพิ่มห้องใหม่ = เพิ่ม gid ที่นั่น
+ *  เรียงตามระดับชั้นแล้วเลขห้อง ไม่ใช่เรียงตามตัวอักษร (ไม่งั้น m3_10 มาก่อน m3_4) */
+export function listClassIds() {
+  return Object.keys(TIMETABLE_TAB_GID_BY_CLASS)
+    .filter((id) => isSheetConfigured(id))
+    .sort((a, b) => {
+      const [, la, ra] = a.match(/^m(\d+)_(\d+)$/) || [];
+      const [, lb, rb] = b.match(/^m(\d+)_(\d+)$/) || [];
+      if (!la || !lb) return a.localeCompare(b);
+      return Number(la) - Number(lb) || Number(ra) - Number(rb);
+    });
 }
 
-/** รายการแถว -> { Monday: { 1: {...} } } */
-export function rowsToTimetable(rows = []) {
-  const timetable = {};
-  for (const row of rows) {
-    const day = row.day;
-    const period = Number(row.period);
-    if (!day || !period) continue;
-    if (!timetable[day]) timetable[day] = {};
-    timetable[day][period] = rowToSlot(row);
+/** อ่านตารางประจำเทอมของห้องหนึ่ง
+ *
+ *  คืน { timetable, source } โดย source บอกตรง ๆ ว่าข้อมูลมาจากไหน
+ *  'sheet' = ของจริงจากชีต / 'seed' = ตัวอย่างสำรองในโค้ด / 'error' = ต่อชีตไม่ได้
+ *
+ *  ไม่ throw — ทุกหน้าที่เรียกต้องมีตารางแสดงได้เสมอ ไม่งั้นครูลาแล้วเน็ตโรงเรียนช้า
+ *  นักเรียนจะเปิดมาเจอหน้าเปล่าแทนที่จะเจอตารางเดิม ซึ่งแย่กว่าเห็นข้อมูลเก่า */
+export async function fetchBaseTimetable(classId) {
+  const seed = SEED_TIMETABLE_BY_CLASS[classId] || {};
+
+  if (!isSheetConfigured(classId)) return { timetable: seed, source: 'seed' };
+
+  try {
+    const data = await fetchTimetableForClass(classId);
+    if (data && Object.keys(data).length > 0) return { timetable: data, source: 'sheet' };
+    return { timetable: seed, source: 'seed' };
+  } catch (err) {
+    console.warn('[timetable] อ่านตารางจาก Google Sheet ไม่สำเร็จ ใช้ข้อมูลสำรองแทน:', err);
+    return { timetable: seed, source: 'error' };
   }
-  return timetable;
 }
 
-/** อ่านตารางสอนทั้งห้อง
- *  คืน { Monday: { 1: {...} }, ... } — ว่างเปล่าถ้ายังไม่มีข้อมูลห้องนี้ */
-export async function fetchTimetable(classId) {
-  if (!classId) return {};
+/* ============================================================
+   วันที่ — ตรึงเขตเวลาไทยไว้ ไม่พึ่งนาฬิกาเครื่องผู้ใช้
+   ============================================================
+   ถ้าใครตั้งเครื่องเป็นเขตเวลาอื่น (หรือเปิดจากต่างประเทศ) "วันนี้" ต้องยังหมายถึง
+   วันนี้ที่นนทบุรี ไม่งั้นครูอาจเห็นตารางสอนแทนของเมื่อวานหรือพรุ่งนี้ */
+
+export const SCHOOL_TIMEZONE = 'Asia/Bangkok';
+
+const WEEKDAY_KEYS = [
+  'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
+];
+
+/** วันนี้ตามเวลาไทย รูปแบบ 'YYYY-MM-DD'
+ *  ใช้ locale en-CA เพราะให้ผลเป็น ISO พอดี ไม่ต้องมาต่อสตริงเอง */
+export function todayISO() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: SCHOOL_TIMEZONE }).format(new Date());
+}
+
+/* 'YYYY-MM-DD' -> Date ที่เที่ยงวัน UTC
+   เจตนา: เลี่ยงปัญหาคลาสสิกที่ new Date('2026-09-07') ถูกตีความเป็นเที่ยงคืน UTC
+   แล้วพอ .getDay() ตามเวลาเครื่องที่อยู่คนละฝั่งของเส้นวันที่ ก็เพี้ยนไปหนึ่งวัน
+   ตรึงที่เที่ยงวันแล้วอ่านค่าแบบ UTC จึงปลอดภัยทุกเขตเวลา */
+function toSafeDate(dateISO) {
+  return new Date(`${dateISO}T12:00:00Z`);
+}
+
+/** 'YYYY-MM-DD' -> 'Monday' | 'Tuesday' | ... (key เดียวกับที่ตารางสอนใช้) */
+export function weekdayKeyOf(dateISO) {
+  if (!dateISO) return '';
+  return WEEKDAY_KEYS[toSafeDate(dateISO).getUTCDay()] || '';
+}
+
+/** true เมื่อวันนั้นเป็นจันทร์–ศุกร์
+ *  ใช้เตือนในหน้าวิชาการเท่านั้น ไม่ได้ห้ามบันทึก เผื่อมีเรียนชดเชยวันเสาร์ */
+export function isSchoolDay(dateISO) {
+  const day = toSafeDate(dateISO).getUTCDay();
+  return day >= 1 && day <= 5;
+}
+
+/** บวก/ลบวัน คืนเป็น 'YYYY-MM-DD' */
+export function addDaysISO(dateISO, days) {
+  const d = toSafeDate(dateISO);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** '2026-09-07' -> '7 ก.ย. 2569' (พ.ศ. เพราะ locale th-TH ใช้ปฏิทินพุทธเป็นค่าเริ่มต้น)
+ *  บังคับ timeZone: 'UTC' ให้เข้าคู่กับ toSafeDate จะได้ไม่เลื่อนวัน */
+export function formatThaiDate(dateISO) {
+  if (!dateISO) return '';
+  return new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric',
+  }).format(toSafeDate(dateISO));
+}
+
+/** ป้ายที่คนอ่านแล้วรู้ทันทีว่าวันไหน โดยไม่ต้องเทียบปฏิทิน */
+export function describeDate(dateISO) {
+  const today = todayISO();
+  if (dateISO === today) return 'วันนี้';
+  if (dateISO === addDaysISO(today, 1)) return 'พรุ่งนี้';
+  if (dateISO === addDaysISO(today, -1)) return 'เมื่อวาน';
+  return `${DAY_LABELS[weekdayKeyOf(dateISO)] ? `${DAY_LABELS[weekdayKeyOf(dateISO)]} ` : ''}${formatThaiDate(dateISO)}`;
+}
+
+/* ============================================================
+   สอนแทนรายวัน — Supabase
+   ============================================================ */
+
+const SUB_COLUMNS =
+  'id, class_id, sub_date, period, subject, original_teacher, substitute_teacher, substitute_room, note, updated_at';
+
+/** สอนแทนของห้องหนึ่ง ในช่วงวันที่ [from, to] (ไม่ส่ง to = วันเดียว)
+ *  คืน [] เมื่อมีปัญหา — ตารางต้องแสดงได้แม้ต่อ Supabase ไม่ติด */
+export async function fetchSubstitutions(classId, from, to = from) {
+  if (!classId || !from) return [];
 
   const { data, error } = await supabase
-    .from('timetables')
-    .select('day, period, subject, teacher, room, is_substituted, substitute_teacher, substitute_room')
+    .from('substitutions')
+    .select(SUB_COLUMNS)
     .eq('class_id', classId)
+    .gte('sub_date', from)
+    .lte('sub_date', to)
+    .order('sub_date', { ascending: true })
     .order('period', { ascending: true });
 
-  if (error) throw error;
-  return rowsToTimetable(data || []);
+  if (error) {
+    console.error('[substitutions] ดึงข้อมูลสอนแทนไม่สำเร็จ:', error);
+    return [];
+  }
+  return data || [];
 }
 
-/** รายชื่อห้องที่มีตารางสอนอยู่จริงในฐานข้อมูล
- *
- *  ที่ต้องอ่านจาก DB ไม่ใช่เขียนรายชื่อห้องไว้ในโค้ด:
- *  ของเดิมหน้าวิชาการมี dropdown 20 ห้อง (ปวช.1/1 ถึง ปวช.3/12) ทั้งที่มีข้อมูลจริงแค่สองห้อง
- *  เลือกห้องที่เหลือไปก็เจอตารางว่างโดยไม่มีคำอธิบาย เหมือนระบบพัง
- *  ทั้งที่จริงคือห้องนั้นยังไม่เคยมีใครใส่ตาราง
- *
- *  เรียงตามระดับชั้นแล้วเลขห้อง ไม่ใช่เรียงตามตัวอักษร (ไม่งั้น m3_10 มาก่อน m3_4) */
-export async function fetchClassIds() {
+/** สอนแทนของทุกห้องในวันเดียว — ใช้ในหน้าครู */
+export async function fetchSubstitutionsForDate(dateISO) {
+  if (!dateISO) return [];
+
   const { data, error } = await supabase
-    .from('timetables')
-    .select('class_id');
+    .from('substitutions')
+    .select(SUB_COLUMNS)
+    .eq('sub_date', dateISO)
+    .order('period', { ascending: true });
 
-  if (error) throw error;
-
-  const ids = [...new Set((data || []).map((r) => r.class_id))];
-
-  return ids.sort((a, b) => {
-    const [, la, ra] = a.match(/^m(\d+)_(\d+)$/) || [];
-    const [, lb, rb] = b.match(/^m(\d+)_(\d+)$/) || [];
-    if (!la || !lb) return a.localeCompare(b);
-    return Number(la) - Number(lb) || Number(ra) - Number(rb);
-  });
+  if (error) {
+    console.error('[substitutions] ดึงรายการสอนแทนรายวันไม่สำเร็จ:', error);
+    return [];
+  }
+  return data || [];
 }
 
-/** ติดตามการแก้ไขตารางของห้องนี้แบบ realtime
+/** บันทึกสอนแทน 1 คาบ ของ 1 วัน
  *
- *  กรองที่ฝั่ง server ด้วย filter class_id — ไม่ใช่รับทุกห้องมาแล้วค่อยกรองในเบราว์เซอร์
- *  ห้องอื่นแก้ตารางกันทั้งวัน เครื่องนักเรียนก็ไม่ต้องตื่นมาทำงานเปล่า
+ *  upsert บน (class_id, sub_date, period) ตาม unique constraint ในไฟล์ 31
+ *  ตั้งซ้ำคาบเดิมวันเดิม = แก้ของเดิม ไม่ใช่เพิ่มแถวใหม่ */
+export async function saveSubstitution({
+  classId, date, period,
+  subject = '', originalTeacher = '', substituteTeacher = '',
+  substituteRoom = '', note = '',
+}) {
+  const { data: auth } = await supabase.auth.getUser();
+
+  const { error } = await supabase.from('substitutions').upsert(
+    {
+      class_id: classId,
+      sub_date: date,
+      period,
+      subject,
+      original_teacher: originalTeacher,
+      substitute_teacher: substituteTeacher,
+      substitute_room: substituteRoom,
+      note,
+      created_by: auth?.user?.id ?? null,
+    },
+    { onConflict: 'class_id,sub_date,period' }
+  );
+
+  if (error) throw error;
+}
+
+/** ยกเลิกสอนแทนของคาบนั้นในวันนั้น — ลบแถวทิ้ง ไม่ใช่ตั้งธงเป็น false
  *
- *  onChange รับตารางก้อนใหม่ทั้งห้อง (ไม่ใช่ patch ทีละแถว) เพราะการ merge
- *  แถวเดียวเข้าโครงซ้อนสองชั้นแล้วพลาด จะกลายเป็นตารางที่ผิดแบบเงียบ ๆ
- *  ซึ่งแย่กว่าโหลดใหม่ทั้งห้อง — ตารางห้องหนึ่งมีไม่ถึง 40 แถว
+ *  "ไม่มีแถว" = "ไม่มีสอนแทน" อยู่แล้ว การเก็บแถวที่ปิดธงไว้จะสร้างสองสถานะ
+ *  ที่ต้องคอยแยกว่าอันไหนคือของจริง ซึ่งเป็นต้นเหตุของบั๊กเดิมพอดี */
+export async function clearSubstitution(classId, date, period) {
+  const { error } = await supabase
+    .from('substitutions')
+    .delete()
+    .eq('class_id', classId)
+    .eq('sub_date', date)
+    .eq('period', period);
+
+  if (error) throw error;
+}
+
+/** ติดตามการสั่งสอนแทนของห้องนี้แบบ realtime
  *
- *  คืนฟังก์ชันสำหรับยกเลิก ต้องเรียกตอน unmount ไม่งั้น channel ค้างสะสม */
-export function subscribeTimetable(classId, onChange) {
+ *  เฉพาะสอนแทนที่ต้อง realtime — ครูลากะทันหันตอนคาบกำลังจะเริ่มคือเคสจริง
+ *  ส่วนตารางประจำเทอมเปลี่ยนปีละสองครั้ง poll จากชีตก็พอ
+ *
+ *  กรองที่ฝั่ง server ด้วย class_id ไม่ใช่รับทุกห้องมาแล้วค่อยกรองในเบราว์เซอร์
+ *  onChange ไม่รับ payload — ให้ผู้เรียกโหลดชุดใหม่เองทั้งก้อน เพราะ merge
+ *  ทีละแถวแล้วพลาดจะได้ตารางผิดแบบเงียบ ๆ ซึ่งแย่กว่าโหลดใหม่ (วันหนึ่งไม่กี่แถว)
+ *
+ *  คืนฟังก์ชันยกเลิก ต้องเรียกตอน unmount ไม่งั้น channel ค้างสะสม */
+export function subscribeSubstitutions(classId, onChange) {
   if (!classId) return () => {};
 
   const channel = supabase
-    .channel(`timetable-${classId}`)
+    .channel(`substitutions-${classId}`)
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'timetables', filter: `class_id=eq.${classId}` },
-      async () => {
-        try {
-          onChange(await fetchTimetable(classId));
-        } catch (err) {
-          console.error('[timetable] โหลดตารางใหม่หลังมีการแก้ไขไม่สำเร็จ:', err);
-        }
-      }
+      { event: '*', schema: 'public', table: 'substitutions', filter: `class_id=eq.${classId}` },
+      () => onChange()
     )
     .subscribe();
 
   return () => supabase.removeChannel(channel);
 }
 
-/** บันทึกคาบเดียว (ฝ่ายวิชาการเท่านั้น — RLS เป็นคนกัน ไม่ใช่หน้าเว็บ)
+/** วางสอนแทนทับตารางฐาน — เฉพาะวันของ dateISO เท่านั้น
  *
- *  ใช้ upsert บน (class_id, day, period) ที่มี unique constraint อยู่
- *  กดบันทึกซ้ำหรือสองคนกดพร้อมกันก็ได้แถวเดียว ไม่เกิดคาบซ้อน */
-export async function saveSlot(classId, day, period, fields) {
-  const { data: auth } = await supabase.auth.getUser();
-
-  const { error } = await supabase.from('timetables').upsert(
-    {
-      class_id: classId,
-      day,
-      period,
-      subject: fields.subject ?? '',
-      teacher: fields.teacher ?? '',
-      room: fields.room ?? '',
-      is_substituted: Boolean(fields.is_substituted),
-      substitute_teacher: fields.substitute_teacher ?? '',
-      substitute_room: fields.substitute_room ?? '',
-      updated_at: new Date().toISOString(),
-      updated_by: auth?.user?.id ?? null,
-    },
-    { onConflict: 'class_id,day,period' }
-  );
-
-  if (error) throw error;
-}
-
-/** ยกเลิกการสอนแทนของคาบนั้น กลับไปเป็นครูเดิม
- *  ล้างชื่อครูแทน/ห้องแทนด้วย ไม่ใช่แค่ปิดธง — ไม่งั้นรอบหน้าที่สั่งสอนแทน
- *  ฟอร์มจะเด้งชื่อครูคนเก่าขึ้นมาเองโดยไม่มีใครพิมพ์ */
-export async function clearSubstitution(classId, day, period) {
-  const { error } = await supabase
-    .from('timetables')
-    .update({
-      is_substituted: false,
-      substitute_teacher: '',
-      substitute_room: '',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('class_id', classId)
-    .eq('day', day)
-    .eq('period', period);
-
-  if (error) throw error;
-}
-
-export { isSheetConfigured };
-
-/** ดูดตารางทั้งเทอมจาก Google Sheet เข้ามาทับใน Supabase
+ *  รับ subs ที่เป็นของวันเดียว (ผู้เรียกกรองมาแล้ว) แล้วแตะเฉพาะคอลัมน์วันนั้น
+ *  วันอื่นในสัปดาห์ไม่ถูกแตะเลย — จุดนี้คือที่ทำให้ "1 วัน" เป็นจริงตอนแสดงผล
  *
- *  ทำไมต้องมี: ต้นเทอมตารางเปลี่ยนทั้งใบ การกรอกทีละคาบในฟอร์ม 35 คาบ x หลายห้อง
- *  คือความทรมาน — วางทับในชีตแล้วกดปุ่มเดียวจบเร็วกว่ามาก
- *  ส่วนการสั่งสอนแทนระหว่างเทอมค่อยใช้ฟอร์มทีละคาบ ซึ่งชีตทำไม่ได้เพราะอ่านได้อย่างเดียว
- *
- *  คืนจำนวนคาบที่นำเข้า */
-export async function importFromSheet(classId) {
-  if (!isSheetConfigured(classId)) {
-    throw new Error('ห้องนี้ยังไม่ได้ตั้งค่า gid ของแท็บใน src/config/sheets.js');
+ *  ไม่แก้ของเดิมในที่ (immutable) เพราะ SEED_TIMETABLE_BY_CLASS เป็น object
+ *  ระดับโมดูลที่ใช้ร่วมกันทุกหน้า เขียนทับตรง ๆ แล้วตารางจะเพี้ยนค้างข้ามหน้า */
+export function applySubstitutions(timetable, subs, dateISO) {
+  if (!subs || subs.length === 0) return timetable;
+
+  const dayKey = weekdayKeyOf(dateISO);
+  if (!dayKey) return timetable;
+
+  const dayPeriods = { ...(timetable?.[dayKey] || {}) };
+
+  for (const sub of subs) {
+    const base = dayPeriods[sub.period] || { subject: '', teacher: '', room: '' };
+    dayPeriods[sub.period] = {
+      ...base,
+      // ค่าที่ฝ่ายวิชาการกรอกชนะตารางฐาน แต่ถ้าเว้นว่างไว้ก็ใช้ของเดิม
+      subject: sub.subject || base.subject,
+      teacher: sub.original_teacher || base.teacher,
+      is_substituted: true,
+      substitute_teacher: sub.substitute_teacher || '',
+      substitute_room: sub.substitute_room || '',
+      sub_date: sub.sub_date,
+      sub_note: sub.note || '',
+    };
   }
 
-  const sheet = await fetchTimetableForClass(classId);
-  if (!sheet) throw new Error('อ่านข้อมูลจากชีตไม่ได้');
-
-  const { data: auth } = await supabase.auth.getUser();
-  const now = new Date().toISOString();
-  const rows = [];
-
-  for (const [day, periods] of Object.entries(sheet)) {
-    for (const [period, slot] of Object.entries(periods)) {
-      rows.push({
-        class_id: classId,
-        day,
-        period: Number(period),
-        ...EMPTY_SLOT,
-        ...slot,
-        updated_at: now,
-        updated_by: auth?.user?.id ?? null,
-      });
-    }
-  }
-
-  if (rows.length === 0) throw new Error('ชีตแท็บนี้ไม่มีข้อมูล');
-
-  const { error } = await supabase
-    .from('timetables')
-    .upsert(rows, { onConflict: 'class_id,day,period' });
-
-  if (error) throw error;
-  return rows.length;
+  return { ...timetable, [dayKey]: dayPeriods };
 }
+
+export { isSheetConfigured, TIMETABLE_POLL_INTERVAL_MS };

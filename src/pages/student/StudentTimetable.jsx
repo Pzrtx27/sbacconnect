@@ -1,101 +1,32 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Calendar, AlertCircle } from 'lucide-react';
-import { fetchTimetable, subscribeTimetable, fetchClassIds, classLabel } from '../../utils/timetable';
+import { Calendar, AlertCircle, CalendarClock } from 'lucide-react';
+import {
+  fetchBaseTimetable,
+  fetchSubstitutions,
+  applySubstitutions,
+  subscribeSubstitutions,
+  listClassIds,
+  classLabel,
+  todayISO,
+  addDaysISO,
+  weekdayKeyOf,
+  describeDate,
+  formatThaiDate,
+  TIMETABLE_POLL_INTERVAL_MS,
+} from '../../utils/timetable';
 
-/* ตารางสอนจริง ภาคเรียน 1/2569 — ทำหน้าที่เป็นข้อมูลตัวอย่าง/สำรอง
-   ก่อนตั้งค่า Google Sheet (ดู src/config/sheets.js) เมื่อเชื่อมชีตแล้ว
-   ข้อมูลจากชีตจะเขียนทับส่วนนี้ตาม class_id ของนักเรียนแต่ละคน */
-const SEED_TIMETABLE_BY_CLASS = {
-  m3_4: {
-    Monday: {
-      1: { subject: 'การผลิตสื่อผสมเพื่องานการตลาด', teacher: 'อ.ธีรวัฒน์', room: '1606' },
-      2: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ธีรภาพ', room: '1606' },
-      3: { subject: 'การถ่ายภาพและการถ่ายทอดเพื่องานการตลาด', teacher: 'อ.พลศิต', room: 'สตูดิโอ' },
-      4: { subject: 'การถ่ายภาพและการถ่ายทอดเพื่องานการตลาด', teacher: 'อ.พลศิต', room: 'สตูดิโอ' },
-      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
-      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
-    },
-    Tuesday: {
-      1: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ธีรภาพ', room: '1406' },
-      2: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ธีรภาพ', room: '1406' },
-      3: { subject: 'โครงงานด้านการตลาด', teacher: 'อ.ศิริญากร', room: '1606' },
-      4: { subject: 'การผลิตสื่อผสมเพื่องานการตลาด', teacher: 'อ.ธีรวัฒน์', room: '1606' },
-      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
-      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
-    },
-    Wednesday: {
-      1: { subject: 'การถ่ายภาพและการถ่ายทอดเพื่องานการตลาด', teacher: 'อ.พลศิต', room: '1406' },
-      2: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ธีรภาพ', room: '1407' },
-      3: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ธีรภาพ', room: '1407' },
-      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
-      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
-    },
-    Thursday: {
-      1: { subject: 'โครงงานด้านการตลาด', teacher: 'อ.ศิริญากร', room: '1606' },
-      2: { subject: 'โครงงานด้านการตลาด', teacher: 'อ.ศิริญากร', room: '1606' },
-      3: { subject: 'การผลิตสื่อผสมเพื่องานการตลาด', teacher: 'อ.ธีรวัฒน์', room: '1606' },
-      4: { subject: 'การผลิตสื่อผสมเพื่องานการตลาด', teacher: 'อ.ธีรวัฒน์', room: '1606' },
-      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
-      6: { subject: 'กิจกรรมชมรม', teacher: '', room: '' },
-    },
-    Friday: {
-      1: { subject: 'การถ่ายภาพและการถ่ายทอดเพื่องานการตลาด', teacher: 'อ.พลศิต', room: '1606' },
-      2: { subject: 'การถ่ายภาพและการถ่ายทอดเพื่องานการตลาด', teacher: 'อ.พลศิต', room: '1606' },
-      3: { subject: 'การผลิตสื่อผสมเพื่องานการตลาด', teacher: 'อ.ธีรวัฒน์', room: '1606' },
-      4: { subject: 'การผลิตสื่อผสมเพื่องานการตลาด', teacher: 'อ.ธีรวัฒน์', room: '1606' },
-      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
-      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
-    },
-  },
-  m3_6: {
-    Monday: {
-      1: { subject: 'การสร้างเกมคอมพิวเตอร์', teacher: 'อ.ธีรภาพ', room: '1503' },
-      2: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ประภวิษณ์', room: '1503' },
-      3: { subject: 'เทคโนโลยีการนำเข้าข้อมูลสู่ระบบคอมพิวเตอร์', teacher: 'อ.ณัฐธิดา', room: '1503' },
-      4: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ประภวิษณ์', room: '1406' },
-      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
-      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
-    },
-    Tuesday: {
-      1: { subject: 'เทคโนโลยีการนำเข้าข้อมูลสู่ระบบคอมพิวเตอร์', teacher: 'อ.ณัฐธิดา', room: '1507' },
-      2: { subject: 'เทคโนโลยีการนำเข้าข้อมูลสู่ระบบคอมพิวเตอร์', teacher: 'อ.ณัฐธิดา', room: '1507' },
-      3: { subject: 'การออกแบบกราฟิกสิ่งพิมพ์ดิจิทัล', teacher: 'อ.ธีรภาพ', room: '1509' },
-      4: { subject: 'การออกแบบกราฟิกสิ่งพิมพ์ดิจิทัล', teacher: 'อ.ธีรภาพ', room: '1509' },
-      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
-      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
-    },
-    Wednesday: {
-      1: { subject: 'การออกแบบกราฟิกสิ่งพิมพ์ดิจิทัล', teacher: 'อ.ธีรภาพ', room: '1503' },
-      2: { subject: 'เทคโนโลยีการนำเข้าข้อมูลสู่ระบบคอมพิวเตอร์', teacher: 'อ.ณัฐธิดา', room: '1503' },
-      3: { subject: 'การติดตั้งระบบเครือข่ายคอมพิวเตอร์เบื้องต้น', teacher: 'อ.ทนงศักดิ์', room: '1506' },
-      4: { subject: 'การติดตั้งระบบเครือข่ายคอมพิวเตอร์เบื้องต้น', teacher: 'อ.ทนงศักดิ์', room: '1506' },
-      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
-      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
-    },
-    Thursday: {
-      1: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ประภวิษณ์', room: '1408' },
-      2: { subject: 'โปรแกรมนำเสนอ', teacher: 'อ.ประภวิษณ์', room: '1408' },
-      3: { subject: 'โครงงานด้านเทคโนโลยีสารสนเทศ', teacher: 'อ.ทนงศักดิ์', room: '1503' },
-      4: { subject: 'โครงงานด้านเทคโนโลยีสารสนเทศ', teacher: 'อ.ทนงศักดิ์', room: '1503' },
-      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
-      6: { subject: 'กิจกรรมชมรม', teacher: '', room: '' },
-      7: { subject: 'การสร้างเกมคอมพิวเตอร์', teacher: 'ช.3/6', room: '1509' },
-      8: { subject: 'การสร้างเกมคอมพิวเตอร์', teacher: 'ช.3/6', room: '1509' },
-    },
-    Friday: {
-      1: { subject: 'การออกแบบกราฟิกสิ่งพิมพ์ดิจิทัล', teacher: 'อ.ธีรภาพ', room: '1408' },
-      2: { subject: 'การออกแบบกราฟิกสิ่งพิมพ์ดิจิทัล', teacher: 'อ.ธีรภาพ', room: '1408' },
-      3: { subject: 'การติดตั้งระบบเครือข่ายคอมพิวเตอร์เบื้องต้น', teacher: 'อ.ทนงศักดิ์', room: '1506' },
-      4: { subject: 'การติดตั้งระบบเครือข่ายคอมพิวเตอร์เบื้องต้น', teacher: 'อ.ทนงศักดิ์', room: '1506' },
-      5: { subject: 'พักกลางวัน', teacher: '', room: '' },
-      6: { subject: 'โฮมรูม (HR)', teacher: '', room: '' },
-      7: { subject: 'การสร้างเกมคอมพิวเตอร์', teacher: 'ช.3/6', room: '1509' },
-      8: { subject: 'การสร้างเกมคอมพิวเตอร์', teacher: 'ช.3/6', room: '1509' },
-    },
-  },
-};
+/* ตารางที่เห็นในหน้านี้ประกอบจากสองชั้น:
+     1. ตารางประจำเทอม — อ่านสดจาก Google Sheet (ต้นฉบับที่ฝ่ายวิชาการแก้จริง)
+     2. สอนแทนรายวัน   — จาก Supabase ผูกกับ "วันที่" ไม่ใช่ชื่อวัน
+
+   ชั้นที่ 2 วางทับเฉพาะคอลัมน์ของ "วันนี้" เท่านั้น จงใจไม่แตะวันอื่น
+   เพราะสอนแทนคือการเปลี่ยนตัวชั่วคราววันเดียว ไม่ใช่การย้ายครูประจำวิชา
+   ถ้าไปทาสีทั้งคอลัมน์วันจันทร์ นักเรียนจะเข้าใจผิดว่าจันทร์หน้าก็ยังเป็นครูคนนี้ */
+
+/** ดึงสอนแทนล่วงหน้ากี่วัน — พอให้เห็นของสัปดาห์นี้ ไม่ยาวจนรายการรก */
+const UPCOMING_DAYS = 7;
 
 const DAYS_TH = {
   Monday: 'จันทร์',
@@ -152,66 +83,65 @@ export default function StudentTimetable() {
   const [viewClassId, setViewClassId] = useState(initialClassId);
   const [classIds, setClassIds] = useState([]);
 
-  const [timetable, setTimetable] = useState({});
-  const [source, setSource] = useState('loading'); // 'loading' | 'live' | 'seed' | 'error'
+  const [baseTimetable, setBaseTimetable] = useState({});
+  const [source, setSource] = useState('loading'); // 'loading' | 'sheet' | 'seed' | 'error'
   const [lastUpdated, setLastUpdated] = useState('');
+  const [today, setToday] = useState(todayISO());
+  const [subs, setSubs] = useState([]);
 
   const stamp = () =>
     setLastUpdated(new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }));
 
-  /* อ่านจากตาราง timetables ใน Supabase แล้วเปิด realtime ค้างไว้ (25_timetables.sql)
-     ของเดิม poll ทั้งไฟล์ csv จาก Google Sheet ทุก 20 วินาที ซึ่งแปลว่า
-     ถ้าฝ่ายวิชาการสั่งสอนแทนตอนคาบกำลังจะเริ่ม นักเรียนอาจรู้ช้าไปถึง 20 วินาที
-     และชีตเขียนกลับไม่ได้ ฝ่ายวิชาการจึงไม่มีทางแก้ให้เห็นผลที่หน้านี้ได้เลย
+  /* ตารางประจำเทอม: poll จากชีตทุก TIMETABLE_POLL_INTERVAL_MS
+     สอนแทน: ดึงพร้อมกัน และมี realtime แยกอีกชั้น (ดู effect ถัดไป)
+     ที่แยกจังหวะกันเพราะสองอย่างนี้เร่งด่วนไม่เท่ากัน — ตารางเทอมเปลี่ยนปีละสองครั้ง
+     ส่วนสอนแทนเกิดตอนครูลากะทันหันก่อนคาบเริ่ม ช้าไปนาทีเดียวก็สายแล้ว
 
-     ตอนนี้ฝ่ายวิชาการกดบันทึก เซิร์ฟเวอร์ส่งเฉพาะแถวที่เปลี่ยนมาที่เครื่องนี้ทันที */
+     คำนวณ "วันนี้" ใหม่ทุกรอบ ไม่ใช่ครั้งเดียวตอน mount
+     ถ้าใครเปิดแอปค้างข้ามเที่ยงคืน ตารางต้องเลื่อนตามวันจริง ไม่ค้างที่เมื่อวาน */
   const load = useCallback(async () => {
-    try {
-      const data = await fetchTimetable(viewClassId);
-      if (Object.keys(data).length > 0) {
-        setTimetable(data);
-        setSource('live');
-      } else {
-        // ห้องนี้ยังไม่มีข้อมูลใน DB — แสดงตารางตัวอย่างไว้ก่อน และบอกตรง ๆ ว่านี่คือตัวอย่าง
-        setTimetable(SEED_TIMETABLE_BY_CLASS[viewClassId] || {});
-        setSource('seed');
-      }
-      stamp();
-    } catch (err) {
-      console.error('[timetable] โหลดตารางสอนไม่สำเร็จ:', err);
-      setTimetable(SEED_TIMETABLE_BY_CLASS[viewClassId] || {});
-      setSource('error');
-    }
+    const t = todayISO();
+    setToday(t);
+
+    const { timetable, source: nextSource } = await fetchBaseTimetable(viewClassId);
+    setBaseTimetable(timetable);
+    setSource(nextSource);
+
+    // ดึงล่วงหน้า 7 วัน เพื่อให้เห็นประกาศสอนแทนที่ตั้งไว้ล่วงหน้าด้วย
+    setSubs(await fetchSubstitutions(viewClassId, t, addDaysISO(t, UPCOMING_DAYS)));
+    stamp();
   }, [viewClassId]);
 
   useEffect(() => {
     setSource('loading');
     load();
+    const interval = setInterval(load, TIMETABLE_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [load]);
 
-    return subscribeTimetable(viewClassId, (next) => {
-      setTimetable(next);
-      setSource('live');
-      stamp();
-    });
-  }, [viewClassId, load]);
+  /* ฝ่ายวิชาการสั่งสอนแทนแล้วนักเรียนต้องเห็นทันที ไม่ต้องรอรอบ poll ถัดไป */
+  useEffect(() => subscribeSubstitutions(viewClassId, load), [viewClassId, load]);
 
-  /* รายชื่อห้องที่มีตารางอยู่จริง — ปุ่มสลับห้องสร้างจากอันนี้
-     ถ้าโหลดไม่ได้ก็ไม่เป็นไร ปุ่มสลับหายไปเฉย ๆ ตารางห้องตัวเองยังแสดงปกติ */
+  /* รายชื่อห้องที่ผูกกับชีตแล้ว — ปุ่มสลับห้องสร้างจากอันนี้
+     อ่านจาก config ตรง ๆ ไม่ต้องยิง DB จึงไม่มีสถานะโหลด/ล้มเหลวให้จัดการ */
   useEffect(() => {
-    if (!isAcademic) return undefined; // นักเรียนไม่มีปุ่มสลับ จึงไม่ต้องยิงขอรายชื่อห้อง
-    let alive = true;
-    fetchClassIds()
-      .then((ids) => {
-        if (!alive) return;
-        setClassIds(ids);
-        // ฝ่ายวิชาการไม่มีห้องของตัวเอง ถ้าห้องที่เปิดมาไม่มีข้อมูลให้เด้งไปห้องแรกที่มี
-        if (!myClassId && ids.length > 0 && !ids.includes(viewClassId)) setViewClassId(ids[0]);
-      })
-      .catch((err) => console.error('[timetable] โหลดรายชื่อห้องไม่สำเร็จ:', err));
-    // เจตนาเช็ค viewClassId แค่ตอนโหลดรายชื่อครั้งแรก ไม่ใช่ทุกครั้งที่กดสลับห้อง
+    if (!isAcademic) return; // นักเรียนไม่มีปุ่มสลับ จึงไม่ต้องคำนวณ
+    const ids = listClassIds();
+    setClassIds(ids);
+    // ฝ่ายวิชาการไม่มีห้องของตัวเอง ถ้าห้องที่เปิดมาไม่มีข้อมูลให้เด้งไปห้องแรกที่มี
+    if (!myClassId && ids.length > 0 && !ids.includes(viewClassId)) setViewClassId(ids[0]);
+    // เจตนาเช็ค viewClassId แค่ตอนโหลดครั้งแรก ไม่ใช่ทุกครั้งที่กดสลับห้อง
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    return () => { alive = false; };
   }, [isAcademic]);
+
+  /* วางสอนแทนของ "วันนี้" ทับตารางฐาน — คอลัมน์วันอื่นไม่ถูกแตะ
+     ส่วนของวันถัดไปแยกไปแสดงเป็นการ์ดประกาศ ไม่เอามาแต้มในตาราง
+     เพราะตารางเป็นแม่แบบรายสัปดาห์ ไม่ได้ผูกกับสัปดาห์ใดสัปดาห์หนึ่ง
+     ทาสีช่องพุธไว้ล่วงหน้าจะแยกไม่ออกว่าพุธไหน */
+  const todaySubs = subs.filter((s) => s.sub_date === today);
+  const upcomingSubs = subs.filter((s) => s.sub_date > today);
+  const timetable = applySubstitutions(baseTimetable, todaySubs, today);
+  const todayKey = weekdayKeyOf(today);
 
   /* แสดงเฉพาะคาบที่มีวิชาจริงสักวันหนึ่ง
      ห้อง 3/4 เลิกคาบ 6 ส่วน 3/6 มีถึงคาบ 8 — ตารางจึงกว้างไม่เท่ากันตามจริง
@@ -229,9 +159,9 @@ export default function StudentTimetable() {
 
   const STATUS = {
     loading: { label: 'กำลังโหลด...', dot: 'bg-slate-400', tone: isDark ? 'bg-white/10 text-content-secondary' : 'bg-slate-100 text-ink-secondary' },
-    live: { label: 'อัปเดตสด', dot: 'bg-emerald-500 animate-pulse', tone: isDark ? 'bg-emerald-950/30 text-accent-emerald' : 'bg-emerald-50 text-accent-emerald' },
-    seed: { label: 'ตัวอย่าง (ห้องนี้ยังไม่มีข้อมูล)', dot: 'bg-amber-500', tone: isDark ? 'bg-amber-950/30 text-accent-amber' : 'bg-amber-50 text-accent-amber' },
-    error: { label: 'เชื่อมต่อไม่สำเร็จ', dot: 'bg-rose-500', tone: isDark ? 'bg-rose-950/30 text-accent-rose' : 'bg-rose-50 text-accent-rose' },
+    sheet: { label: 'อัปเดตสด', dot: 'bg-emerald-500 animate-pulse', tone: isDark ? 'bg-emerald-950/30 text-accent-emerald' : 'bg-emerald-50 text-accent-emerald' },
+    seed: { label: 'ตัวอย่าง (ห้องนี้ยังไม่ผูกกับชีต)', dot: 'bg-amber-500', tone: isDark ? 'bg-amber-950/30 text-accent-amber' : 'bg-amber-50 text-accent-amber' },
+    error: { label: 'อ่านชีตไม่สำเร็จ', dot: 'bg-rose-500', tone: isDark ? 'bg-rose-950/30 text-accent-rose' : 'bg-rose-50 text-accent-rose' },
   };
   const status = STATUS[source] || STATUS.loading;
 
@@ -318,11 +248,39 @@ export default function StudentTimetable() {
         <div className={`text-[10px] border-t pt-2 flex justify-between transition-colors duration-300 ${isDark ? 'text-content-secondary border-white/10' : 'text-ink-muted border-slate-200/50'
           }`}>
           <span>{lastUpdated ? `อัปเดตล่าสุด: ${lastUpdated} น.` : 'กำลังเชื่อมต่อ...'}</span>
-          <span className={source === 'live' ? 'text-accent-emerald font-bold' : 'text-content-muted font-bold'}>
-            {source === 'live' ? '● Connected' : '○ Offline'}
+          <span className={source === 'sheet' ? 'text-accent-emerald font-bold' : 'text-content-muted font-bold'}>
+            {source === 'sheet' ? '● Connected' : '○ Offline'}
           </span>
         </div>
       </div>
+
+      {/* ประกาศสอนแทนล่วงหน้า — ของวันถัดไป ไม่ใช่วันนี้
+          แยกเป็นการ์ดเพราะตารางด้านล่างเป็นแม่แบบรายสัปดาห์ ไม่ผูกกับสัปดาห์ใดสัปดาห์หนึ่ง
+          ถ้าเอาไปแต้มในช่อง นักเรียนจะแยกไม่ออกว่าเป็นของพุธไหน */}
+      {upcomingSubs.length > 0 && (
+        <div className={`rounded-2xl border p-4 space-y-2 transition-colors duration-300 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
+          }`}>
+          <span className={`text-xs font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+            <CalendarClock size={16} className="text-accent-amber" />
+            สอนแทนที่ประกาศไว้ล่วงหน้า
+          </span>
+          {upcomingSubs.map((sub) => (
+            <div
+              key={sub.id}
+              className={`flex items-start gap-2 text-[11px] font-semibold leading-relaxed ${isDark ? 'text-content-secondary' : 'text-ink-secondary'
+                }`}
+            >
+              <span className="text-accent-amber font-extrabold shrink-0">
+                {describeDate(sub.sub_date)}
+              </span>
+              <span className="min-w-0">
+                คาบ {sub.period} · {sub.subject || 'ไม่ระบุวิชา'} — สอนแทนโดย {sub.substitute_teacher || 'รอประกาศ'}
+                {sub.substitute_room ? ` (ย้ายไปห้อง ${sub.substitute_room})` : ''}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Grid Timetable */}
       <div className={`rounded-3xl border shadow-sm overflow-hidden transition-colors duration-300 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100 shadow-sm'
@@ -357,6 +315,9 @@ export default function StudentTimetable() {
                     <td className={`p-3 text-xs font-extrabold transition-colors duration-300 ${isDark ? 'text-white bg-white/10' : 'text-sbac-navy bg-slate-50/30'
                       }`}>
                       {DAYS_TH[day] || day}
+                      {day === todayKey && (
+                        <span className="block text-[8px] font-bold text-brand mt-0.5">วันนี้</span>
+                      )}
                     </td>
                     {visiblePeriods.map(p => {
                       const period = (periods && typeof periods === 'object' && periods[p]) || { subject: '', teacher: '', room: '' };
@@ -393,6 +354,10 @@ export default function StudentTimetable() {
                                 {isSubstituted && period.substitute_room ? period.substitute_room : period.room}
                               </div>
                             )}
+                            {/* ย้ำว่าเป็นของวันนี้วันเดียว จะได้ไม่เข้าใจว่าเปลี่ยนครูถาวร */}
+                            {isSubstituted && (
+                              <div className="text-[8px] font-extrabold text-accent-rose">เฉพาะวันนี้</div>
+                            )}
                           </div>
                         ) : (
                           <span className={`text-[10px] font-bold transition-colors duration-300 ${isDark ? 'text-content-muted' : 'text-content-secondary'
@@ -409,12 +374,14 @@ export default function StudentTimetable() {
         </div>
       </div>
 
-      <div className={`flex gap-2 items-center p-3 rounded-2xl border transition-colors duration-300 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
+      <div className={`flex gap-2 items-start p-3 rounded-2xl border transition-colors duration-300 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
         }`}>
-        <AlertCircle className="text-accent-rose flex-shrink-0" size={16} />
+        <AlertCircle className="text-accent-rose flex-shrink-0 mt-0.5" size={16} />
         <p className={`text-[10px] leading-relaxed transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-muted'
           }`}>
-          <strong>หมายเหตุ:</strong> คาบเรียนแถบสีแดงกระพริบ มีการปรับเปลี่ยนการเรียนการสอน (มีอาจารย์สอนแทนหรือเปลี่ยนห้องเรียน) เมื่อฝ่ายวิชาการแก้ตาราง หน้านี้จะเปลี่ยนตามทันทีโดยไม่ต้องรีเฟรช
+          <strong>หมายเหตุ:</strong> ช่องแถบสีแดงกระพริบคือคาบที่ฝ่ายวิชาการสั่งครูสอนแทนหรือย้ายห้องไว้
+          <strong> เฉพาะวันที่ {formatThaiDate(today)} เท่านั้น</strong> — สัปดาห์ถัดไปตารางจะกลับเป็นปกติเอง
+          สั่งสอนแทนเมื่อไหร่หน้านี้เปลี่ยนตามทันทีโดยไม่ต้องรีเฟรช ส่วนตารางประจำเทอมอ่านจาก Google Sheet
         </p>
       </div>
     </div>
