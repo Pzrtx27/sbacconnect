@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -8,6 +8,12 @@ import { useTheme } from '../../contexts/ThemeContext';
    เลื่อนผ่านฟอร์มตารางสอน ตัวอัปโหลด Excel และตารางพรีวิว กว่าจะถึงใบลาที่รออนุมัติ
    ซึ่งเป็นงานที่ต้องทำทุกวัน — ของที่ใช้บ่อยที่สุดดันอยู่ล่างสุด
 
+   เรื่องการจัดวาง: ขึ้นบรรทัดใหม่ (flex-wrap) ไม่ใช่เลื่อนซ้ายขวา
+   ของเดิมเป็น overflow-x-auto แล้วเฟดขอบบอกว่ายังเลื่อนต่อได้
+   แต่บนจอ 375px แท็บ 5 อันกินที่เกินความกว้างราว 216px = สองแท็บอยู่นอกจอ
+   ผู้ใช้ต้องรู้ตัวว่าต้องปัดก่อนถึงจะเจอ ซึ่งเป็นการซ่อนทางเข้าหลักของหน้า
+   ยอมสูงขึ้นอีกบรรทัดดีกว่าให้คนหาเมนูไม่เจอ — แนวเดียวกับที่แก้ปุ่มลัดในแชทไปแล้ว
+
    เรื่องคีย์บอร์ด: ทำตาม WAI-ARIA tabs pattern คือลูกศรซ้าย/ขวาย้ายแท็บ
    Home/End ไปหัว-ท้าย และมีแค่แท็บที่เลือกอยู่ที่ tabIndex=0 (roving tabindex)
    คนกด Tab จึงข้ามทั้งแถบไปที่เนื้อหาเลย ไม่ต้องกดผ่านทุกแท็บก่อน
@@ -16,36 +22,6 @@ export default function TabNav({ tabs, active, onChange, ariaLabel = 'หมว�
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const refs = useRef({});
-  const listRef = useRef(null);
-
-  /* บนจอ 375px แท็บ 5 อันกินที่เกินความกว้างอยู่ราว 216px คือมีสองแท็บที่มองไม่เห็นเลย
-     ถ้าไม่มีอะไรบอก ผู้ใช้บนมือถือจะไม่รู้ด้วยซ้ำว่ามีแท็บ "กิจกรรม" กับ "นำเข้าข้อมูล" อยู่
-     จึงเฟดขอบด้านที่ยังเลื่อนต่อได้ ให้เห็นว่าเนื้อหาถูกตัด ไม่ใช่จบแค่นั้น */
-  const [edges, setEdges] = useState({ start: false, end: false });
-
-  const syncEdges = useCallback(() => {
-    const el = listRef.current;
-    if (!el) return;
-    const max = el.scrollWidth - el.clientWidth;
-    setEdges({ start: el.scrollLeft > 4, end: el.scrollLeft < max - 4 });
-  }, []);
-
-  useLayoutEffect(() => {
-    syncEdges();
-    const el = listRef.current;
-    if (!el) return undefined;
-    // ResizeObserver จับตอนหมุนจอ/ย่อหน้าต่าง ซึ่ง scroll event ไม่ยิง
-    const ro = new ResizeObserver(syncEdges);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [syncEdges, tabs.length]);
-
-  /* เลื่อนแท็บที่เลือกอยู่เข้ามาในจอ — สำคัญตอนเข้าหน้าครั้งแรกโดยที่แท็บนั้นอยู่นอกจอ
-     block: 'nearest' กันไม่ให้หน้าทั้งหน้ากระโดดตาม */
-  useEffect(() => {
-    refs.current[active]?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    syncEdges();
-  }, [active, syncEdges]);
 
   const activeIndex = tabs.findIndex((t) => t.id === active);
 
@@ -71,23 +47,11 @@ export default function TabNav({ tabs, active, onChange, ariaLabel = 'หมว�
       }`}
     >
       <div
-        ref={listRef}
         role="tablist"
         aria-label={ariaLabel}
         aria-orientation="horizontal"
         onKeyDown={onKeyDown}
-        onScroll={syncEdges}
-        className="flex gap-1.5 overflow-x-auto scrollbar-hide"
-        /* เฟดเฉพาะฝั่งที่ยังเลื่อนต่อได้ ใช้ mask แทนการวาง gradient ทับ
-           เพราะ gradient ทับต้องรู้สีพื้นหลังที่แน่นอน ซึ่งเปลี่ยนตามธีม */
-        style={{
-          maskImage: edges.start || edges.end
-            ? `linear-gradient(to right, ${edges.start ? 'transparent' : '#000'} 0, #000 24px, #000 calc(100% - 24px), ${edges.end ? 'transparent' : '#000'} 100%)`
-            : undefined,
-          WebkitMaskImage: edges.start || edges.end
-            ? `linear-gradient(to right, ${edges.start ? 'transparent' : '#000'} 0, #000 24px, #000 calc(100% - 24px), ${edges.end ? 'transparent' : '#000'} 100%)`
-            : undefined,
-        }}
+        className="flex flex-wrap gap-1.5"
       >
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -103,7 +67,8 @@ export default function TabNav({ tabs, active, onChange, ariaLabel = 'หมว�
               aria-controls={`panel-${tab.id}`}
               tabIndex={isActive ? 0 : -1}
               onClick={() => onChange(tab.id)}
-              /* min-h 44px = ขนาดพื้นที่กดขั้นต่ำบนมือถือ (เท่ากับ BottomNav) */
+              /* min-h 44px = ขนาดพื้นที่กดขั้นต่ำบนมือถือ (เท่ากับ BottomNav)
+                 shrink-0 กันไม่ให้ข้อความถูกบีบจนตัดคำ — ให้ขึ้นบรรทัดใหม่แทน */
               className={`relative shrink-0 flex items-center gap-1.5 px-3.5 min-h-[44px] rounded-2xl
                           text-xs font-extrabold transition-colors duration-200 ${
                 isActive
