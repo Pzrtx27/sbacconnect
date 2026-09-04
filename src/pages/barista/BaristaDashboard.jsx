@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../config/supabase';
 import { showToast } from '../../components/ui/Toast';
@@ -6,6 +6,8 @@ import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { LogOut, Clock, Check, RefreshCw, Coffee, X, Archive } from 'lucide-react';
 import { formatBaht } from '../../utils/identity';
 import { ORDER_STATUS_TEXT, productEmoji, optionSummary, bulkErrorText } from '../../utils/orders';
+import { useRealtimeTable, useSerialCallback } from '../../hooks/useRealtimeTable';
+import { playChime, unlockAudio } from '../../utils/sound';
 
 /* คิวหน้าร้าน — ต้องเรียกผ่านฟังก์ชันใน 07_pos_ops.sql เท่านั้น
    เพราะ RLS ให้เห็นแค่ออเดอร์ของตัวเอง และ revoke สิทธิ์ update บน orders ไว้
@@ -38,11 +40,10 @@ export default function BaristaDashboard() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const { confirm, confirmDialog } = useConfirm();
 
-  const audioRef = useRef(null);
   const knownIdsRef = useRef(new Set());
   const firstLoadRef = useRef(true);
 
-  const fetchQueue = useCallback(async () => {
+  const fetchQueue = useSerialCallback(async () => {
     const { data, error } = await supabase.rpc('pos_order_queue', { p_limit: 50 });
 
     if (error) {
@@ -63,7 +64,7 @@ export default function BaristaDashboard() {
     if (!firstLoadRef.current) {
       const hasNew = list.some((o) => o.status === 'paid' && !knownIdsRef.current.has(o.id));
       if (hasNew) {
-        audioRef.current?.play().catch(() => {});
+        playChime('new');
         showToast('มีคำสั่งซื้อกาแฟใหม่เข้ามา!', 'info');
       }
     }
@@ -72,22 +73,29 @@ export default function BaristaDashboard() {
 
     setOrders(list);
     setLoading(false);
-  }, []);
+  });
 
   useEffect(() => {
-    audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-500.wav');
     fetchQueue();
-
-    // ออเดอร์ใหม่ถูก insert โดยฟังก์ชันฝั่ง DB — ฟัง event แล้วดึงคิวใหม่
-    const channel = supabase
-      .channel('pos-queue')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchQueue)
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [fetchQueue]);
+
+  /* ออเดอร์ใหม่ถูก insert โดยฟังก์ชันฝั่ง DB — ฟัง event แล้วดึงคิวใหม่
+     ถ้าเรียลไทม์ต่อไม่ติด (เช่นยังไม่ได้รัน 18_realtime_orders.sql) hook จะสลับไปถามถี่ ๆ ให้เอง
+     จอเคาน์เตอร์จึงไม่มีวันค้างจนต้องกดรีเฟรชมือ */
+  const live = useRealtimeTable({ table: 'orders', onChange: fetchQueue });
+
+  /* เบราว์เซอร์ห้ามเล่นเสียงจนกว่าผู้ใช้จะแตะหน้าจอสักครั้ง
+     จอเคาน์เตอร์เปิดทิ้งไว้ทั้งวันโดยไม่มีใครแตะ = ออเดอร์แรกจะเงียบ
+     ดักการแตะครั้งแรก (ครั้งเดียว) เพื่อปลดล็อกไว้ล่วงหน้า */
+  useEffect(() => {
+    const unlock = () => unlockAudio();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
 
   const updateOrderStatus = async (orderId, newStatus) => {
     setUpdatingId(orderId);
@@ -235,8 +243,20 @@ export default function BaristaDashboard() {
           </div>
           <div>
             <h1 className="text-lg font-black tracking-tight leading-none">SBAC COFFEE BARISTA</h1>
-            <span className="text-[10px] text-content-secondary font-extrabold uppercase tracking-widest mt-1.5 block">
-              ● Live Queue Management
+            {/* บอกสถานะการเชื่อมต่อจริง ไม่ใช่จุดเขียวที่ติดค้างไว้เฉย ๆ
+                ถ้าเรียลไทม์หลุด บาริสต้าต้องรู้ว่าคิวมาช้ากว่าปกติ ไม่ใช่เดาเอา */}
+            <span
+              className={`text-[10px] font-extrabold uppercase tracking-widest mt-1.5 flex items-center gap-1.5 ${
+                live ? 'text-accent-emerald' : 'text-accent-amber'
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  live ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                }`}
+                aria-hidden="true"
+              />
+              {live ? 'Live Queue — เชื่อมต่อแล้ว' : 'กำลังเชื่อมต่อ — ดึงคิวทุก 8 วินาที'}
             </span>
           </div>
         </div>

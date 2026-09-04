@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
+import { OrdersProvider } from './contexts/OrdersContext';
 import LoginPage from './pages/LoginPage';
 import StudentHome from './pages/student/StudentHome';
 import StudentTimetable from './pages/student/StudentTimetable';
@@ -15,6 +16,7 @@ import SideNav from './components/layout/SideNav';
 import Header from './components/layout/Header';
 import PageWrapper from './components/layout/PageWrapper';
 import LoadingSpinner from './components/ui/LoadingSpinner';
+import OrderAlerts from './components/ui/OrderAlerts';
 import AssistantFAB from './components/assistant/AssistantFAB';
 import { shellWidthClass } from './utils/layout';
 
@@ -176,8 +178,16 @@ function MainLayout() {
   return (
     /* pb-24 เว้นที่ให้ BottomNav บนมือถือ — บนคอมไม่มีแถบล่างแล้วจึงคืนพื้นที่ให้เนื้อหา
        xl:pl-64 หลบแถบซ้ายที่เป็น fixed (กว้าง w-64 เท่ากัน) */
+    /* OrdersProvider ครอบทั้ง shell ไม่ใช่แค่หน้าคำสั่งซื้อ
+       เพราะทั้งแถบเมนู (ตัวเลขพร้อมรับ) และกล่องแจ้งเตือน ต้องอ่านชุดข้อมูลเดียวกัน
+       และต้องฟังต่อเนื่องแม้ผู้ใช้จะเดินไปหน้าอื่น */
+    <OrdersProvider>
     <div className="min-h-screen flex flex-col pb-24 xl:pb-0 xl:pl-64 transition-colors duration-300 relative bg-surface text-ink dark:bg-surface-dark dark:text-white">
       <SideNav />
+
+      {/* ฟังสถานะออเดอร์ของตัวเองทุกหน้า — บาริสต้ากด "เสร็จแล้ว" ต้องเด้งเตือนทันที
+          ไม่ว่านักเรียนกำลังเปิดหน้าไหนค้างไว้อยู่ */}
+      <OrderAlerts />
 
       <div className="relative z-10 flex-1 flex flex-col">
         <Header />
@@ -264,6 +274,7 @@ function MainLayout() {
 
       </div>
     </div>
+    </OrdersProvider>
   );
 }
 
