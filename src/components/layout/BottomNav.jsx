@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { LogOut } from 'lucide-react';
 import { navItemsFor, isNavItemActive } from './navConfig';
+import { useMyOrders } from '../../contexts/OrdersContext';
 
 export default function BottomNav() {
   const { user, logout } = useAuth();
@@ -11,6 +12,11 @@ export default function BottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const isDark = theme === 'dark';
+
+  /* จำนวนแก้วที่ชงเสร็จแล้วแต่ยังไม่ได้ไปรับ
+     ต้องเห็นได้จากทุกหน้า ไม่ใช่เฉพาะตอนเปิดหน้าคำสั่งซื้อค้างไว้
+     นักเรียนส่วนใหญ่สั่งแล้วสลับไปดูตารางเรียนหรือปิดจอ */
+  const { readyOrders } = useMyOrders();
 
   if (!user) return null;
 
@@ -35,13 +41,14 @@ export default function BottomNav() {
             {items.map((item) => {
               const isActive = isNavItemActive(item, location.pathname);
               const Icon = item.icon;
+              const badge = item.id === 'orders' ? readyOrders.length : 0;
 
               return (
                 <button
                   key={item.id}
                   onClick={() => navigate(item.path)}
                   type="button"
-                  aria-label={item.label}
+                  aria-label={badge > 0 ? `${item.label} — พร้อมรับ ${badge} รายการ` : item.label}
                   aria-current={isActive ? 'page' : undefined}
                   /* min-h 44px = ขนาดพื้นที่กดขั้นต่ำตามแนวทาง mobile accessibility */
                   className="relative flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 min-w-[60px] min-h-[52px] rounded-2xl transition-all duration-200"
@@ -57,6 +64,17 @@ export default function BottomNav() {
                       aria-hidden="true"
                       className={`transition-colors duration-200 ${isActive ? 'text-brand' : 'text-content-muted'}`}
                     />
+
+                    {/* จุดเขียวนับจำนวน — เขียวเพราะเป็นข่าวดี ไม่ใช่คำเตือน
+                        วางคร่อมมุมไอคอนแบบเดียวกับ badge ของแอปแชททั่วไป */}
+                    {badge > 0 && (
+                      <span
+                        className="absolute top-0 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-700 text-white text-[10px] font-black flex items-center justify-center ring-2 ring-surface-card dark:ring-surface-dark-elev animate-pulse"
+                        aria-hidden="true"
+                      >
+                        {badge}
+                      </span>
+                    )}
                   </div>
                   <span className={`text-[10px] font-bold transition-colors duration-200 ${
                     isActive ? 'text-brand' : 'text-content-muted'

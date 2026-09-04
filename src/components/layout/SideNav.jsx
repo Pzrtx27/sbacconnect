@@ -3,6 +3,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { navItemsFor, isNavItemActive } from './navConfig';
+import { useMyOrders } from '../../contexts/OrdersContext';
 import logo from '../../assets/sbac_logo.png';
 
 /* แถบนำทางด้านซ้าย ใช้เฉพาะบนจอคอม (>=1280px)
@@ -19,6 +20,9 @@ export default function SideNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const isDark = theme === 'dark';
+
+  // แก้วที่ชงเสร็จแล้วแต่ยังไม่ได้ไปรับ — ตัวเลขเดียวกับที่ขึ้นบนแถบล่างของมือถือ
+  const { readyOrders } = useMyOrders();
 
   if (!user) return null;
 
@@ -55,6 +59,7 @@ export default function SideNav() {
         {items.map((item) => {
           const isActive = isNavItemActive(item, location.pathname);
           const Icon = item.icon;
+          const badge = item.id === 'orders' ? readyOrders.length : 0;
 
           return (
             <li key={item.id}>
@@ -74,6 +79,13 @@ export default function SideNav() {
               >
                 <Icon size={20} strokeWidth={isActive ? 2.4 : 1.8} aria-hidden="true" />
                 {item.label}
+
+                {/* บนคอมมีที่พอจะเขียนคำกำกับได้ ไม่ต้องให้ผู้ใช้เดาว่าตัวเลขแปลว่าอะไร */}
+                {badge > 0 && (
+                  <span className="ml-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-black animate-pulse">
+                    พร้อมรับ {badge}
+                  </span>
+                )}
               </button>
             </li>
           );

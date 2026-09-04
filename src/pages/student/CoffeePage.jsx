@@ -13,6 +13,8 @@ import { formatBaht } from '../../utils/identity';
 import {
   productEmoji, newIdempotencyKey, placeOrderErrorText, optionSummary,
 } from '../../utils/orders';
+import { requestNotifyPermission } from '../../utils/notify';
+import { unlockAudio } from '../../utils/sound';
 
 /* หน้าสั่งเครื่องดื่ม SBAC COFFEE
 
@@ -222,6 +224,10 @@ export default function CoffeePage() {
   const submitOrder = async () => {
     if (cart.length === 0 || submitting || cannotAfford) return;
 
+    /* ปลดล็อกเสียงตรงนี้ เพราะเป็น "การกด" ที่เบราว์เซอร์ยอมรับ
+       ตอนกาแฟเสร็จอีกสิบนาทีข้างหน้าจะไม่มี user gesture ให้ใช้แล้ว */
+    unlockAudio();
+
     setSubmitting(true);
     try {
       // ส่งไปเฉพาะ id — ไม่ส่งราคา ไม่ส่งยอดรวม ให้ DB คิดเองทั้งหมด
@@ -269,6 +275,11 @@ export default function CoffeePage() {
         totalSatang: typeof data.total === 'number' ? data.total : null,
         balanceSatang: typeof data.balance === 'number' ? data.balance : null,
       });
+
+      /* ขอสิทธิ์แจ้งเตือนตรงนี้ ไม่ใช่ตอนเปิดแอป
+         จังหวะนี้คือจังหวะเดียวที่คำถาม "ให้เตือนตอนเครื่องดื่มเสร็จไหม" มีความหมายกับผู้ใช้
+         (ถ้าเคยตอบไปแล้วไม่ว่าอนุญาตหรือปฏิเสธ ฟังก์ชันนี้จะไม่ถามซ้ำ) */
+      requestNotifyPermission();
     } finally {
       setSubmitting(false);
     }

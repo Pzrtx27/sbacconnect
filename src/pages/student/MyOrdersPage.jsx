@@ -1,93 +1,92 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useTheme } from '../../contexts/ThemeContext';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../config/supabase';
-import { RefreshCw, History, Coffee, ChevronRight } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { useTheme } from '../../contexts/ThemeContext';
+import { RefreshCw, History, Coffee, ChevronRight, Check } from 'lucide-react';
 import { formatBaht } from '../../utils/identity';
 import {
   ORDER_STATUS_TEXT_LONG,
   ORDER_STATUS_COLOR,
-  ACTIVE_STATUSES,
   productEmoji,
   optionSummary,
 } from '../../utils/orders';
+import { useMyOrders } from '../../contexts/OrdersContext';
 
-/* หน้านี้แสดงเฉพาะ "ออเดอร์ที่กำลังดำเนินการอยู่" (paid / preparing)
-   ส่วนประวัติทั้งหมดแยกไปหน้า /orders/history
-   RLS (orders_self_select) กรองให้เห็นเฉพาะออเดอร์ของตัวเองอยู่แล้ว */
+/* หน้านี้แสดงออเดอร์ที่ยัง "ไม่จบเรื่อง" ในสายตาของนักเรียน:
+     ยังไม่ได้ทำ / กำลังชง — รอต่อไป
+     ทำเสร็จแล้วแต่ยังไม่ได้กดรับ — ต้องลุกไปรับที่เคาน์เตอร์
 
-const ORDER_SELECT =
-  'id, total_satang, status, pickup_code, note, created_at, ' +
-  'order_items(qty, unit_price_satang, note, products(name, category), order_item_options(option_name, group_name))';
+   ของเดิมกรองไว้แค่ paid/preparing ใบที่บาริสต้ากดเสร็จจึงหายวับไปจากหน้าจอ
+   นักเรียนที่นั่งรออยู่เห็นการ์ดหายไปเฉย ๆ แล้วเหลือหน้าว่างเปล่า
+   ซึ่งอ่านได้ว่า "ไม่มีอะไรเกิดขึ้น" ทั้งที่ความจริงคือกาแฟพร้อมแล้ว
+   ตอนนี้ใบที่เสร็จจะกลายเป็นการ์ดเขียวเด่นอยู่บนสุดจนกว่าจะกดว่ารับแล้ว
+
+   ข้อมูลทั้งหมดมาจาก OrdersContext ซึ่งฟังเรียลไทม์ให้อยู่แล้ว
+   หน้านี้จึงไม่ต้องยิง query เองซ้ำอีกชุด */
+
+/** ลำดับขั้นของออเดอร์ตาม enum order_status (paid -> preparing -> done) */
+const STEPS = [
+  { key: 'paid', label: 'รับออเดอร์' },
+  { key: 'preparing', label: 'กำลังชง' },
+  { key: 'done', label: 'พร้อมรับ' },
+];
 
 export default function MyOrdersPage() {
-  const { user } = useAuth();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const navigate = useNavigate();
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadFailed, setLoadFailed] = useState(false);
+  const { activeOrders, readyOrders, loading, loadFailed, live, markPickedUp, refresh } =
+    useMyOrders();
 
-  const fetchOrders = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('orders')
-      .select(ORDER_SELECT)
-      .in('status', ACTIVE_STATUSES)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      // ต้องแยก "ดึงไม่ได้" ออกจาก "ไม่มีออเดอร์" ให้ชัด — ของเดิม error แล้ว orders
-      // ค้างเป็น [] หน้าจอจึงขึ้นว่า "ยังไม่มีคำสั่งซื้อ" ทั้งที่นักเรียนเพิ่งจ่ายเงินไป
-      console.warn('[orders] โหลดออเดอร์ไม่สำเร็จ:', error);
-      setLoadFailed(true);
-      setLoading(false);
-      return;
-    }
-
-    setLoadFailed(false);
-    setOrders(data || []);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    fetchOrders();
-
-    // ติดตามการเปลี่ยนสถานะแบบเรียลไทม์ (บาริสต้ากดเปลี่ยน -> หน้านี้อัปเดตเอง)
-    const channel = supabase
-      .channel('my-orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchOrders)
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, fetchOrders]);
+  const textPrimary = isDark ? 'text-white' : 'text-sbac-navy';
+  const textMuted = isDark ? 'text-content-secondary' : 'text-ink-muted';
 
   return (
     <div className="space-y-6 xl:max-w-3xl">
       <div className="flex justify-between items-center gap-3">
         <h2
-          className={`text-xl font-extrabold flex items-center gap-2 transition-colors duration-300 ${
-            isDark ? 'text-white' : 'text-sbac-navy'
-          }`}
+          className={`text-xl font-extrabold flex items-center gap-2 transition-colors duration-300 ${textPrimary}`}
         >
           <span className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-accent-amber shrink-0">
             <Coffee size={18} aria-hidden="true" />
           </span>
           สถานะการสั่งซื้อ
         </h2>
-        <span
-          className={`text-xs font-bold flex items-center gap-1 px-3 py-1 rounded-full shrink-0 transition-colors duration-300 ${
-            isDark ? 'bg-emerald-950/30 text-accent-emerald' : 'bg-emerald-50 text-accent-emerald'
+
+        {/* ป้ายนี้เคยเป็นจุดเขียวกะพริบตายตัว ทั้งที่ข้างหลังไม่ได้ต่อเรียลไทม์จริง
+            ตอนนี้ผูกกับสถานะการเชื่อมต่อจริง และกดได้ด้วย
+            เพราะเวลาคนสงสัยว่า "มันอัปเดตอยู่จริงไหม" สิ่งที่อยากทำคือกดเช็คเดี๋ยวนั้น
+            ไม่ใช่ดึงหน้าจอลงมารีโหลดทั้งแอปแล้วรอโหลดใหม่หมด */}
+        <button
+          type="button"
+          onClick={refresh}
+          title="แตะเพื่อตรวจสถานะเดี๋ยวนี้"
+          className={`text-xs font-bold flex items-center gap-1.5 px-3 py-1 rounded-full shrink-0 transition-colors duration-300 active:scale-95 ${
+            live
+              ? isDark
+                ? 'bg-emerald-950/30 text-accent-emerald'
+                : 'bg-emerald-50 text-accent-emerald'
+              : isDark
+              ? 'bg-amber-950/30 text-accent-amber'
+              : 'bg-amber-50 text-accent-amber'
           }`}
         >
-          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-          Live status
-        </span>
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${live ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}
+            aria-hidden="true"
+          />
+          {live ? 'อัปเดตสด' : 'กำลังเชื่อมต่อ'}
+        </button>
       </div>
+
+      {/* ---------- พร้อมรับแล้ว ---------- */}
+      {readyOrders.map((order) => (
+        <ReadyCard
+          key={order.id}
+          order={order}
+          isDark={isDark}
+          onPickedUp={() => markPickedUp(order.id)}
+        />
+      ))}
 
       <button
         type="button"
@@ -98,17 +97,14 @@ export default function MyOrdersPage() {
             : 'bg-slate-50 border-slate-100 hover:bg-slate-100'
         }`}
       >
-        <span
-          className={`flex items-center gap-2 text-xs font-extrabold transition-colors duration-300 ${
-            isDark ? 'text-white' : 'text-sbac-navy'
-          }`}
-        >
+        <span className={`flex items-center gap-2 text-xs font-extrabold transition-colors duration-300 ${textPrimary}`}>
           <History size={16} className={isDark ? 'text-content-secondary' : 'text-ink-muted'} aria-hidden="true" />
           ดูประวัติการสั่งซื้อทั้งหมด
         </span>
         <ChevronRight size={16} className={isDark ? 'text-content-secondary' : 'text-ink-light'} aria-hidden="true" />
       </button>
 
+      {/* ---------- ยังทำไม่เสร็จ ---------- */}
       {loading ? (
         <div className="text-center py-10">
           <RefreshCw className="animate-spin text-brand mx-auto mb-2" size={24} />
@@ -131,32 +127,27 @@ export default function MyOrdersPage() {
           </p>
           <button
             type="button"
-            onClick={() => {
-              setLoading(true);
-              fetchOrders();
-            }}
+            onClick={refresh}
             className="px-5 py-2.5 rounded-2xl text-xs font-extrabold bg-sbac-blue hover:bg-sbac-navy text-white transition-colors"
           >
             ลองโหลดใหม่
           </button>
         </div>
-      ) : orders.length === 0 ? (
+      ) : activeOrders.length === 0 && readyOrders.length === 0 ? (
         <div
           className={`rounded-3xl border shadow-sm p-8 text-center space-y-3 transition-colors duration-300 ${
             isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
           }`}
         >
           <div className="text-5xl">☕</div>
-          <h3 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
-            ยังไม่มีคำสั่งซื้อที่ดำเนินการอยู่
-          </h3>
-          <p className={`text-xs leading-relaxed ${isDark ? 'text-content-secondary' : 'text-ink-muted'}`}>
+          <h3 className={`text-sm font-extrabold ${textPrimary}`}>ยังไม่มีคำสั่งซื้อที่ดำเนินการอยู่</h3>
+          <p className={`text-xs leading-relaxed ${textMuted}`}>
             สามารถสั่งเครื่องดื่มแก้วโปรดของคุณได้ง่ายๆ ผ่านแถบสั่งกาแฟด้านล่าง
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {orders.map((order) => (
+          {activeOrders.map((order) => (
             <div
               key={order.id}
               className={`rounded-3xl border shadow-sm p-5 space-y-4 transition-colors duration-300 ${
@@ -169,18 +160,10 @@ export default function MyOrdersPage() {
                 }`}
               >
                 <div>
-                  <span
-                    className={`text-[10px] font-bold block ${
-                      isDark ? 'text-content-secondary' : 'text-ink-muted'
-                    }`}
-                  >
+                  <span className={`text-[10px] font-bold block ${textMuted}`}>
                     รหัสรับของ / Pickup Code
                   </span>
-                  <span
-                    className={`text-3xl font-black tracking-tight mt-1 block tabular-nums ${
-                      isDark ? 'text-white' : 'text-sbac-navy'
-                    }`}
-                  >
+                  <span className={`text-3xl font-black tracking-tight mt-1 block tabular-nums ${textPrimary}`}>
                     #{order.pickup_code}
                   </span>
                 </div>
@@ -193,6 +176,10 @@ export default function MyOrdersPage() {
                 </span>
               </div>
 
+              {/* แถบขั้นตอน — บอกว่าตอนนี้อยู่ตรงไหนและเหลืออีกกี่ขั้น
+                  ข้อความสถานะอย่างเดียวตอบไม่ได้ว่า "ใกล้เสร็จหรือยัง" */}
+              <StatusSteps status={order.status} isDark={isDark} />
+
               <div className="space-y-3">
                 {order.order_items?.map((item, idx) => (
                   <div key={idx} className="flex gap-3 items-center">
@@ -204,7 +191,7 @@ export default function MyOrdersPage() {
                       {productEmoji(item.products?.name, item.products?.category)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+                      <div className={`text-sm font-extrabold ${textPrimary}`}>
                         {item.products?.name || 'สินค้า'}
                       </div>
 
@@ -224,11 +211,7 @@ export default function MyOrdersPage() {
                         </div>
                       )}
 
-                      <div
-                        className={`text-[10px] mt-0.5 ${
-                          isDark ? 'text-content-secondary' : 'text-ink-muted'
-                        }`}
-                      >
+                      <div className={`text-[10px] mt-0.5 ${textMuted}`}>
                         จำนวน {item.qty} × {formatBaht(item.unit_price_satang)} ฿
                       </div>
                     </div>
@@ -265,5 +248,109 @@ export default function MyOrdersPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/* การ์ด "พร้อมรับแล้ว" — ตั้งใจให้ดังกว่าทุกอย่างบนหน้าจอ
+   ขอบเรืองแสงเต้นช้า ๆ + รหัสรับของตัวเบ้อเริ่ม เพราะสองอย่างนี้คือสิ่งที่
+   ต้องเห็นตั้งแต่เหลือบตามอง และเป็นสิ่งเดียวที่ต้องใช้ตอนไปยืนหน้าเคาน์เตอร์ */
+function ReadyCard({ order, isDark, onPickedUp }) {
+  /* เครื่องที่เปิด "ลดการเคลื่อนไหว" ไว้ อาจไม่เล่นแอนิเมชันให้เลย
+     ถ้าเริ่มที่ opacity 0 แล้วรอแอนิเมชันพาขึ้นมา การ์ดจะอยู่จริงแต่มองไม่เห็น
+     ซึ่งแย่กว่าไม่มีแอนิเมชันเยอะ — ของสำคัญขนาดนี้ห้ามผูกการมองเห็นไว้กับแอนิเมชัน
+     ปิดโมชันไปเลยดีกว่า แล้วให้มันโผล่มาแบบนิ่ง ๆ แต่เห็นแน่นอน */
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0, y: -8, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={reduceMotion ? { duration: 0 } : { type: 'spring', damping: 24, stiffness: 300 }}
+      className={`relative rounded-3xl border-2 p-5 space-y-4 overflow-hidden ${
+        isDark ? 'bg-emerald-950/30 border-emerald-500/50' : 'bg-emerald-50 border-emerald-400'
+      }`}
+    >
+      {/* วงเรืองแสงจาง ๆ หลังการ์ด ทำให้สะดุดตาโดยไม่ต้องกะพริบจนรบกวนสายตา */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-16 -right-10 w-48 h-48 rounded-full bg-emerald-500/20 blur-2xl animate-pulse"
+      />
+
+      <div className="relative flex items-center gap-2">
+        <span className="w-7 h-7 rounded-full bg-emerald-700 text-white flex items-center justify-center shrink-0">
+          <Check size={16} strokeWidth={3.5} aria-hidden="true" />
+        </span>
+        <span className="text-sm font-black text-accent-emerald uppercase tracking-wide">
+          พร้อมรับแล้ว — เชิญที่เคาน์เตอร์
+        </span>
+      </div>
+
+      <div className="relative text-center py-2">
+        <span className="text-[10px] font-extrabold uppercase tracking-widest text-accent-emerald block">
+          ยื่นรหัสนี้ให้บาริสต้า
+        </span>
+        <span
+          className={`text-6xl font-black tracking-tight tabular-nums block mt-1 ${
+            isDark ? 'text-white' : 'text-sbac-navy'
+          }`}
+        >
+          #{order.pickup_code}
+        </span>
+        <span className={`text-[11px] font-bold ${isDark ? 'text-content-secondary' : 'text-ink-muted'}`}>
+          {order.order_items?.map((i) => `${i.products?.name || 'สินค้า'} × ${i.qty}`).join(' · ')}
+        </span>
+      </div>
+
+      <button
+        type="button"
+        onClick={onPickedUp}
+        className="relative w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3 rounded-2xl text-sm shadow-lg shadow-emerald-500/25 active:scale-95 transition-all"
+      >
+        รับเครื่องดื่มแล้ว
+      </button>
+    </motion.div>
+  );
+}
+
+/** แถบขั้นตอน 3 ขั้น — ขั้นที่ผ่านแล้วทึบ ขั้นปัจจุบันเต้น ขั้นที่ยังไม่ถึงจาง */
+function StatusSteps({ status, isDark }) {
+  const currentIndex = STEPS.findIndex((s) => s.key === status);
+
+  return (
+    <ol className="flex items-center gap-1" aria-label="ความคืบหน้าของออเดอร์">
+      {STEPS.map((step, idx) => {
+        const reached = idx <= currentIndex;
+        const isCurrent = idx === currentIndex;
+
+        return (
+          <li key={step.key} className="flex-1 space-y-1.5">
+            <div
+              className={`h-1.5 rounded-full transition-colors duration-500 ${
+                reached
+                  ? isCurrent
+                    ? 'bg-amber-500 animate-pulse'
+                    : 'bg-emerald-500'
+                  : isDark
+                  ? 'bg-white/10'
+                  : 'bg-slate-200'
+              }`}
+            />
+            <span
+              className={`text-[10px] font-extrabold block text-center ${
+                isCurrent
+                  ? 'text-accent-amber'
+                  : reached
+                  ? 'text-accent-emerald'
+                  : isDark
+                  ? 'text-content-muted'
+                  : 'text-ink-light'
+              }`}
+            >
+              {step.label}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
