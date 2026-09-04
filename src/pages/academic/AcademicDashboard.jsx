@@ -720,7 +720,7 @@ export default function AcademicDashboard() {
                 </div>
                 {currentSub && (
                   <div className="text-accent-rose font-extrabold">
-                    {describeDate(subDate)}นี้ สอนแทนโดย {currentSub.substitute_teacher || 'ไม่ระบุ'}
+                    {describeDate(subDate)} สอนแทนโดย {currentSub.substitute_teacher || 'ไม่ระบุ'}
                     {currentSub.substitute_room && ` · ย้ายไปห้อง ${currentSub.substitute_room}`}
                   </div>
                 )}
