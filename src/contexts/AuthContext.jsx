@@ -11,11 +11,33 @@ const AuthContext = createContext(null);
    - สิทธิ์การอ่านข้อมูลถูกกันด้วย RLS ฝั่ง DB (03_rls.sql) ไม่ใช่การเช็คในหน้าเว็บ */
 
 /** โหลดโปรไฟล์ของผู้ใช้ที่ล็อกอินอยู่
- *  RLS กรองให้เหลือเฉพาะแถวของตัวเองแล้ว จึงไม่ต้องใส่ where เอง */
+ *
+ *  ต้องใส่ where เองทุกคำสั่ง ห้ามพึ่ง RLS เป็นตัวกรอง — policy ใน 03_rls.sql
+ *  หลายข้อมีเงื่อนไข or ที่ทำให้บาง role เห็นมากกว่าแถวของตัวเอง:
+ *    users            -> or app_has_role('sysadmin')  = sysadmin เห็นทุกคน
+ *    user_roles       -> or app_has_role('sysadmin')  = sysadmin เห็น role ของทุกคน
+ *    student_profiles -> or teacher or academic       = ครู/วิชาการ เห็นนักเรียนทุกคน
+ *
+ *  ของเดิมไม่ใส่ where เลยเพราะเชื่อว่า RLS กรองให้แล้ว ผลคือ:
+ *    - sysadmin: maybeSingle() บน users เจอหลายแถว -> โยน PGRST116 -> ตกไปที่ catch
+ *      ของ login() แล้วขึ้นข้อความ "ไม่สามารถเชื่อมต่อระบบได้" ซึ่งชี้ผิดทางสนิท
+ *      = บัญชีแอดมินล็อกอินไม่ได้เลยแม้แต่ครั้งเดียว
+ *    - ครู/วิชาการ: student_profiles ก็เจอหลายแถวเหมือนกัน แต่บังเอิญรอดมาได้
+ *      เพราะอยู่ใน Promise.all ซึ่ง supabase คืน error เป็นค่า ไม่ throw
+ *      -> profileRes.data เป็น null เงียบ ๆ (ความบังเอิญ ไม่ใช่การออกแบบ)
+ *
+ *  ตัวกรองนี้ทำหน้าที่ "เลือกแถวที่ต้องการ" เท่านั้น ไม่ใช่ด่านความปลอดภัย
+ *  ด่านจริงยังเป็น RLS ฝั่ง DB เหมือนเดิม แก้ค่าใน devtools แล้วไม่ได้อะไรเพิ่ม */
 async function loadProfile() {
+  // getSession() อ่านจากเครื่อง ไม่ยิงเน็ต — เร็วกว่า getUser() และพอสำหรับใช้เป็นตัวกรอง
+  const { data: sessionData } = await supabase.auth.getSession();
+  const authUid = sessionData?.session?.user?.id;
+  if (!authUid) return null;
+
   const { data: userRow, error: userErr } = await supabase
     .from('users')
     .select('id, email, full_name')
+    .eq('auth_uid', authUid)
     .maybeSingle();
 
   if (userErr) throw userErr;
@@ -23,10 +45,11 @@ async function loadProfile() {
 
   // ดึงข้อมูลส่วนที่เหลือแบบขนาน ลดเวลารอ
   const [roleRes, profileRes, balanceRes] = await Promise.all([
-    supabase.from('user_roles').select('role'),
+    supabase.from('user_roles').select('role').eq('user_id', userRow.id),
     supabase
       .from('student_profiles')
       .select('student_code, class_rooms(level, room_no)')
+      .eq('user_id', userRow.id)
       .maybeSingle(),
     supabase.rpc('my_balance'),
   ]);
