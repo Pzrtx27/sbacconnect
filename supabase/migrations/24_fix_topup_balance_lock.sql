@@ -94,69 +94,18 @@ grant execute on function public.approve_topup_request(uuid, numeric, text) to a
 revoke all on function public.approve_topup_request(uuid, numeric, text) from anon;
 
 -- ============================================================
--- 2) topup_qr_instant — เติมเงินทันทีตอนแนบสลิป
---    คำเตือนเรื่อง "ไม่มีใครตรวจสลิป" ยังเหมือนเดิมทุกข้อ (ดูหัวไฟล์ 19_topup_qr_instant.sql)
---    ไฟล์นี้แก้เฉพาะเรื่องการล็อกแถวก่อนอ่านยอดเท่านั้น
+-- 2) topup_qr_instant — ถอดออกจากไฟล์นี้แล้ว (เดิมอยู่ตรงนี้ 64 บรรทัด)
+--
+-- เดิมบล็อกนี้ create or replace ตัว topup_qr_instant() แล้ว grant ให้ authenticated
+-- ซึ่งกลายเป็นกับดัก: ตัวนั้นเชื่อยอดที่ผู้ใช้พิมพ์ 100% และไม่มีด่านอะไรเลย
+-- 30_topup_instant_guarded.sql ถอนสิทธิ์มันไปแล้ว และ 36_drop_topup_qr_instant_v1.sql
+-- ลบทิ้งถาวร — แต่ถ้าใครเผลอรันไฟล์ 24 ซ้ำ (ทุกไฟล์ในโปรเจกต์เขียนว่า "รันซ้ำได้")
+-- ฟังก์ชันกับสิทธิ์จะกลับมาเงียบ ๆ ไม่มี error ไม่มี log = ช่องเสกเงินเปิดใหม่ทันที
+--
+-- จึงตัดออกให้ไฟล์นี้เหลือแค่หน้าที่จริงของมัน คือแก้การล็อกแถวก่อนอ่านยอด
+-- (ส่วนที่ 1 ด้านบน) ตัวที่ใช้งานจริงตอนนี้คือ topup_qr_instant_v2() ในไฟล์ 30
+-- ถ้าอยากดูว่าโค้ดตัวเก่าหน้าตาอย่างไร ยังอ่านได้ที่ 19_topup_qr_instant.sql
 -- ============================================================
-create or replace function public.topup_qr_instant(
-  p_amount_baht numeric,
-  p_slip_path   text,
-  p_slip_mime   text default null
-)
-returns jsonb
-language plpgsql security definer set search_path = public
-as $$
-declare
-  v_user     uuid := app_current_user_id();
-  v_balance  integer;
-  v_satang   integer;
-  v_request  uuid;
-  v_max_baht constant numeric := 20000;
-begin
-  if v_user is null then
-    return jsonb_build_object('ok', false, 'error', 'NOT_AUTHENTICATED');
-  end if;
-
-  if p_amount_baht is null or p_amount_baht <= 0 or p_amount_baht > v_max_baht then
-    return jsonb_build_object('ok', false, 'error', 'INVALID_AMOUNT');
-  end if;
-
-  -- กันอ้าง path ไฟล์ของคนอื่น: โฟลเดอร์แรกของ path ต้องเป็น users.id ของคนเรียกเท่านั้น
-  if p_slip_path is null or (storage.foldername(p_slip_path))[1] is distinct from v_user::text then
-    return jsonb_build_object('ok', false, 'error', 'INVALID_SLIP_PATH');
-  end if;
-
-  v_satang := round(p_amount_baht * 100)::integer;
-
-  -- ล็อกแถวตัวเองก่อนอ่านยอด (บรรทัดที่เพิ่มในไฟล์นี้)
-  -- เคสจริง: เปิดแอปสองแท็บแล้วกดยืนยันเติมเงินพร้อมกัน ทั้งสองอ่านยอดเดิมค่าเดียวกัน
-  perform 1 from public.users where id = v_user for update;
-
-  insert into public.topup_requests
-    (user_id, amount_baht, slip_path, slip_mime, status, reviewed_by, reviewed_at, note)
-  values
-    (v_user, p_amount_baht, p_slip_path, p_slip_mime, 'approved', v_user, now(),
-     'อนุมัติอัตโนมัติทันที — ไม่มีเจ้าหน้าที่ตรวจสอบสลิป')
-  returning id into v_request;
-
-  v_balance := app_balance(v_user);
-
-  insert into public.wallet_entries
-    (user_id, amount_satang, kind, ref_id, balance_after, idempotency_key, created_by)
-  values
-    (v_user, v_satang, 'topup_qr', v_request, v_balance + v_satang,
-     'topup-request:' || v_request, v_user);
-
-  return jsonb_build_object('ok', true, 'balance', v_balance + v_satang, 'request_id', v_request);
-end $$;
-
-comment on function public.topup_qr_instant(numeric, text, text) is
-  'เติมเงินทันทีตอนนักเรียนแนบสลิป ไม่มีเจ้าหน้าที่ตรวจสอบ — เชื่อยอดที่ผู้ใช้พิมพ์เอง 100% '
-  '(ความเสี่ยงที่ทีมงานรับทราบและเลือกใช้เอง อ่านคำเตือนเต็มในคอมเมนต์หัวไฟล์ 19_topup_qr_instant.sql) '
-  'ล็อกแถวผู้ใช้ก่อนอ่านยอดแล้วตั้งแต่ 24_fix_topup_balance_lock.sql';
-
-grant execute on function public.topup_qr_instant(numeric, text, text) to authenticated;
-revoke all on function public.topup_qr_instant(numeric, text, text) from anon;
 
 -- ============================================================
 -- ตรวจสอบ: หา wallet_entries ที่ balance_after ไม่ต่อเนื่องกัน (อาการของบั๊กเดิม)
