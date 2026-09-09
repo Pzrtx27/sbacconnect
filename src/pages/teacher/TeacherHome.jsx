@@ -16,6 +16,8 @@ import { supabase } from '../../config/supabase';
 import { useBehaviorCategories } from '../../hooks/useBehaviorCategories';
 import { useBehaviorLogs } from '../../hooks/useBehaviorLogs';
 import { useLeaveRequests } from '../../hooks/useLeaveRequests';
+import { useRealtimeTable } from '../../hooks/useRealtimeTable';
+import { fetchSubstitutionsForDate, todayISO, classLabel, PERIOD_TIMES } from '../../utils/timetable';
 import {
   Calendar,
   Coffee,
@@ -49,18 +51,32 @@ export default function TeacherHome() {
   const isDark = theme === 'dark';
   const navigate = useNavigate();
 
-  // Substitutions state
-  const [substitutions, setSubstitutions] = useState([
-    {
-      id: 'sub_1',
-      day: 'วันจันทร์',
-      period: '3',
-      class_id: 'm3_6',
-      subject: 'English for Project Work',
-      original_teacher: 'อ.มานี',
-      room: 'ห้อง 1503'
-    }
-  ]);
+  /* รายการสอนแทน "ของวันนี้" จากตาราง substitutions จริง (31_substitutions.sql)
+
+     ของเดิมตรงนี้เป็น mock ที่ hardcode ไว้ 1 แถว (อ.มานี / English for Project Work)
+     และไม่มีใครเรียก setSubstitutions เลยสักที่ กล่องแจ้งเตือนจึงขึ้นค้างตลอดเวลา
+     ไม่ว่าจะมีการสั่งสอนแทนจริงหรือไม่ ครูเลยเลิกสนใจกล่องนี้ไปโดยปริยาย
+
+     ตอนนี้ดึงเฉพาะแถวที่ sub_date = วันนี้ ถ้าไม่มีก็เป็น [] แล้วกล่องหายไปเอง
+     ใช้ todayISO() ซึ่งคิดตามเวลาไทยเสมอ ไม่ใช่ timezone ของเครื่อง */
+  const [substitutions, setSubstitutions] = useState([]);
+  const [subsLoaded, setSubsLoaded] = useState(false);
+
+  const loadSubstitutions = useCallback(async () => {
+    const rows = await fetchSubstitutionsForDate(todayISO());
+    setSubstitutions(rows);
+    setSubsLoaded(true);
+  }, []);
+
+  // ฝ่ายวิชาการสั่งสอนแทนกะทันหันตอนคาบกำลังจะเริ่ม ครูต้องเห็นโดยไม่ต้องรีเฟรช
+  useRealtimeTable({ table: 'substitutions', onChange: loadSubstitutions });
+
+  /* โหลดรอบแรกแบบไม่พึ่ง realtime — useRealtimeTable เรียก onChange ตอน SUBSCRIBED
+     ซึ่งถ้า websocket ต่อไม่ติด (เน็ตโรงเรียน/ชนเพดาน connection) จะต้องรอถึงรอบ poll
+     ครูอาจเปิดหน้ามาแล้วไม่เห็นรายการสอนแทนของตัวเองในช่วงนั้น */
+  useEffect(() => {
+    loadSubstitutions();
+  }, [loadSubstitutions]);
 
   // Modal control
   const [activeModal, setActiveModal] = useState(null);
@@ -262,7 +278,7 @@ export default function TeacherHome() {
         <div className="absolute top-0 right-0 w-36 h-36 bg-white/5 rounded-full -mr-10 -mt-10 pointer-events-none" />
         <div className="relative z-10 flex justify-between items-start gap-3">
           <div className="space-y-1 min-w-0">
-            <span className="text-[10px] bg-white/20 text-white font-extrabold px-3 py-1 rounded-full inline-block uppercase tracking-wider mb-2">
+            <span className="text-[11px] bg-white/20 text-white font-bold px-3 py-1 rounded-full inline-block mb-2">
               อาจารย์ผู้สอน (Faculty Panel)
             </span>
             <h2 className="text-2xl font-extrabold truncate">{user?.name}</h2>
@@ -277,7 +293,7 @@ export default function TeacherHome() {
             onClick={() => setActiveModal('balance')}
             className="shrink-0 p-3 rounded-2xl bg-white/15 hover:bg-white/20 border border-white/20 flex flex-col items-end active:scale-95 transition-all"
           >
-            <span className="text-[9px] font-bold uppercase tracking-wider text-white/70">Wallet</span>
+            <span className="text-[9px] font-bold text-white/70">Wallet</span>
             <span className="text-base font-extrabold text-white">
               {formatBaht(user?.balance_satang || 0)} <span className="text-xs font-semibold text-white/80">฿</span>
             </span>
@@ -285,12 +301,13 @@ export default function TeacherHome() {
         </div>
       </div>
 
-      {/* Substitution Notifications */}
-      {substitutions.length > 0 && (
+      {/* รายการสอนแทนของวันนี้ — ขึ้นเฉพาะตอนมีจริง
+          subsLoaded กันไม่ให้กล่องกะพริบขึ้นมาแวบหนึ่งตอนยังโหลดไม่เสร็จ */}
+      {subsLoaded && substitutions.length > 0 && (
         <div className="space-y-3">
-          <span className="text-xs font-extrabold text-sbac-red flex items-center gap-1">
+          <span className="text-xs font-bold text-sbac-red flex items-center gap-1">
             <AlertCircle size={16} />
-            รายการสอนแทนวันนี้ (Substitution Alerts)
+            รายการสอนแทนวันนี้ ({substitutions.length} คาบ)
           </span>
 
           {substitutions.map(sub => (
@@ -305,18 +322,27 @@ export default function TeacherHome() {
               <div className={`p-2.5 rounded-xl shrink-0 ${isDark ? 'bg-rose-900/40 text-accent-rose' : 'bg-rose-100 text-accent-rose'}`}>
                 <Clock size={20} />
               </div>
+              {/* ทุกค่ามาจากแถวจริงในตาราง substitutions
+                  ของเดิม hardcode "ระดับชั้น ปวช. 3/6" ไว้ ซึ่งผิดทันทีถ้าเป็นห้องอื่น */}
               <div className="flex-1 space-y-1 min-w-0">
-                <div className={`text-[10px] font-extrabold uppercase tracking-wider ${isDark ? 'text-accent-rose' : 'text-accent-rose'}`}>
-                  คาบที่ {sub.period} • {sub.day}
+                <div className="text-[11px] font-bold text-accent-rose">
+                  คาบที่ {sub.period}
+                  {PERIOD_TIMES[sub.period] && ` • ${PERIOD_TIMES[sub.period]} น.`}
                 </div>
                 <div className={`text-sm font-extrabold truncate ${textPrimary}`}>
-                  สอนแทน: {sub.subject}
+                  {sub.subject || 'ไม่ระบุวิชา'}
                 </div>
-                <p className={`text-[10px] font-semibold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
-                  ระดับชั้น ปวช. 3/6 • {sub.room}
+                <p className={`text-[11px] font-semibold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+                  {classLabel(sub.class_id)}
+                  {sub.substitute_room && ` • ย้ายไปห้อง ${sub.substitute_room}`}
                 </p>
-                <div className={`text-[9px] font-bold pt-1 ${isDark ? 'text-accent-rose' : 'text-accent-rose'}`}>
-                  * ครูประจำวิชาเดิม: {sub.original_teacher}
+                <div className="text-[11px] font-bold pt-1 text-accent-rose">
+                  สอนแทนโดย {sub.substitute_teacher || 'ยังไม่ระบุ'}
+                  {sub.original_teacher && (
+                    <span className={`font-semibold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+                      {' '}(แทน {sub.original_teacher})
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -335,7 +361,7 @@ export default function TeacherHome() {
               <div>
                 <UserCheck className="text-accent-emerald mb-2" size={24} />
                 <div className={`text-sm font-extrabold ${textPrimary}`}>เช็คเข้าแถว</div>
-                <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ลงเวลาเช็คชื่อเข้าแถวหน้าเสาธง</div>
+                <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ลงเวลาเช็คชื่อเข้าแถวหน้าเสาธง</div>
               </div>
               <div className="mt-2.5 flex items-center justify-between">
                 <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
@@ -356,7 +382,7 @@ export default function TeacherHome() {
               <div>
                 <ClipboardCheck className="text-brand mb-2" size={24} />
                 <div className={`text-sm font-extrabold ${textPrimary}`}>อนุมัติใบลาเรียน</div>
-                <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>พิจารณาใบลาป่วย/ลากิจของเด็ก</div>
+                <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>พิจารณาใบลาป่วย/ลากิจของเด็ก</div>
               </div>
               <div className="mt-2.5 flex items-center justify-between">
                 {pendingLeavesCount > 0 ? (
@@ -379,7 +405,7 @@ export default function TeacherHome() {
               <div>
                 <Award className="text-accent-amber mb-2" size={24} />
                 <div className={`text-sm font-extrabold ${textPrimary}`}>เช็คคะแนนพฤติกรรม</div>
-                <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>เช็คและตัด/เพิ่มคะแนนพฤติกรรม (พร้อมคอมเมนต์)</div>
+                <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>เช็คและตัด/เพิ่มคะแนนพฤติกรรม (พร้อมคอมเมนต์)</div>
               </div>
               <div className="mt-2.5 flex items-center justify-between">
                 <span className={`text-[9px] font-semibold text-accent-amber`}>
@@ -396,7 +422,7 @@ export default function TeacherHome() {
               <div>
                 <History className="text-brand mb-2" size={24} />
                 <div className={`text-sm font-extrabold ${textPrimary}`}>ประวัติที่ฉันบันทึก</div>
-                <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>แก้ไข / ลบรายการตัด-เพิ่มคะแนนย้อนหลัง</div>
+                <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>แก้ไข / ลบรายการตัด-เพิ่มคะแนนย้อนหลัง</div>
               </div>
               <div className="mt-2.5 flex items-center justify-between">
                 <span className={`text-[9px] font-semibold text-brand`}>
@@ -413,7 +439,7 @@ export default function TeacherHome() {
               <div>
                 <Calendar className="text-brand mb-2" size={24} />
                 <div className={`text-sm font-extrabold ${textPrimary}`}>ตารางสอนของฉัน</div>
-                <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ดูตารางคาบสอนรายวัน</div>
+                <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ดูตารางคาบสอนรายวัน</div>
               </div>
               <div className="mt-2.5 flex items-center justify-between">
                 <span className={`text-[9px] text-brand font-semibold`}>
@@ -433,7 +459,7 @@ export default function TeacherHome() {
                 </div>
                 <div>
                   <div className={`text-sm font-extrabold ${textPrimary}`}>สั่งเครื่องดื่มแผนกบาริสต้า (Barista Shop)</div>
-                  <div className={`text-[10px] ${textMuted}`}>สั่งชากาแฟออนไลน์ ส่งตรงถึงห้องเรียนและห้องพักครู</div>
+                  <div className={`text-[11px] ${textMuted}`}>สั่งชากาแฟออนไลน์ ส่งตรงถึงห้องเรียนและห้องพักครู</div>
                 </div>
               </div>
               <ChevronRight size={16} className={textMuted} />
@@ -447,7 +473,7 @@ export default function TeacherHome() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <TrendingUp size={16} className="text-accent-emerald" />
-            <span className={`text-xs font-extrabold uppercase tracking-wider ${textPrimary}`}>
+            <span className={`text-xs font-bold ${textPrimary}`}>
               รายงานสถานะห้องเรียน ปวช. 3/6 วันนี้
             </span>
           </div>
@@ -459,7 +485,7 @@ export default function TeacherHome() {
           </span>
         </div>
 
-        <p className="text-[10px] font-semibold leading-relaxed text-content-muted">
+        <p className="text-[11px] font-semibold leading-relaxed text-content-muted">
           รายชื่อชุดนี้เป็นข้อมูลสมมติสำหรับสาธิตหน้าจอ และผลการเช็คชื่อบันทึกไว้ในเครื่องนี้เท่านั้น
           ยังไม่ได้เชื่อมกับรายชื่อนักเรียนจริงในฐานข้อมูล
         </p>
@@ -506,7 +532,7 @@ export default function TeacherHome() {
                 }`}
               >
                 <div className="flex justify-between items-center">
-                  <span className={`text-xs font-extrabold ${textPrimary}`}>{student.name}</span>
+                  <span className={`text-xs font-bold ${textPrimary}`}>{student.name}</span>
                   <span className={`text-[9px] font-semibold ${textMuted}`}>รหัส {student.id} • {student.branch}</span>
                 </div>
 
@@ -587,11 +613,11 @@ export default function TeacherHome() {
             </div>
 
             {searchingStudents && (
-              <p className={`text-[10px] font-semibold mt-1.5 ${textMuted}`}>กำลังค้นหา...</p>
+              <p className={`text-[11px] font-semibold mt-1.5 ${textMuted}`}>กำลังค้นหา...</p>
             )}
 
             {!selectedStudent && !searchingStudents && studentQuery.trim().length >= 2 && studentResults.length === 0 && (
-              <p className={`text-[10px] font-semibold mt-1.5 ${textMuted}`}>ไม่พบนักเรียนที่ตรงกับ "{studentQuery.trim()}"</p>
+              <p className={`text-[11px] font-semibold mt-1.5 ${textMuted}`}>ไม่พบนักเรียนที่ตรงกับ "{studentQuery.trim()}"</p>
             )}
 
             {!selectedStudent && studentResults.length > 0 && (
@@ -603,7 +629,7 @@ export default function TeacherHome() {
                     onClick={() => handlePickStudent(s)}
                     className={`w-full text-left px-3 py-2.5 transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`}
                   >
-                    <div className={`text-xs font-extrabold ${textPrimary}`}>{s.full_name}</div>
+                    <div className={`text-xs font-bold ${textPrimary}`}>{s.full_name}</div>
                     <div className={`text-[9px] font-semibold mt-0.5 ${textMuted}`}>
                       รหัส {s.student_code || '—'} • {s.class_label || 'ไม่มีข้อมูลห้อง'} • ปัจจุบัน {s.score} แต้ม
                     </div>
@@ -615,7 +641,7 @@ export default function TeacherHome() {
             {selectedStudent && (
               <div className={`mt-2 flex items-center justify-between gap-2 p-3 rounded-xl border ${isDark ? 'bg-white/[0.02] border-white/10' : 'bg-slate-50 border-slate-100'}`}>
                 <div className="min-w-0">
-                  <div className={`text-xs font-extrabold truncate ${textPrimary}`}>{selectedStudent.full_name}</div>
+                  <div className={`text-xs font-bold truncate ${textPrimary}`}>{selectedStudent.full_name}</div>
                   <div className={`text-[9px] font-semibold mt-0.5 ${textMuted}`}>
                     รหัส {selectedStudent.student_code || '—'} • {selectedStudent.class_label || 'ไม่มีข้อมูลห้อง'} • ปัจจุบัน {selectedStudent.score} แต้ม
                   </div>
@@ -623,7 +649,7 @@ export default function TeacherHome() {
                 <button
                   type="button"
                   onClick={handleChangeStudent}
-                  className="shrink-0 text-[10px] font-extrabold text-brand px-2 py-1"
+                  className="shrink-0 text-[11px] font-bold text-brand px-2 py-1"
                 >
                   เปลี่ยน
                 </button>
@@ -669,7 +695,7 @@ export default function TeacherHome() {
                     key={cat.id}
                     type="button"
                     onClick={() => handlePickCategory(cat)}
-                    className={`p-2.5 rounded-xl border text-[10px] font-bold text-left transition-all ${
+                    className={`p-2.5 rounded-xl border text-[11px] font-bold text-left transition-all ${
                       selectedCategoryId === cat.id
                         ? 'border-sbac-blue bg-sbac-blue-50/20 text-brand'
                         : isDark
@@ -738,7 +764,7 @@ export default function TeacherHome() {
             <span className={`text-5xl font-extrabold block ${textPrimary}`}>
               {formatBaht(user?.balance_satang || 0)}
             </span>
-            <span className={`text-xs font-extrabold mt-2 block ${textMuted}`}>THB</span>
+            <span className={`text-xs font-bold mt-2 block ${textMuted}`}>THB</span>
           </div>
 
           <button
@@ -753,8 +779,8 @@ export default function TeacherHome() {
           <div className={`rounded-2xl border p-4 ${
             isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
           }`}>
-            <span className={`text-xs font-extrabold block ${textPrimary}`}>เติมเงินอย่างไร</span>
-            <p className={`text-[11px] font-semibold leading-relaxed mt-1 ${textMuted}`}>
+            <span className={`text-xs font-bold block ${textPrimary}`}>เติมเงินอย่างไร</span>
+            <p className={`text-[12px] font-semibold leading-relaxed mt-1 ${textMuted}`}>
               โอนผ่าน QR พร้อมเพย์แล้วแนบสลิปด้านบน หรือเติมเงินสดได้ที่จุดบริการการเงิน
               อาคาร 1 ชั้น 1 — เจ้าหน้าที่จะแตะบัตรแล้วเติมให้ในระบบ ยอดขึ้นในแอปทันที
             </p>

@@ -13,6 +13,14 @@ import { Camera, UploadCloud, X, Loader2, CheckCircle2, AlertTriangle, RefreshCw
 const STORAGE_BUCKET = 'topup-slips';
 const MAX_TOPUP_BAHT = 20000; // เพดานกันพิมพ์ผิด/ทดสอบ ไม่ใช่ข้อจำกัดทางธุรกิจตายตัว
 
+/* เพดานต่อวัน — ต้องตรงกับ topup_daily_limit_satang() ใน 30_topup_instant_guarded.sql
+   ค่านี้ใช้ "แสดงผลล่วงหน้า" อย่างเดียว ตัวบังคับจริงอยู่ฝั่ง DB เสมอ
+   ถ้าสองค่าไม่ตรงกัน ฝั่ง DB ชนะ แล้ว error DAILY_LIMIT จะบอกตัวเลขจริงกลับมาเอง
+
+   ที่ต้องมีฝั่งหน้าเว็บด้วย เพราะถ้าไม่บอกก่อน ผู้ใช้จะโอนเงินจริงออกไปแล้ว
+   ค่อยมารู้ตอนกดส่งว่าเกินเพดาน = เงินออกจากบัญชีไปแล้วแต่ไม่ได้ยอด */
+const TOPUP_DAILY_LIMIT_BAHT = 2000;
+
 /* ฟอร์มเติมเงินด้วย QR พร้อมเพย์ + แนบสลิป (30_topup_instant_guarded.sql)
 
    ขั้นตอน: กรอกจำนวนเงิน -> สแกน QR ด้วยแอปธนาคารแล้วโอนจริง -> ถ่าย/เลือกรูปสลิป
@@ -42,6 +50,7 @@ export default function TopUpSlipForm() {
 
   const [recentRequests, setRecentRequests] = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(true);
+  const [dailyUsedBaht, setDailyUsedBaht] = useState(0);
 
   const fileInputRef = useRef(null);
 
@@ -53,7 +62,15 @@ export default function TopUpSlipForm() {
     : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue';
 
   const amountValue = Number(amountBaht);
-  const isAmountValid = amountBaht !== '' && amountValue > 0 && amountValue <= MAX_TOPUP_BAHT;
+  const remainingBaht = Math.max(0, TOPUP_DAILY_LIMIT_BAHT - dailyUsedBaht);
+  const exceedsDailyLimit = amountBaht !== '' && amountValue > remainingBaht;
+
+  /* exceedsDailyLimit อยู่ใน isAmountValid ด้วย ไม่ใช่แค่เตือนเฉย ๆ
+     เพราะ isAmountValid เป็นตัวคุมว่าจะสร้าง QR พร้อมเพย์ให้สแกนหรือไม่
+     ถ้าปล่อยให้สร้าง QR ของยอดที่เกินเพดาน ผู้ใช้จะโอนเงินจริงออกไปก่อน
+     แล้วค่อยโดนปฏิเสธตอนกดส่ง ซึ่งคือจุดที่เงินหายโดยไม่ได้ยอด */
+  const isAmountValid =
+    amountBaht !== '' && amountValue > 0 && amountValue <= MAX_TOPUP_BAHT && !exceedsDailyLimit;
 
   const qrPayload = isPromptPayConfigured
     ? buildPromptPayPayload(PROMPTPAY_ID, isAmountValid ? amountValue : undefined)
@@ -61,12 +78,32 @@ export default function TopUpSlipForm() {
 
   const loadRecentRequests = useCallback(async () => {
     setLoadingRequests(true);
-    const { data, error } = await supabase
-      .from('topup_requests')
-      .select('id, amount_baht, status, created_at, note')
-      .order('created_at', { ascending: false })
-      .limit(5);
-    if (!error) setRecentRequests(data || []);
+
+    /* นับยอดที่เติมสำเร็จไปแล้ว "วันนี้" เพื่อบอกโควตาคงเหลือก่อนผู้ใช้โอนเงิน
+       ต้องนับจากเที่ยงคืนตามเวลาเครื่อง ให้ตรงกับ date_trunc('day', now()) ฝั่ง DB
+       RLS ของ topup_requests กรองให้เหลือเฉพาะของตัวเองอยู่แล้ว */
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const [listRes, todayRes] = await Promise.all([
+      supabase
+        .from('topup_requests')
+        .select('id, amount_baht, status, created_at, note')
+        .order('created_at', { ascending: false })
+        .limit(5),
+      supabase
+        .from('topup_requests')
+        .select('amount_baht')
+        .eq('status', 'approved')
+        .gte('created_at', startOfDay.toISOString()),
+    ]);
+
+    if (!listRes.error) setRecentRequests(listRes.data || []);
+    if (!todayRes.error) {
+      setDailyUsedBaht(
+        (todayRes.data || []).reduce((sum, r) => sum + Number(r.amount_baht || 0), 0)
+      );
+    }
     setLoadingRequests(false);
   }, []);
 
@@ -185,9 +222,25 @@ export default function TopUpSlipForm() {
     <div className="space-y-5">
       {/* ขั้นที่ 1: จำนวนเงิน */}
       <div>
-        <label htmlFor="topup-amount" className={`text-xs font-extrabold block mb-1.5 ${textPrimary}`}>
-          จำนวนเงินที่โอน (บาท)
-        </label>
+        {/* โควตาคงเหลือต้องอยู่ "ก่อน" ช่องกรอก ไม่ใช่ในข้อความท้ายฟอร์ม
+            เพราะลำดับที่ผู้ใช้ทำจริงคือ กรอกยอด -> สแกน QR -> โอนเงินจริง -> แนบสลิป
+            ถ้ารู้เพดานหลังโอน ก็สายไปแล้ว */}
+        <div className="flex items-baseline justify-between gap-2 mb-1.5">
+          <label htmlFor="topup-amount" className={`text-xs font-bold ${textPrimary}`}>
+            จำนวนเงินที่โอน (บาท)
+          </label>
+          {!loadingRequests && (
+            <span
+              className={`text-[11px] font-bold tabular-nums ${
+                remainingBaht === 0 ? 'text-accent-rose' : textMuted
+              }`}
+            >
+              {remainingBaht === 0
+                ? 'วันนี้เต็มโควตาแล้ว'
+                : `วันนี้เหลือ ${remainingBaht.toLocaleString('th-TH')} บาท`}
+            </span>
+          )}
+        </div>
         <input
           id="topup-amount"
           type="number"
@@ -200,10 +253,22 @@ export default function TopUpSlipForm() {
           onChange={(e) => setAmountBaht(e.target.value)}
           className={`w-full px-4 py-3 rounded-2xl border text-lg font-extrabold outline-none transition-colors ${inputClass}`}
         />
-        {amountBaht !== '' && !isAmountValid && (
-          <p className="text-[11px] font-semibold text-accent-rose mt-1">
-            กรอกจำนวนเงินมากกว่า 0 และไม่เกิน {MAX_TOPUP_BAHT.toLocaleString('th-TH')} บาท
+        {/* แยกสองสาเหตุออกจากกัน ของเดิมขึ้นข้อความ "ไม่เกิน 20,000" ทั้งที่ปัญหาจริง
+            คือชนเพดานต่อวัน 2,000 ซึ่งคนละเรื่องกันและแก้คนละวิธี */}
+        {exceedsDailyLimit ? (
+          <p className="text-[12px] font-semibold text-accent-rose mt-1 leading-relaxed">
+            {remainingBaht === 0 ? (
+              <>วันนี้เติมครบ {TOPUP_DAILY_LIMIT_BAHT.toLocaleString('th-TH')} บาทแล้ว เติมเพิ่มได้พรุ่งนี้ — ยังไม่ต้องโอนเงิน</>
+            ) : (
+              <>เกินโควตาที่เหลือวันนี้ ({remainingBaht.toLocaleString('th-TH')} บาท) ลดยอดลงก่อนโอน</>
+            )}
           </p>
+        ) : (
+          amountBaht !== '' && !isAmountValid && (
+            <p className="text-[12px] font-semibold text-accent-rose mt-1">
+              กรอกจำนวนเงินมากกว่า 0 และไม่เกิน {MAX_TOPUP_BAHT.toLocaleString('th-TH')} บาท
+            </p>
+          )
         )}
       </div>
 
@@ -214,19 +279,19 @@ export default function TopUpSlipForm() {
             <div className="bg-white p-3 rounded-xl inline-block">
               <QRCodeSVG value={qrPayload} size={176} level="M" marginSize={0} />
             </div>
-            <p className={`text-xs font-extrabold mt-3 ${textPrimary}`}>สแกนด้วยแอปธนาคารเพื่อโอนเงิน</p>
+            <p className={`text-xs font-bold mt-3 ${textPrimary}`}>สแกนด้วยแอปธนาคารเพื่อโอนเงิน</p>
             {PROMPTPAY_ACCOUNT_NAME && (
-              <p className={`text-[11px] font-semibold mt-0.5 ${textMuted}`}>บัญชี: {PROMPTPAY_ACCOUNT_NAME}</p>
+              <p className={`text-[12px] font-semibold mt-0.5 ${textMuted}`}>บัญชี: {PROMPTPAY_ACCOUNT_NAME}</p>
             )}
             {!isAmountValid && (
-              <p className={`text-[10px] mt-1 ${textMuted}`}>กรอกจำนวนเงินด้านบนก่อน คิวอาร์จะฝังยอดให้อัตโนมัติ</p>
+              <p className={`text-[11px] mt-1 ${textMuted}`}>กรอกจำนวนเงินด้านบนก่อน คิวอาร์จะฝังยอดให้อัตโนมัติ</p>
             )}
           </>
         ) : (
           <div className="flex flex-col items-center gap-2 py-2">
             <AlertTriangle className="text-accent-amber" size={28} aria-hidden="true" />
             <p className={`text-xs font-bold ${textPrimary}`}>ยังไม่ได้ตั้งค่าบัญชีพร้อมเพย์</p>
-            <p className={`text-[11px] leading-relaxed ${textMuted}`}>
+            <p className={`text-[12px] leading-relaxed ${textMuted}`}>
               ผู้ดูแลระบบต้องตั้งค่า VITE_PROMPTPAY_ID ใน .env ก่อน (ดู .env.example)
             </p>
           </div>
@@ -235,7 +300,7 @@ export default function TopUpSlipForm() {
 
       {/* ขั้นที่ 3: แนบรูปสลิป */}
       <div>
-        <span className={`text-xs font-extrabold block mb-1.5 ${textPrimary}`}>แนบรูปสลิปโอนเงิน</span>
+        <span className={`text-xs font-bold block mb-1.5 ${textPrimary}`}>แนบรูปสลิปโอนเงิน</span>
 
         <input
           ref={fileInputRef}
@@ -278,14 +343,14 @@ export default function TopUpSlipForm() {
             <span className={`text-xs font-bold ${textPrimary}`}>
               {checkingFile ? 'กำลังตรวจสอบไฟล์...' : 'แตะเพื่อถ่ายรูปหรือเลือกจากคลังภาพ'}
             </span>
-            <span className={`text-[10px] ${textMuted}`}>
+            <span className={`text-[11px] ${textMuted}`}>
               JPG หรือ PNG เท่านั้น • ไม่เกิน {(MAX_SLIP_BYTES / 1024 / 1024).toFixed(0)}MB
             </span>
           </button>
         )}
 
         {fileError && (
-          <p className="text-[11px] font-semibold text-accent-rose mt-1.5">{fileError}</p>
+          <p className="text-[12px] font-semibold text-accent-rose mt-1.5">{fileError}</p>
         )}
       </div>
 
@@ -306,15 +371,15 @@ export default function TopUpSlipForm() {
       </button>
       {/* บอกกติกาที่ผู้ใช้จะชนจริง ก่อนที่เขาจะชน
           ไม่งั้นแนบสลิปใบเดิมซ้ำแล้วโดนปฏิเสธ จะงงว่าทำไม */}
-      <p className={`text-[10px] text-center leading-relaxed ${textMuted}`}>
+      <p className={`text-[11px] text-center leading-relaxed ${textMuted}`}>
         ยอดเข้าบัตรทันทีหลังแนบสลิป — สลิปหนึ่งใบใช้ได้ครั้งเดียว
-        และรวมทั้งวันไม่เกินเพดานที่กำหนด
+        และรวมทั้งวันไม่เกิน {TOPUP_DAILY_LIMIT_BAHT.toLocaleString('th-TH')} บาท
       </p>
 
       {/* คำขอล่าสุดของฉัน */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <span className={`text-xs font-extrabold ${textPrimary}`}>คำขอเติมเงินล่าสุด</span>
+          <span className={`text-xs font-bold ${textPrimary}`}>คำขอเติมเงินล่าสุด</span>
           <button
             type="button"
             onClick={loadRecentRequests}
@@ -332,7 +397,7 @@ export default function TopUpSlipForm() {
             ))}
           </div>
         ) : recentRequests.length === 0 ? (
-          <p className={`text-[11px] font-semibold ${textMuted}`}>ยังไม่เคยส่งคำขอเติมเงิน</p>
+          <p className={`text-[12px] font-semibold ${textMuted}`}>ยังไม่เคยส่งคำขอเติมเงิน</p>
         ) : (
           <ul className="space-y-2">
             {recentRequests.map((req) => (
@@ -344,18 +409,18 @@ export default function TopUpSlipForm() {
                   <span className={`text-sm font-extrabold block ${textPrimary}`}>
                     {Number(req.amount_baht).toLocaleString('th-TH', { minimumFractionDigits: 2 })} ฿
                   </span>
-                  <span className={`text-[10px] ${textMuted}`}>
+                  <span className={`text-[11px] ${textMuted}`}>
                     {new Date(req.created_at).toLocaleString('th-TH', {
                       dateStyle: 'medium',
                       timeStyle: 'short',
                     })}
                   </span>
                   {req.status === 'rejected' && req.note && (
-                    <span className="text-[10px] font-semibold text-accent-rose block mt-0.5">{req.note}</span>
+                    <span className="text-[11px] font-semibold text-accent-rose block mt-0.5">{req.note}</span>
                   )}
                 </div>
                 <span
-                  className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full border shrink-0 flex items-center gap-1 ${
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-full border shrink-0 flex items-center gap-1 ${
                     TOPUP_STATUS_COLOR[req.status] || TOPUP_STATUS_COLOR.pending
                   }`}
                 >

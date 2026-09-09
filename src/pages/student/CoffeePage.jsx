@@ -323,7 +323,7 @@ export default function CoffeePage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/orders/history')}
-            className={`flex items-center gap-1 text-xs font-extrabold px-3 py-1.5 rounded-xl border active:scale-95 transition-all ${
+            className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl border active:scale-95 transition-all ${
               isDark
                 ? 'bg-amber-500/20 text-accent-amber border-amber-500/30 hover:bg-amber-500/30'
                 : 'bg-amber-500/10 text-accent-amber border-amber-500/20 hover:bg-amber-500/20'
@@ -384,7 +384,7 @@ export default function CoffeePage() {
                     <h4 className={`text-sm font-extrabold ${textPrimary}`}>{item.name}</h4>
 
                     {item.option_groups.length > 0 && (
-                      <p className={`text-[10px] ${textMuted}`}>
+                      <p className={`text-[11px] ${textMuted}`}>
                         เลือก{item.option_groups.map((g) => g.name).slice(0, 2).join(' / ')}ได้
                       </p>
                     )}
@@ -431,7 +431,7 @@ export default function CoffeePage() {
           editing && (
             <div className="space-y-2">
               {editingWouldExceed && (
-                <p className="text-[11px] font-bold text-accent-rose text-center">
+                <p className="text-[12px] font-bold text-accent-rose text-center">
                   ใส่แก้วนี้แล้วยอดจะเกินเงินในบัตร
                 </p>
               )}
@@ -460,12 +460,18 @@ export default function CoffeePage() {
               const selected = editing.selection[group.id] || [];
               const required = group.min_select > 0;
 
+              /* ท็อปปิ้งถูกปลดเพดานแล้ว (37_cup_sizes_and_free_toppings.sql ตั้ง max_select = 99
+                 เพราะสคีมาไม่มีค่าพิเศษสำหรับ "ไม่จำกัด") ห้ามเอาเลข 99 ไปโชว์ให้ผู้ใช้เห็น
+                 เทียบกับจำนวนตัวเลือกจริงแทน — ถ้าเลือกได้ครบทุกอย่างอยู่แล้ว
+                 เพดานนั้นก็ไม่มีความหมายกับคนสั่ง เขียนว่าเลือกกี่อย่างก็ได้ตรง ๆ */
+              const unlimited = group.max_select >= group.options.length;
+
               return (
                 <fieldset key={group.id} className="space-y-2">
                   <legend className="flex items-center gap-2 mb-2">
                     <span className={`text-sm font-extrabold ${textPrimary}`}>{group.name}</span>
                     <span
-                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
                         required
                           ? 'bg-rose-500/10 text-accent-rose'
                           : isDark
@@ -475,6 +481,8 @@ export default function CoffeePage() {
                     >
                       {required
                         ? `บังคับเลือก ${group.min_select}`
+                        : unlimited
+                        ? 'เลือกกี่อย่างก็ได้'
                         : `ไม่บังคับ สูงสุด ${group.max_select}`}
                     </span>
                   </legend>
@@ -631,16 +639,16 @@ export default function CoffeePage() {
                         {line.product.name}
                       </span>
                       {line.chosen.length > 0 && (
-                        <span className={`text-[10px] font-semibold block mt-0.5 ${textMuted}`}>
+                        <span className={`text-[11px] font-semibold block mt-0.5 ${textMuted}`}>
                           {optionSummary(line.chosen)}
                         </span>
                       )}
                       {line.note && (
-                        <span className="text-[10px] font-semibold block mt-0.5 text-accent-amber">
+                        <span className="text-[11px] font-semibold block mt-0.5 text-accent-amber">
                           หมายเหตุ: {line.note}
                         </span>
                       )}
-                      <span className="text-[10px] font-bold text-brand block mt-1">
+                      <span className="text-[11px] font-bold text-brand block mt-1">
                         แตะเพื่อแก้ไขตัวเลือก
                       </span>
                     </button>
@@ -668,7 +676,7 @@ export default function CoffeePage() {
                       >
                         <Minus size={14} aria-hidden="true" />
                       </button>
-                      <span className={`text-sm font-black tabular-nums ${textPrimary}`}>{line.qty}</span>
+                      <span className={`text-sm font-extrabold tabular-nums ${textPrimary}`}>{line.qty}</span>
                       <button
                         type="button"
                         onClick={() => changeLineQty(index, 1)}
@@ -734,7 +742,7 @@ export default function CoffeePage() {
                 </div>
 
                 {cannotAfford && (
-                  <p className="text-[11px] font-bold text-accent-rose pt-1 leading-relaxed">
+                  <p className="text-[12px] font-bold text-accent-rose pt-1 leading-relaxed">
                     ยอดเงินในบัตรไม่พอ ขาดอีก {formatBaht(shortfall)} บาท
                     <span className={`block font-semibold ${textMuted}`}>
                       เอาบางรายการออก หรือเติมเงินที่จุดบริการการเงินก่อน
@@ -756,7 +764,7 @@ export default function CoffeePage() {
                 สั่งเพิ่ม
               </button>
 
-              <p className={`text-[10px] leading-relaxed ${textMuted}`}>
+              <p className={`text-[11px] leading-relaxed ${textMuted}`}>
                 ระบบคำนวณราคาจากฝั่งเซิร์ฟเวอร์ และมีระบบกันตัดเงินซ้ำ
                 หากกดค้างหรือเน็ตสะดุด จะไม่ถูกหักเงินสองรอบ
               </p>
@@ -793,11 +801,11 @@ export default function CoffeePage() {
             {/* รหัสรับของตัวใหญ่สุดในกล่อง เพราะเป็นสิ่งเดียวที่ต้องใช้จริงที่หน้าร้าน */}
             {orderResult.pickupCode && (
               <div className={`rounded-2xl border p-4 text-center ${panel}`}>
-                <span className={`text-[10px] font-extrabold block ${textMuted}`}>รหัสรับของ</span>
+                <span className={`text-[11px] font-bold block ${textMuted}`}>รหัสรับของ</span>
                 <span className={`text-4xl font-extrabold tracking-[0.2em] block mt-1 ${textPrimary}`}>
                   {orderResult.pickupCode}
                 </span>
-                <span className={`text-[10px] font-semibold block mt-1.5 ${textMuted}`}>
+                <span className={`text-[11px] font-semibold block mt-1.5 ${textMuted}`}>
                   แจ้งรหัสนี้ที่เคาน์เตอร์เพื่อรับเครื่องดื่ม
                 </span>
               </div>
