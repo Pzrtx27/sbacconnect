@@ -75,12 +75,12 @@ export default function UpcomingEvents({ limit = 3 }) {
               />
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-start justify-between gap-2">
-                  <span className={`text-xs font-extrabold leading-snug ${textPrimary}`}>{evt.title}</span>
-                  <span className="text-[10px] font-extrabold text-brand shrink-0 whitespace-nowrap">
+                  <span className={`text-xs font-bold leading-snug ${textPrimary}`}>{evt.title}</span>
+                  <span className="text-[11px] font-bold text-brand shrink-0 whitespace-nowrap">
                     {relativeDayText(evt.start)}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap text-[10px] font-semibold text-content-muted">
+                <div className="flex items-center gap-2 flex-wrap text-[11px] font-semibold text-content-muted">
                   <span
                     className={`px-1.5 py-0.5 rounded font-bold ${isDark ? 'bg-white/10' : 'bg-surface-card'}`}
                   >

@@ -84,7 +84,7 @@ export default function LeaveRequestList({ requests, loading, mode = 'student', 
             <div className="flex justify-between items-start gap-2">
               <div className="min-w-0">
                 {mode !== 'student' && (
-                  <span className={`text-xs font-extrabold block truncate ${textPrimary}`}>
+                  <span className={`text-xs font-bold block truncate ${textPrimary}`}>
                     {req.student_name} {req.student_code ? `(รหัส ${req.student_code})` : ''}
                   </span>
                 )}
@@ -150,7 +150,7 @@ export default function LeaveRequestList({ requests, loading, mode = 'student', 
                       type="button"
                       onClick={() => handleRejectConfirm(req)}
                       disabled={isBusy}
-                      className="flex-1 py-2 rounded-lg text-xs font-extrabold bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white"
+                      className="flex-1 py-2 rounded-lg text-xs font-bold bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white"
                     >
                       {isBusy ? 'กำลังส่ง...' : 'ยืนยันไม่อนุมัติ'}
                     </button>

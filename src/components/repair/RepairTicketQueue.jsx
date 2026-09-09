@@ -73,7 +73,7 @@ export default function RepairTicketQueue() {
           <Wrench size={18} className="text-brand" aria-hidden="true" />
           คิวแจ้งซ่อม
           {openCount > 0 && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/15 text-accent-amber border border-amber-500/25">
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-accent-amber border border-amber-500/25">
               รอรับเรื่อง {openCount}
             </span>
           )}
@@ -96,7 +96,7 @@ export default function RepairTicketQueue() {
             type="button"
             onClick={() => setFilter(f.value)}
             aria-pressed={filter === f.value}
-            className={`px-3 py-1.5 rounded-full text-[11px] font-bold border transition-colors ${
+            className={`px-3 py-1.5 rounded-full text-[12px] font-bold border transition-colors ${
               filter === f.value
                 ? 'bg-sbac-blue text-white border-sbac-blue'
                 : isDark
@@ -121,14 +121,14 @@ export default function RepairTicketQueue() {
             isDark ? 'bg-rose-950/30 border-rose-900/40' : 'bg-rose-50 border-rose-200'
           }`}
         >
-          <p className="text-xs font-extrabold text-accent-rose">โหลดคิวแจ้งซ่อมไม่สำเร็จ</p>
-          <p className="text-[11px] font-semibold text-content-secondary">
+          <p className="text-xs font-bold text-accent-rose">โหลดคิวแจ้งซ่อมไม่สำเร็จ</p>
+          <p className="text-[12px] font-semibold text-content-secondary">
             ถ้าเพิ่งติดตั้งระบบ ตรวจว่ารัน 23_repair_tickets.sql บน Supabase แล้วหรือยัง
           </p>
           <button
             type="button"
             onClick={reload}
-            className="px-4 py-2 rounded-xl text-[11px] font-extrabold bg-sbac-blue hover:bg-sbac-navy text-white transition-colors"
+            className="px-4 py-2 rounded-xl text-[12px] font-bold bg-sbac-blue hover:bg-sbac-navy text-white transition-colors"
           >
             ลองใหม่
           </button>
@@ -148,13 +148,13 @@ export default function RepairTicketQueue() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className={`text-xs font-extrabold ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+                  <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
                     {t.ticket_no} · {t.room_label}
                   </p>
-                  <p className="text-[11px] font-semibold text-content-secondary mt-0.5">
+                  <p className="text-[12px] font-semibold text-content-secondary mt-0.5">
                     {t.equipment} — {t.problem}
                   </p>
-                  <p className="text-[10px] font-semibold text-content-muted mt-1">
+                  <p className="text-[11px] font-semibold text-content-muted mt-1">
                     แจ้งโดย {t.reporter_name}
                     {t.reporter_code ? ` (${t.reporter_code})` : ''} ·{' '}
                     {new Date(t.created_at).toLocaleString('th-TH', {
@@ -167,7 +167,7 @@ export default function RepairTicketQueue() {
                 </div>
 
                 <span
-                  className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${
+                  className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
                     STATUS_TONE[t.status] || STATUS_TONE.open
                   }`}
                 >
@@ -182,7 +182,7 @@ export default function RepairTicketQueue() {
                       type="button"
                       onClick={() => changeStatus(t, 'in_progress', 'รับเรื่อง')}
                       disabled={busyId === t.id}
-                      className="flex-1 py-2 rounded-xl text-[11px] font-extrabold bg-sbac-blue hover:bg-sbac-navy text-white transition-colors disabled:opacity-50"
+                      className="flex-1 py-2 rounded-xl text-[12px] font-bold bg-sbac-blue hover:bg-sbac-navy text-white transition-colors disabled:opacity-50"
                     >
                       รับเรื่อง
                     </button>
@@ -191,7 +191,7 @@ export default function RepairTicketQueue() {
                     type="button"
                     onClick={() => changeStatus(t, 'done', 'ปิดงาน')}
                     disabled={busyId === t.id}
-                    className={`flex-1 py-2 rounded-xl text-[11px] font-extrabold border-2 transition-colors disabled:opacity-50 ${
+                    className={`flex-1 py-2 rounded-xl text-[12px] font-bold border-2 transition-colors disabled:opacity-50 ${
                       isDark ? 'border-white/20 text-slate-200 hover:bg-white/10' : 'border-border text-ink-secondary hover:bg-slate-100'
                     }`}
                   >
@@ -201,7 +201,7 @@ export default function RepairTicketQueue() {
                     type="button"
                     onClick={() => changeStatus(t, 'cancelled', 'ยกเลิก')}
                     disabled={busyId === t.id}
-                    className="px-3 py-2 rounded-xl text-[11px] font-extrabold text-accent-rose border-2 border-rose-500/30 hover:bg-rose-500/10 transition-colors disabled:opacity-50"
+                    className="px-3 py-2 rounded-xl text-[12px] font-bold text-accent-rose border-2 border-rose-500/30 hover:bg-rose-500/10 transition-colors disabled:opacity-50"
                   >
                     ยกเลิก
                   </button>
@@ -209,7 +209,7 @@ export default function RepairTicketQueue() {
               )}
 
               {t.staff_note && (
-                <p className="text-[10px] font-semibold text-content-muted">บันทึก: {t.staff_note}</p>
+                <p className="text-[11px] font-semibold text-content-muted">บันทึก: {t.staff_note}</p>
               )}
             </li>
           ))}

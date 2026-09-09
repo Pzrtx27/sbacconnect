@@ -64,7 +64,7 @@ export default function WalletHistory({ limit = 50 }) {
         <button
           type="button"
           onClick={load}
-          className="text-xs font-extrabold text-brand hover:underline inline-flex items-center gap-1.5"
+          className="text-xs font-bold text-brand hover:underline inline-flex items-center gap-1.5"
         >
           <RefreshCw size={13} />
           ลองใหม่
@@ -95,7 +95,7 @@ export default function WalletHistory({ limit = 50 }) {
           {/* หัวข้อวันคั่น — ไม่งั้นเป็นรายการยาวพรืดที่หาไม่เจอว่าอันไหนวันไหน
               ถ้า DB ไม่มีคอลัมน์เวลา label จะว่าง ก็ไม่ต้องขึ้นหัวข้อ */}
           {group.label && (
-            <div className={`text-[11px] font-extrabold mb-1 ${isDark ? 'text-content-secondary' : 'text-ink-muted'}`}>
+            <div className={`text-[12px] font-bold mb-1 ${isDark ? 'text-content-secondary' : 'text-ink-muted'}`}>
               {group.label}
             </div>
           )}
@@ -119,10 +119,10 @@ export default function WalletHistory({ limit = 50 }) {
                   </span>
 
                   <span className="min-w-0 flex-1">
-                    <span className={`block text-xs font-extrabold truncate ${isDark ? 'text-white' : 'text-ink'}`}>
+                    <span className={`block text-xs font-bold truncate ${isDark ? 'text-white' : 'text-ink'}`}>
                       {walletKindLabel(item.kind, item.direction)}
                     </span>
-                    <span className="block text-[10px] font-semibold text-content-muted">
+                    <span className="block text-[11px] font-semibold text-content-muted">
                       {formatTime(item.occurred_at)}
                       {item.balance_after != null && (
                         <> · เหลือ {formatSignedBaht(item.balance_after).replace('+', '')} บาท</>

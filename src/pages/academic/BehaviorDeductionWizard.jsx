@@ -125,7 +125,7 @@ export default function BehaviorDeductionWizard() {
           <div>
             <Award className="text-accent-amber mb-2" size={24} />
             <div className={`text-sm font-extrabold ${textPrimary}`}>ตัด/เพิ่มคะแนนพฤติกรรม</div>
-            <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>เลือกหมวดหมู่ → ห้องเรียน → นักเรียน</div>
+            <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>เลือกหมวดหมู่ → ห้องเรียน → นักเรียน</div>
           </div>
           <div className="mt-2.5 flex items-center justify-between">
             <span className="text-[9px] font-semibold text-accent-amber">เริ่ม Workflow</span>
@@ -145,7 +145,7 @@ export default function BehaviorDeductionWizard() {
               return (
                 <div key={label} className="flex items-center gap-2 flex-1">
                   <div
-                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0 ${
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
                       done
                         ? 'bg-accent-emerald text-white'
                         : active
@@ -155,7 +155,7 @@ export default function BehaviorDeductionWizard() {
                   >
                     {done ? <Check size={12} /> : n}
                   </div>
-                  <span className={`text-[10px] font-bold ${active ? textPrimary : textMuted}`}>{label}</span>
+                  <span className={`text-[11px] font-bold ${active ? textPrimary : textMuted}`}>{label}</span>
                   {n < STEP_LABELS.length && <div className={`flex-1 h-px ${isDark ? 'bg-white/10' : 'bg-slate-200'}`} />}
                 </div>
               );
@@ -196,7 +196,7 @@ export default function BehaviorDeductionWizard() {
                     key={cat.id}
                     type="button"
                     onClick={() => handlePickCategory(cat)}
-                    className={`p-2.5 rounded-xl border text-[10px] font-bold text-left transition-all ${
+                    className={`p-2.5 rounded-xl border text-[11px] font-bold text-left transition-all ${
                       categoryId === cat.id
                         ? 'border-sbac-blue bg-sbac-blue-50/20 text-brand'
                         : isDark ? 'border-white/5 bg-white/[0.02] text-content-secondary' : 'border-slate-100 bg-surface-card text-slate-600'
@@ -263,7 +263,7 @@ export default function BehaviorDeductionWizard() {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className={`w-full font-extrabold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 border ${
+                className={`w-full font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 border ${
                   isDark ? 'border-white/10 text-content-secondary hover:bg-white/5' : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
                 }`}
               >
@@ -297,7 +297,7 @@ export default function BehaviorDeductionWizard() {
                             isDark ? 'border-white/5 hover:bg-white/5' : 'border-slate-100 hover:bg-slate-50'
                           }`}
                         >
-                          <div className={`text-xs font-extrabold ${textPrimary}`}>{s.full_name}</div>
+                          <div className={`text-xs font-bold ${textPrimary}`}>{s.full_name}</div>
                           <div className={`text-[9px] font-semibold mt-0.5 ${textMuted}`}>
                             รหัส {s.student_code || '—'} • ปัจจุบัน {s.score} แต้ม
                           </div>
@@ -308,7 +308,7 @@ export default function BehaviorDeductionWizard() {
                   <button
                     type="button"
                     onClick={() => setStep(2)}
-                    className={`w-full font-extrabold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 border ${
+                    className={`w-full font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 border ${
                       isDark ? 'border-white/10 text-content-secondary hover:bg-white/5' : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
                     }`}
                   >
@@ -319,7 +319,7 @@ export default function BehaviorDeductionWizard() {
                 <>
                   <div className={`rounded-2xl border p-4 space-y-2 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'}`}>
                     <div className={`text-sm font-extrabold ${textPrimary}`}>{selectedStudent.full_name}</div>
-                    <div className={`text-[11px] font-semibold ${textMuted}`}>รหัส {selectedStudent.student_code || '—'} • ปัจจุบัน {selectedStudent.score} แต้ม</div>
+                    <div className={`text-[12px] font-semibold ${textMuted}`}>รหัส {selectedStudent.student_code || '—'} • ปัจจุบัน {selectedStudent.score} แต้ม</div>
                     <div className={`h-px my-1 ${isDark ? 'bg-white/10' : 'bg-slate-200'}`} />
                     <div className={`text-xs font-semibold ${textPrimary}`}>{reason}</div>
                     <div className={`text-sm font-extrabold ${actionType === 'add' ? 'text-accent-emerald' : 'text-accent-rose'}`}>
@@ -331,7 +331,7 @@ export default function BehaviorDeductionWizard() {
                     <button
                       type="button"
                       onClick={() => setSelectedStudent(null)}
-                      className={`flex-1 font-extrabold py-3 rounded-xl text-xs transition-all border ${
+                      className={`flex-1 font-bold py-3 rounded-xl text-xs transition-all border ${
                         isDark ? 'border-white/10 text-content-secondary hover:bg-white/5' : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
                       }`}
                     >
@@ -341,7 +341,7 @@ export default function BehaviorDeductionWizard() {
                       type="button"
                       onClick={handleSubmit}
                       disabled={submitting}
-                      className={`flex-1 text-white font-extrabold py-3 rounded-xl text-xs transition-all disabled:opacity-50 ${
+                      className={`flex-1 text-white font-bold py-3 rounded-xl text-xs transition-all disabled:opacity-50 ${
                         actionType === 'add' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-rose-500 hover:bg-rose-600'
                       }`}
                     >

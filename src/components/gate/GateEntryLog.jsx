@@ -59,7 +59,7 @@ export default function GateEntryLog({ limit = 14 }) {
         <button
           type="button"
           onClick={load}
-          className="text-xs font-extrabold text-brand hover:underline inline-flex items-center gap-1.5"
+          className="text-xs font-bold text-brand hover:underline inline-flex items-center gap-1.5"
         >
           <RefreshCw size={13} />
           ลองใหม่
@@ -83,7 +83,7 @@ export default function GateEntryLog({ limit = 14 }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-[11px] font-semibold text-content-muted leading-relaxed">
+      <p className="text-[12px] font-semibold text-content-muted leading-relaxed">
         ระบบบันทึกเฉพาะตอนเข้าโรงเรียน ไม่ได้บันทึกตอนกลับ
       </p>
 
@@ -103,7 +103,7 @@ export default function GateEntryLog({ limit = 14 }) {
                   <LogIn size={13} className="text-accent-emerald shrink-0" aria-hidden="true" />
                   {formatDayLabel(item.entered_at)}
                 </div>
-                <div className="text-[10px] text-content-muted font-semibold truncate">
+                <div className="text-[11px] text-content-muted font-semibold truncate">
                   {item.gate}
                   {METHOD_LABEL[item.method] && ` · ${METHOD_LABEL[item.method]}`}
                 </div>

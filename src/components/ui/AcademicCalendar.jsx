@@ -142,7 +142,7 @@ export default function AcademicCalendar() {
             </div>
             <div className="min-w-0">
               <h3 className={`text-sm font-extrabold truncate ${textPrimary}`}>ปฏิทินฝ่ายวิชาการ</h3>
-              <p className="text-[11px] font-bold text-content-secondary" aria-live="polite">
+              <p className="text-[12px] font-bold text-content-secondary" aria-live="polite">
                 {MONTH_NAMES[viewMonth]} {viewYear + 543}
               </p>
             </div>
@@ -181,13 +181,13 @@ export default function AcademicCalendar() {
         {/* แถบภาคเรียน + จำนวนกิจกรรม */}
         <div className="flex items-center justify-between mb-3 gap-2">
           <span
-            className={`text-[10px] font-bold px-2.5 py-1 rounded-lg text-content-secondary ${
+            className={`text-[11px] font-bold px-2.5 py-1 rounded-lg text-content-secondary ${
               isDark ? 'bg-white/10' : 'bg-slate-100'
             }`}
           >
             ภาคเรียน {getSemesterLabel(viewYear, viewMonth)}
           </span>
-          <span className={`text-[10px] font-bold ${error ? 'text-accent-rose' : textMuted}`}>
+          <span className={`text-[11px] font-bold ${error ? 'text-accent-rose' : textMuted}`}>
             {summaryText}
           </span>
         </div>
@@ -198,7 +198,7 @@ export default function AcademicCalendar() {
             <abbr
               key={name}
               title={`วัน${DAY_NAMES_FULL[i]}`}
-              className={`no-underline text-center text-[10px] font-bold py-1 ${
+              className={`no-underline text-center text-[11px] font-bold py-1 ${
                 i === 0 || i === 6 ? 'text-accent-rose' : textMuted
               }`}
             >
@@ -276,7 +276,7 @@ export default function AcademicCalendar() {
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-1.5">
               <div className={`w-2 h-2 rounded-full ${item.color}`} aria-hidden="true" />
-              <span className={`text-[10px] font-bold ${textMuted}`}>{item.label}</span>
+              <span className={`text-[11px] font-bold ${textMuted}`}>{item.label}</span>
             </div>
           ))}
         </div>
@@ -296,7 +296,7 @@ export default function AcademicCalendar() {
             }`}
           >
             <div className="flex items-center justify-between mb-3">
-              <span className={`text-xs font-extrabold ${textPrimary}`}>
+              <span className={`text-xs font-bold ${textPrimary}`}>
                 {selectedDate} {MONTH_NAMES[viewMonth]} {viewYear + 543}
               </span>
               <button
@@ -310,7 +310,7 @@ export default function AcademicCalendar() {
             </div>
 
             {selectedEvents.length === 0 ? (
-              <p className={`text-[11px] font-semibold py-2 ${textMuted}`}>ไม่มีกิจกรรมในวันนี้</p>
+              <p className={`text-[12px] font-semibold py-2 ${textMuted}`}>ไม่มีกิจกรรมในวันนี้</p>
             ) : (
               <div className="space-y-2.5">
                 {selectedEvents.map((evt) => (
@@ -332,7 +332,7 @@ export default function AcademicCalendar() {
                     />
                     <div className="flex-1 space-y-1">
                       <div className="flex items-start gap-2 flex-wrap">
-                        <span className="text-xs font-extrabold">{evt.title}</span>
+                        <span className="text-xs font-bold">{evt.title}</span>
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-white/10' : 'bg-white/70'}`}>
                           {EVENT_TYPE_LABELS[evt.type] || evt.type}
                         </span>
@@ -349,17 +349,17 @@ export default function AcademicCalendar() {
                       </div>
 
                       {evt.description && (
-                        <p className="text-[10px] font-semibold leading-relaxed opacity-90">
+                        <p className="text-[11px] font-semibold leading-relaxed opacity-90">
                           {evt.description}
                         </p>
                       )}
 
                       <div className="flex items-center gap-3 flex-wrap">
-                        <span className="flex items-center gap-1 text-[10px] font-semibold">
+                        <span className="flex items-center gap-1 text-[11px] font-semibold">
                           <ClockIcon size={10} aria-hidden="true" /> {eventTimeText(evt)}
                         </span>
                         {evt.location && (
-                          <span className="flex items-center gap-1 text-[10px] font-semibold">
+                          <span className="flex items-center gap-1 text-[11px] font-semibold">
                             <MapPin size={10} aria-hidden="true" /> {evt.location}
                           </span>
                         )}

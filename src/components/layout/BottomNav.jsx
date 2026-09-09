@@ -69,14 +69,14 @@ export default function BottomNav() {
                         วางคร่อมมุมไอคอนแบบเดียวกับ badge ของแอปแชททั่วไป */}
                     {badge > 0 && (
                       <span
-                        className="absolute top-0 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-700 text-white text-[10px] font-black flex items-center justify-center ring-2 ring-surface-card dark:ring-surface-dark-elev animate-pulse"
+                        className="absolute top-0 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-700 text-white text-[11px] font-extrabold flex items-center justify-center ring-2 ring-surface-card dark:ring-surface-dark-elev animate-pulse"
                         aria-hidden="true"
                       >
                         {badge}
                       </span>
                     )}
                   </div>
-                  <span className={`text-[10px] font-bold transition-colors duration-200 ${
+                  <span className={`text-[11px] font-bold transition-colors duration-200 ${
                     isActive ? 'text-brand' : 'text-content-muted'
                   }`}>
                     {item.label}
@@ -102,7 +102,7 @@ export default function BottomNav() {
               <div className="p-1.5 rounded-xl">
                 <LogOut size={22} strokeWidth={1.8} className="text-accent-rose" aria-hidden="true" />
               </div>
-              <span className="text-[10px] font-bold text-accent-rose">ออก</span>
+              <span className="text-[11px] font-bold text-accent-rose">ออก</span>
             </button>
         </div>
       </div>

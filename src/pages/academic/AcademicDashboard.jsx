@@ -529,7 +529,7 @@ export default function AcademicDashboard() {
             <HomeroomAssignmentPanel />
 
             <div className="space-y-3">
-              <span className={`text-xs font-extrabold flex items-center gap-1.5 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+              <span className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
                 <ListChecks size={14} />
                 รอฝ่ายวิชาการอนุมัติ ({pendingAcademicLeaves.length})
               </span>
@@ -572,7 +572,7 @@ export default function AcademicDashboard() {
               <Settings size={18} className="text-brand" />
               ห้องที่กำลังจัดการ
             </h3>
-            <span className="text-[10px] font-bold text-content-muted">
+            <span className="text-[11px] font-bold text-content-muted">
               {classIds.length > 0 ? `${classIds.length} ห้อง` : ''}
             </span>
           </div>
@@ -614,7 +614,7 @@ export default function AcademicDashboard() {
             }`}>
             <Calendar size={18} className="text-brand" />
             สั่งสอนแทน (ชั่วคราว 1 วัน)
-            <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-accent-emerald/15 text-accent-emerald border border-accent-emerald/25">
+            <span className="ml-auto text-[11px] font-bold px-2 py-0.5 rounded-full bg-accent-emerald/15 text-accent-emerald border border-accent-emerald/25">
               นักเรียนเห็นทันที
             </span>
           </h3>
@@ -648,7 +648,7 @@ export default function AcademicDashboard() {
                 : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue focus:bg-surface-card'
                 }`}
             />
-            <p className={`text-[11px] font-bold mt-1.5 ${isSchoolDay(subDate) ? 'text-content-muted' : 'text-accent-rose'}`}>
+            <p className={`text-[12px] font-bold mt-1.5 ${isSchoolDay(subDate) ? 'text-content-muted' : 'text-accent-rose'}`}>
               {isSchoolDay(subDate)
                 ? `วัน${DAY_LABELS[dayKey]} · ${describeDate(subDate)}`
                 : `วัน${DAY_LABELS[dayKey]} — ปกติไม่มีคาบเรียน`}
@@ -671,7 +671,7 @@ export default function AcademicDashboard() {
                     onClick={() => setPeriod(p)}
                     aria-pressed={selected}
                     aria-label={`คาบ ${p}${slot ? ` — ${slot.subject}` : ' — ยังว่าง'}`}
-                    className={`relative min-h-[44px] rounded-xl text-xs font-extrabold border transition-all active:scale-95 ${
+                    className={`relative min-h-[44px] rounded-xl text-xs font-bold border transition-all active:scale-95 ${
                       selected
                         ? 'bg-sbac-blue text-white border-sbac-blue shadow-button'
                         : slot
@@ -710,7 +710,7 @@ export default function AcademicDashboard() {
               <div className="space-y-1">
                 <div className={`font-extrabold ${isDark ? 'text-white' : 'text-ink'}`}>
                   {baseSlot.subject || 'ยังไม่ระบุวิชา'}
-                  <span className="ml-2 text-[10px] font-bold text-content-muted">
+                  <span className="ml-2 text-[11px] font-bold text-content-muted">
                     {PERIOD_TIMES[period] ? `${PERIOD_TIMES[period]} น.` : ''}
                   </span>
                 </div>
@@ -762,7 +762,7 @@ export default function AcademicDashboard() {
               <div className="flex gap-2 mb-2">
                 <button
                   onClick={() => setRoomMode('same')}
-                  className={`flex-1 py-2 rounded-xl text-xs font-extrabold border transition-all ${roomMode === 'same'
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${roomMode === 'same'
                     ? 'bg-sbac-blue text-white border-sbac-blue shadow-sm'
                     : isDark
                       ? 'bg-white/5 text-content-secondary border-white/10 hover:bg-white/10'
@@ -773,7 +773,7 @@ export default function AcademicDashboard() {
                 </button>
                 <button
                   onClick={() => setRoomMode('new')}
-                  className={`flex-1 py-2 rounded-xl text-xs font-extrabold border transition-all ${roomMode === 'new'
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${roomMode === 'new'
                     ? 'bg-sbac-blue text-white border-sbac-blue shadow-sm'
                     : isDark
                       ? 'bg-white/5 text-content-secondary border-white/10 hover:bg-white/10'
@@ -802,7 +802,7 @@ export default function AcademicDashboard() {
             <button
               onClick={handleSaveSubstitution}
               disabled={savingSlot}
-              className="w-full bg-sbac-blue hover:bg-sbac-navy text-white font-extrabold py-3 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-sbac-blue"
+              className="w-full bg-sbac-blue hover:bg-sbac-navy text-white font-bold py-3 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-sbac-blue"
             >
               <RefreshCw size={14} className={savingSlot ? 'animate-spin' : undefined} />
               {savingSlot
@@ -819,7 +819,7 @@ export default function AcademicDashboard() {
               <button
                 onClick={() => handleClearSubstitution()}
                 disabled={savingSlot}
-                className={`w-full border-2 font-extrabold py-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${isDark
+                className={`w-full border-2 font-bold py-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${isDark
                   ? 'border-white/10 text-content-secondary hover:bg-white/5'
                   : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
                   }`}
@@ -835,10 +835,10 @@ export default function AcademicDashboard() {
               สั่งอะไรค้างไว้บ้าง นอกจากไล่กดเปลี่ยนเลขคาบดูทีละอัน */}
           <div className={`border-t pt-4 space-y-2 ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
             <div className="flex items-center justify-between">
-              <span className={`text-xs font-extrabold ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+              <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
                 สอนแทนของ {formatThaiDate(subDate)}
               </span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${daySubs.length > 0
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${daySubs.length > 0
                 ? 'bg-accent-rose/15 text-accent-rose'
                 : isDark ? 'bg-white/5 text-content-muted' : 'bg-slate-100 text-content-muted'
                 }`}>
@@ -847,7 +847,7 @@ export default function AcademicDashboard() {
             </div>
 
             {daySubs.length === 0 ? (
-              <p className="text-[11px] font-semibold text-content-muted">
+              <p className="text-[12px] font-semibold text-content-muted">
                 ยังไม่มีการสอนแทนในวันนี้ — ห้องนี้ใช้ตารางปกติตามชีต
               </p>
             ) : (
@@ -858,10 +858,10 @@ export default function AcademicDashboard() {
                     }`}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className={`text-[11px] font-extrabold truncate ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+                    <div className={`text-[12px] font-bold truncate ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
                       คาบ {sub.period} · {sub.subject || 'ไม่ระบุวิชา'}
                     </div>
-                    <div className="text-[10px] font-semibold text-content-muted truncate">
+                    <div className="text-[11px] font-semibold text-content-muted truncate">
                       {sub.original_teacher || 'ครูเดิมไม่ระบุ'} → {sub.substitute_teacher || 'ยังไม่ระบุ'}
                       {' · '}
                       {sub.substitute_room ? `ย้ายไปห้อง ${sub.substitute_room}` : 'ห้องเดิมตามตาราง'}
@@ -870,7 +870,7 @@ export default function AcademicDashboard() {
                   <button
                     type="button"
                     onClick={() => setPeriod(Number(sub.period))}
-                    className={`text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg shrink-0 transition-all ${isDark
+                    className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg shrink-0 transition-all ${isDark
                       ? 'bg-white/10 text-content-secondary hover:bg-white/20'
                       : 'bg-surface-card text-ink-secondary hover:bg-slate-100'
                       }`}
@@ -920,7 +920,7 @@ export default function AcademicDashboard() {
             <BehaviorDeductionWizard />
 
             <div className="space-y-3">
-              <span className={`text-xs font-extrabold flex items-center gap-1.5 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+              <span className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
                 <ListChecks size={14} />
                 รายการทั้งหมด ({allBehaviorLogs.length})
               </span>
@@ -987,7 +987,7 @@ export default function AcademicDashboard() {
           <div className="flex gap-2">
             <button
               onClick={downloadTemplate}
-              className={`flex-1 border font-extrabold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 ${isDark
+              className={`flex-1 border font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 ${isDark
                 ? 'border-white/10 text-content-secondary hover:bg-white/5'
                 : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
                 }`}
@@ -1002,7 +1002,7 @@ export default function AcademicDashboard() {
             } space-y-3`}>
             <div className="flex items-center gap-1.5">
               <Key size={14} className="text-brand" />
-              <span className={`text-xs font-extrabold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+              <span className={`text-xs font-bold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
                 การตั้งค่าความปลอดภัยและการเข้ารหัส
               </span>
             </div>
@@ -1024,7 +1024,7 @@ export default function AcademicDashboard() {
                       : 'bg-surface-card border-slate-200 hover:bg-slate-50 text-slate-600'
                     }`}
                 >
-                  <div className="text-xs font-extrabold">{mode.label}</div>
+                  <div className="text-xs font-bold">{mode.label}</div>
                   <div className="text-[9px] opacity-75 mt-0.5 leading-tight">{mode.desc}</div>
                 </button>
               ))}
@@ -1033,7 +1033,7 @@ export default function AcademicDashboard() {
             {/* Key Passphrase input for AES mode */}
             {encryptionMode === 'aes256' && (
               <div className="space-y-1 animate-slide-down">
-                <label className={`text-[10px] font-bold block ${isDark ? 'text-slate-200' : 'text-slate-600'}`}>
+                <label className={`text-[11px] font-bold block ${isDark ? 'text-slate-200' : 'text-slate-600'}`}>
                   คีย์หลักความปลอดภัย (Encryption Passphrase) <span className="text-accent-rose">*จำเป็นในการถอดรหัส</span>
                 </label>
                 <div className="relative">
@@ -1064,7 +1064,7 @@ export default function AcademicDashboard() {
             )}
 
             {encryptionMode === 'none' && (
-              <div className="text-[10px] text-accent-amber font-bold bg-amber-500/10 p-3 rounded-xl border border-amber-500/20 flex items-start gap-1.5 animate-slide-down">
+              <div className="text-[11px] text-accent-amber font-bold bg-amber-500/10 p-3 rounded-xl border border-amber-500/20 flex items-start gap-1.5 animate-slide-down">
                 <ShieldAlert size={14} className="shrink-0 mt-0.5" />
                 <span>
                   คำเตือน: การไม่เข้ารหัสข้อมูลส่วนบุคคล (National ID) ขัดต่อพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล (PDPA) และลดระดับความปลอดภัยของวิทยาลัย
@@ -1103,10 +1103,10 @@ export default function AcademicDashboard() {
             />
             <Upload size={32} className={`mx-auto mb-2.5 transition-colors ${dragOver ? 'text-brand' : 'text-content-muted'
               }`} />
-            <div className="text-xs font-extrabold text-ink-secondary dark:text-slate-200">
+            <div className="text-xs font-bold text-ink-secondary dark:text-slate-200">
               ลากและวางไฟล์ หรือคลิกเพื่ออัปโหลด
             </div>
-            <div className="text-[10px] text-content-muted mt-1">
+            <div className="text-[11px] text-content-muted mt-1">
               รองรับไฟล์ Excel (.xlsx, .xls) และ CSV (.csv)
             </div>
           </div>
@@ -1115,12 +1115,12 @@ export default function AcademicDashboard() {
           {parsedStudents.length > 0 && (
             <div className="space-y-3 pt-2">
               <div className="flex justify-between items-center px-1">
-                <span className={`text-xs font-extrabold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+                <span className={`text-xs font-bold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
                   ตัวอย่างผลลัพธ์การเข้ารหัส ({parsedStudents.length} รายชื่อ)
                 </span>
                 <button
                   onClick={() => setParsedStudents([])}
-                  className="text-[10px] font-bold text-accent-rose hover:underline"
+                  className="text-[11px] font-bold text-accent-rose hover:underline"
                 >
                   ล้างข้อมูล
                 </button>
@@ -1135,7 +1135,7 @@ export default function AcademicDashboard() {
                     : 'ไม่มีข้อมูล';
 
                   return (
-                    <div key={idx} className="p-3 text-[10px] flex items-center justify-between gap-4">
+                    <div key={idx} className="p-3 text-[11px] flex items-center justify-between gap-4">
                       <div className="space-y-0.5 min-w-0">
                         <div className="font-extrabold text-ink-secondary dark:text-slate-200 truncate flex items-center gap-1.5">
                           <span className="bg-sbac-blue/10 dark:bg-sbac-blue/20 text-brand px-1.5 py-0.5 rounded font-mono font-medium">
@@ -1173,7 +1173,7 @@ export default function AcademicDashboard() {
               <button
                 onClick={exportEncrypted}
                 disabled={isProcessing}
-                className={`w-full text-white font-extrabold py-3.5 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-2 select-none bg-gradient-to-r from-sbac-blue to-sbac-navy hover:to-sbac-blue disabled:opacity-40 disabled:cursor-not-allowed ${isProcessing ? 'cursor-wait' : 'cursor-pointer'
+                className={`w-full text-white font-bold py-3.5 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-2 select-none bg-gradient-to-r from-sbac-blue to-sbac-navy hover:to-sbac-blue disabled:opacity-40 disabled:cursor-not-allowed ${isProcessing ? 'cursor-wait' : 'cursor-pointer'
                   }`}
               >
                 {isProcessing ? (

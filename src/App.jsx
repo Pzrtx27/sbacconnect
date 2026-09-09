@@ -83,13 +83,13 @@ class ErrorBoundary extends Component {
             กำลังกู้คืนระบบกลับสู่ปกติ กรุณากดปุ่มด้านล่างเพื่อกลับสู่หน้าหลัก
           </p>
           {import.meta.env?.DEV && this.state.error && (
-            <pre className="text-[10px] text-accent-rose max-w-sm overflow-auto text-left bg-accent-rose/5 border border-accent-rose/20 rounded-xl p-3">
+            <pre className="text-[11px] text-accent-rose max-w-sm overflow-auto text-left bg-accent-rose/5 border border-accent-rose/20 rounded-xl p-3">
               {String(this.state.error?.stack || this.state.error)}
             </pre>
           )}
           <button
             onClick={this.handleReset}
-            className="px-6 py-3 bg-sbac-blue hover:bg-sbac-navy text-white text-xs font-extrabold rounded-2xl shadow-lg shadow-sbac-blue/30 active:scale-95 transition-all"
+            className="px-6 py-3 bg-sbac-blue hover:bg-sbac-navy text-white text-xs font-bold rounded-2xl shadow-lg shadow-sbac-blue/30 active:scale-95 transition-all"
           >
             กลับสู่หน้าหลัก
           </button>

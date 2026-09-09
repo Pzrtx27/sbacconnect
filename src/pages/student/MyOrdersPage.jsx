@@ -97,7 +97,7 @@ export default function MyOrdersPage() {
             : 'bg-slate-50 border-slate-100 hover:bg-slate-100'
         }`}
       >
-        <span className={`flex items-center gap-2 text-xs font-extrabold transition-colors duration-300 ${textPrimary}`}>
+        <span className={`flex items-center gap-2 text-xs font-bold transition-colors duration-300 ${textPrimary}`}>
           <History size={16} className={isDark ? 'text-content-secondary' : 'text-ink-muted'} aria-hidden="true" />
           ดูประวัติการสั่งซื้อทั้งหมด
         </span>
@@ -128,7 +128,7 @@ export default function MyOrdersPage() {
           <button
             type="button"
             onClick={refresh}
-            className="px-5 py-2.5 rounded-2xl text-xs font-extrabold bg-sbac-blue hover:bg-sbac-navy text-white transition-colors"
+            className="px-5 py-2.5 rounded-2xl text-xs font-bold bg-sbac-blue hover:bg-sbac-navy text-white transition-colors"
           >
             ลองโหลดใหม่
           </button>
@@ -160,7 +160,7 @@ export default function MyOrdersPage() {
                 }`}
               >
                 <div>
-                  <span className={`text-[10px] font-bold block ${textMuted}`}>
+                  <span className={`text-[11px] font-bold block ${textMuted}`}>
                     รหัสรับของ / Pickup Code
                   </span>
                   <span className={`text-3xl font-black tracking-tight mt-1 block tabular-nums ${textPrimary}`}>
@@ -168,7 +168,7 @@ export default function MyOrdersPage() {
                   </span>
                 </div>
                 <span
-                  className={`text-xs font-extrabold px-3 py-1.5 rounded-full border ${
+                  className={`text-xs font-bold px-3 py-1.5 rounded-full border ${
                     ORDER_STATUS_COLOR[order.status] || ORDER_STATUS_COLOR.paid
                   }`}
                 >
@@ -198,7 +198,7 @@ export default function MyOrdersPage() {
                       {/* ตัวเลือกที่สั่งไว้ — ชื่อกับราคาเป็น snapshot จากตอนสั่ง
                           ต่อให้ร้านขึ้นราคาทีหลัง ออเดอร์ใบนี้ก็ยังแสดงของเดิม */}
                       {item.order_item_options?.length > 0 && (
-                        <div className="text-[10px] font-bold mt-0.5 text-accent-amber leading-snug">
+                        <div className="text-[11px] font-bold mt-0.5 text-accent-amber leading-snug">
                           {optionSummary(
                             item.order_item_options.map((o) => ({ name: o.option_name }))
                           )}
@@ -206,12 +206,12 @@ export default function MyOrdersPage() {
                       )}
 
                       {item.note && (
-                        <div className="text-[10px] font-semibold mt-0.5 text-brand leading-snug">
+                        <div className="text-[11px] font-semibold mt-0.5 text-brand leading-snug">
                           📝 {item.note}
                         </div>
                       )}
 
-                      <div className={`text-[10px] mt-0.5 ${textMuted}`}>
+                      <div className={`text-[11px] mt-0.5 ${textMuted}`}>
                         จำนวน {item.qty} × {formatBaht(item.unit_price_satang)} ฿
                       </div>
                     </div>
@@ -280,13 +280,13 @@ function ReadyCard({ order, isDark, onPickedUp }) {
         <span className="w-7 h-7 rounded-full bg-emerald-700 text-white flex items-center justify-center shrink-0">
           <Check size={16} strokeWidth={3.5} aria-hidden="true" />
         </span>
-        <span className="text-sm font-black text-accent-emerald uppercase tracking-wide">
+        <span className="text-sm font-extrabold text-accent-emerald">
           พร้อมรับแล้ว — เชิญที่เคาน์เตอร์
         </span>
       </div>
 
       <div className="relative text-center py-2">
-        <span className="text-[10px] font-extrabold uppercase tracking-widest text-accent-emerald block">
+        <span className="text-[11px] font-bold text-accent-emerald block">
           ยื่นรหัสนี้ให้บาริสต้า
         </span>
         <span
@@ -296,7 +296,7 @@ function ReadyCard({ order, isDark, onPickedUp }) {
         >
           #{order.pickup_code}
         </span>
-        <span className={`text-[11px] font-bold ${isDark ? 'text-content-secondary' : 'text-ink-muted'}`}>
+        <span className={`text-[12px] font-bold ${isDark ? 'text-content-secondary' : 'text-ink-muted'}`}>
           {order.order_items?.map((i) => `${i.products?.name || 'สินค้า'} × ${i.qty}`).join(' · ')}
         </span>
       </div>
@@ -304,7 +304,7 @@ function ReadyCard({ order, isDark, onPickedUp }) {
       <button
         type="button"
         onClick={onPickedUp}
-        className="relative w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3 rounded-2xl text-sm shadow-lg shadow-emerald-500/25 active:scale-95 transition-all"
+        className="relative w-full bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold py-3 rounded-2xl text-sm shadow-lg shadow-emerald-500/25 active:scale-95 transition-all"
       >
         รับเครื่องดื่มแล้ว
       </button>
@@ -336,7 +336,7 @@ function StatusSteps({ status, isDark }) {
               }`}
             />
             <span
-              className={`text-[10px] font-extrabold block text-center ${
+              className={`text-[11px] font-bold block text-center ${
                 isCurrent
                   ? 'text-accent-amber'
                   : reached

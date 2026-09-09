@@ -70,7 +70,7 @@ export default function TabNav({ tabs, active, onChange, ariaLabel = 'หมว�
               /* min-h 44px = ขนาดพื้นที่กดขั้นต่ำบนมือถือ (เท่ากับ BottomNav)
                  shrink-0 กันไม่ให้ข้อความถูกบีบจนตัดคำ — ให้ขึ้นบรรทัดใหม่แทน */
               className={`relative shrink-0 flex items-center gap-1.5 px-3.5 min-h-[44px] rounded-2xl
-                          text-xs font-extrabold transition-colors duration-200 ${
+                          text-xs font-bold transition-colors duration-200 ${
                 isActive
                   ? 'text-white'
                   : isDark
@@ -96,7 +96,7 @@ export default function TabNav({ tabs, active, onChange, ariaLabel = 'หมว�
                     ซ่อนตอนเป็น 0 เพราะป้ายว่างเปล่ารกกว่าไม่มีป้าย */}
                 {tab.badge > 0 && (
                   <span
-                    className={`ml-0.5 min-w-[18px] px-1 h-[18px] rounded-full text-[10px] font-extrabold
+                    className={`ml-0.5 min-w-[18px] px-1 h-[18px] rounded-full text-[11px] font-bold
                                 inline-flex items-center justify-center ${
                       isActive ? 'bg-white/25 text-white' : 'bg-accent-rose/15 text-accent-rose'
                     }`}

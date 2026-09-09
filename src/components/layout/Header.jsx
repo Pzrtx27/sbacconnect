@@ -22,7 +22,7 @@ export default function Header({ title = 'SBAC CONNECT', subtitle = 'Smart Campu
               isDark ? 'text-white' : 'text-sbac-navy'
             }`}>{title}</h1>
             {subtitle && (
-              <p className={`text-[10px] font-semibold tracking-wider uppercase transition-colors duration-300 ${
+              <p className={`text-[11px] font-semibold transition-colors duration-300 ${
                 isDark ? 'text-content-secondary' : 'text-content-muted'
               }`}>{subtitle}</p>
             )}

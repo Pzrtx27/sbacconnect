@@ -211,7 +211,7 @@ export default function StudentTimetable() {
                 {classLabel(id)}
                 {/* ป้ายนี้ขึ้นเฉพาะคนที่มีห้องของตัวเองจริง ๆ (ฝ่ายวิชาการไม่มี) */}
                 {mine && myClassId && (
-                  <span className={`ml-1.5 text-[10px] font-bold ${selected ? 'text-white/70' : 'text-content-muted'}`}>
+                  <span className={`ml-1.5 text-[11px] font-bold ${selected ? 'text-white/70' : 'text-content-muted'}`}>
                     ห้องฉัน
                   </span>
                 )}
@@ -245,7 +245,7 @@ export default function StudentTimetable() {
             1/2569
           </span>
         </div>
-        <div className={`text-[10px] border-t pt-2 flex justify-between transition-colors duration-300 ${isDark ? 'text-content-secondary border-white/10' : 'text-ink-muted border-slate-200/50'
+        <div className={`text-[11px] border-t pt-2 flex justify-between transition-colors duration-300 ${isDark ? 'text-content-secondary border-white/10' : 'text-ink-muted border-slate-200/50'
           }`}>
           <span>{lastUpdated ? `อัปเดตล่าสุด: ${lastUpdated} น.` : 'กำลังเชื่อมต่อ...'}</span>
           <span className={source === 'sheet' ? 'text-accent-emerald font-bold' : 'text-content-muted font-bold'}>
@@ -260,14 +260,14 @@ export default function StudentTimetable() {
       {upcomingSubs.length > 0 && (
         <div className={`rounded-2xl border p-4 space-y-2 transition-colors duration-300 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
           }`}>
-          <span className={`text-xs font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+          <span className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
             <CalendarClock size={16} className="text-accent-amber" />
             สอนแทนที่ประกาศไว้ล่วงหน้า
           </span>
           {upcomingSubs.map((sub) => (
             <div
               key={sub.id}
-              className={`flex items-start gap-2 text-[11px] font-semibold leading-relaxed ${isDark ? 'text-content-secondary' : 'text-ink-secondary'
+              className={`flex items-start gap-2 text-[12px] font-semibold leading-relaxed ${isDark ? 'text-content-secondary' : 'text-ink-secondary'
                 }`}
             >
               <span className="text-accent-amber font-extrabold shrink-0">
@@ -291,10 +291,10 @@ export default function StudentTimetable() {
             <thead>
               <tr className={`border-b transition-colors duration-300 ${isDark ? 'bg-white/10 border-white/10' : 'bg-slate-50 border-slate-100'
                 }`}>
-                <th className={`p-3 text-xs font-extrabold w-16 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
+                <th className={`p-3 text-xs font-bold w-16 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
                   }`}>วัน</th>
                 {visiblePeriods.map(p => (
-                  <th key={p} className={`p-3 text-xs font-extrabold text-center transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
+                  <th key={p} className={`p-3 text-xs font-bold text-center transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
                     }`}>
                     คาบ {p}
                     <span className={`block text-[8px] font-normal mt-0.5 transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-muted'
@@ -312,7 +312,7 @@ export default function StudentTimetable() {
                 return (
                   <tr key={day} className={`transition-colors duration-200 ${isDark ? 'hover:bg-white/10' : 'hover:bg-slate-50/50'
                     }`}>
-                    <td className={`p-3 text-xs font-extrabold transition-colors duration-300 ${isDark ? 'text-white bg-white/10' : 'text-sbac-navy bg-slate-50/30'
+                    <td className={`p-3 text-xs font-bold transition-colors duration-300 ${isDark ? 'text-white bg-white/10' : 'text-sbac-navy bg-slate-50/30'
                       }`}>
                       {DAYS_TH[day] || day}
                       {day === todayKey && (
@@ -344,7 +344,7 @@ export default function StudentTimetable() {
                               </div>
                             )}
 
-                            <div className={`text-xs font-extrabold ${isSubstituted
+                            <div className={`text-xs font-bold ${isSubstituted
                               ? 'text-accent-rose'
                               : (isDark ? 'text-white' : 'text-sbac-navy')
                               }`}>
@@ -397,7 +397,7 @@ export default function StudentTimetable() {
                             )}
                           </div>
                         ) : (
-                          <span className={`text-[10px] font-bold transition-colors duration-300 ${isDark ? 'text-content-muted' : 'text-content-secondary'
+                          <span className={`text-[11px] font-bold transition-colors duration-300 ${isDark ? 'text-content-muted' : 'text-content-secondary'
                             }`}>-</span>
                         )}
                       </td>
@@ -414,7 +414,7 @@ export default function StudentTimetable() {
       <div className={`flex gap-2 items-start p-3 rounded-2xl border transition-colors duration-300 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
         }`}>
         <AlertCircle className="text-accent-rose flex-shrink-0 mt-0.5" size={16} />
-        <p className={`text-[10px] leading-relaxed transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-muted'
+        <p className={`text-[11px] leading-relaxed transition-colors duration-300 ${isDark ? 'text-content-secondary' : 'text-ink-muted'
           }`}>
           <strong>หมายเหตุ:</strong> ช่องที่มีป้าย <span className="font-extrabold text-accent-rose">สอนแทน</span> และกรอบสีแดง
           คือคาบที่ฝ่ายวิชาการสั่งครูสอนแทนหรือย้ายห้องไว้ ในช่องบอกทั้งครูที่มาสอนแทนและครูเดิม

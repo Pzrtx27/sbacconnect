@@ -45,10 +45,10 @@ export default function SideNav() {
       <div className={`flex items-center gap-3 px-5 py-5 border-b ${isDark ? 'border-white/10' : 'border-border'}`}>
         <img src={logo} alt="" className="w-9 h-9 rounded-xl object-contain" />
         <div className="min-w-0">
-          <div className={`text-sm font-black tracking-wide ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+          <div className={`text-sm font-extrabold tracking-wide ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
             SBAC CONNECT
           </div>
-          <div className="text-[10px] font-bold uppercase tracking-wider text-content-muted truncate">
+          <div className="text-[11px] font-bold text-content-muted truncate">
             {user.name || 'ผู้ใช้งาน'}
           </div>
         </div>
@@ -82,7 +82,7 @@ export default function SideNav() {
 
                 {/* บนคอมมีที่พอจะเขียนคำกำกับได้ ไม่ต้องให้ผู้ใช้เดาว่าตัวเลขแปลว่าอะไร */}
                 {badge > 0 && (
-                  <span className="ml-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-black animate-pulse">
+                  <span className="ml-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[11px] font-extrabold animate-pulse">
                     พร้อมรับ {badge}
                   </span>
                 )}

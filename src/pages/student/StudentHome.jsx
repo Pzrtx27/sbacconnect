@@ -200,7 +200,7 @@ export default function StudentHome() {
       {/* Profile Section */}
       <div className={`flex justify-between items-end p-4 rounded-3xl border transition-colors duration-300 ${bgSubtle} ${borderSubtle}`}>
         <div>
-          <span className="text-[10px] text-brand font-extrabold uppercase tracking-wider block mb-1">
+          <span className="text-[11px] text-brand font-bold block mb-1">
             Welcome back
           </span>
           <h2 className={`text-xl font-extrabold ${textPrimary}`}>
@@ -217,7 +217,7 @@ export default function StudentHome() {
             isDark ? 'bg-white/[0.06] border-white/10' : 'bg-white/80 border-slate-200'
           }`}
         >
-          <span className={`text-[9px] font-bold uppercase tracking-wider ${textMuted}`}>Wallet</span>
+          <span className={`text-[9px] font-bold ${textMuted}`}>Wallet</span>
           <span className="text-base font-extrabold text-brand">
             {formatBaht(user?.balance_satang || 0)} <span className={`text-xs font-semibold ${textSecondary}`}>฿</span>
           </span>
@@ -278,7 +278,7 @@ export default function StudentHome() {
             <div>
               <Clock className="text-brand mb-2" size={24} />
               <div className={`text-sm font-extrabold ${textPrimary}`}>เวลาเข้าโรงเรียน</div>
-              <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>เวลาแตะบัตรผ่านประตู / Gate entry</div>
+              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>เวลาแตะบัตรผ่านประตู / Gate entry</div>
             </div>
             <div className="flex items-center text-xs font-bold text-brand mt-2">
               ดูข้อมูล <ArrowRight size={14} className="ml-1" />
@@ -294,9 +294,9 @@ export default function StudentHome() {
                 <Receipt size={20} />
               </div>
               <div className={`text-sm font-extrabold ${textPrimary}`}>รายการค้างชำระ</div>
-              <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ยอดคงเหลือ / Outstanding</div>
+              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ยอดคงเหลือ / Outstanding</div>
             </div>
-            <span className={`inline-block self-start text-xs font-extrabold px-3 py-1 rounded-full mt-2 ${
+            <span className={`inline-block self-start text-xs font-bold px-3 py-1 rounded-full mt-2 ${
               isDark ? 'bg-emerald-900/30 text-accent-emerald' : 'bg-emerald-50 text-accent-emerald'
             }`}>
               0 THB
@@ -310,9 +310,9 @@ export default function StudentHome() {
             <div>
               <Award className="text-accent-amber mb-2" size={24} />
               <div className={`text-sm font-extrabold ${textPrimary}`}>คะแนนความประพฤติ</div>
-              <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ดูคะแนนความประพฤติสะสม</div>
+              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ดูคะแนนความประพฤติสะสม</div>
             </div>
-            <span className={`inline-block self-start text-xs font-extrabold px-3 py-1 rounded-full mt-2 ${
+            <span className={`inline-block self-start text-xs font-bold px-3 py-1 rounded-full mt-2 ${
               getBehaviorColor(behaviorScore)
             }`}>
               {behaviorScore} / 100
@@ -326,7 +326,7 @@ export default function StudentHome() {
             <div>
               <BookOpen className="text-accent-emerald mb-2" size={24} />
               <div className={`text-sm font-extrabold ${textPrimary}`}>คะแนนระหว่างภาค</div>
-              <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>คะแนนเก็บและโครงงาน</div>
+              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>คะแนนเก็บและโครงงาน</div>
             </div>
             <div className="flex items-center text-xs font-bold text-brand mt-2">
               ดูข้อมูล <ArrowRight size={14} className="ml-1" />
@@ -340,7 +340,7 @@ export default function StudentHome() {
             <div>
               <GraduationCap className="text-accent-violet mb-2" size={24} />
               <div className={`text-sm font-extrabold ${textPrimary}`}>ผลการเรียน</div>
-              <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ดูเกรดเฉลี่ยเทอมนี้</div>
+              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ดูเกรดเฉลี่ยเทอมนี้</div>
             </div>
             <div className="flex items-center text-xs font-bold text-brand mt-2">
               ดูข้อมูล <ArrowRight size={14} className="ml-1" />
@@ -354,7 +354,7 @@ export default function StudentHome() {
             <div>
               <Calendar className="text-brand mb-2" size={24} />
               <div className={`text-sm font-extrabold ${textPrimary}`}>ตารางสอน</div>
-              <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ดูตารางเรียนรายคาบ</div>
+              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ดูตารางเรียนรายคาบ</div>
             </div>
             <div className="flex items-center text-xs font-bold text-brand mt-2">
               ดูข้อมูล <ArrowRight size={14} className="ml-1" />
@@ -368,7 +368,7 @@ export default function StudentHome() {
             <div>
               <FileText className="text-accent-cyan mb-2" size={24} />
               <div className={`text-sm font-extrabold ${textPrimary}`}>กำหนดการสอบ</div>
-              <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>สถานที่สอบ / เวลาสอบ</div>
+              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>สถานที่สอบ / เวลาสอบ</div>
             </div>
             <div className="flex items-center text-xs font-bold text-brand mt-2">
               เปิดดู <ArrowRight size={14} className="ml-1" />
@@ -382,7 +382,7 @@ export default function StudentHome() {
             <div>
               <FileText className="text-accent-emerald mb-2" size={24} />
               <div className={`text-sm font-extrabold ${textPrimary}`}>เอกสารอิเล็กทรอนิกส์</div>
-              <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ใบรับรอง, ทรานสคริปต์</div>
+              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ใบรับรอง, ทรานสคริปต์</div>
             </div>
             <div className="flex items-center text-xs font-bold text-brand mt-2">
               เปิดดู <ArrowRight size={14} className="ml-1" />
@@ -396,7 +396,7 @@ export default function StudentHome() {
             <div>
               <UserX className="text-accent-rose mb-2" size={24} />
               <div className={`text-sm font-extrabold ${textPrimary}`}>ยื่นใบลา</div>
-              <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ยื่นใบลาผ่านแอป SBAC</div>
+              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ยื่นใบลาผ่านแอป SBAC</div>
             </div>
             {pendingLeaveCount > 0 ? (
               <span className="inline-block self-start text-[9px] font-extrabold px-2.5 py-0.5 rounded-full mt-2 bg-amber-500/10 text-accent-amber">
@@ -418,7 +418,7 @@ export default function StudentHome() {
                 <Coffee size={22} aria-hidden="true" />
               </div>
               <div className={`text-sm font-extrabold ${textPrimary}`}>สั่งกาแฟบาริสต้า</div>
-              <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>SBAC Barista Coffee</div>
+              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>SBAC Barista Coffee</div>
             </div>
             <div className="flex items-center text-xs font-bold text-accent-amber mt-2">
               สั่งเครื่องดื่ม <ArrowRight size={14} className="ml-1" />
@@ -432,7 +432,7 @@ export default function StudentHome() {
             <div>
               <History className="text-accent-emerald mb-2" size={24} />
               <div className={`text-sm font-extrabold ${textPrimary}`}>ประวัติการสั่งซื้อ</div>
-              <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ดูประวัติและสถานะคิวสั่งซื้อ</div>
+              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ดูประวัติและสถานะคิวสั่งซื้อ</div>
             </div>
             <div className="flex items-center text-xs font-bold text-accent-emerald mt-2">
               ดูประวัติ <ArrowRight size={14} className="ml-1" />
@@ -456,7 +456,7 @@ export default function StudentHome() {
             <span className={`text-5xl font-extrabold block ${textPrimary}`}>
               {formatBaht(user?.balance_satang || 0)}
             </span>
-            <span className={`text-xs font-extrabold mt-2 block ${textMuted}`}>THB</span>
+            <span className={`text-xs font-bold mt-2 block ${textMuted}`}>THB</span>
           </div>
 
           {/* ปุ่มเติมเงินแบบเดิม (เขียน wallet_entries ตรง ๆ จากหน้าเว็บ) ถูกเอาออกไปแล้ว
@@ -474,8 +474,8 @@ export default function StudentHome() {
           <div className={`rounded-2xl border p-4 ${
             isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
           }`}>
-            <span className={`text-xs font-extrabold block ${textPrimary}`}>เติมเงินอย่างไร</span>
-            <p className={`text-[11px] font-semibold leading-relaxed mt-1 ${textMuted}`}>
+            <span className={`text-xs font-bold block ${textPrimary}`}>เติมเงินอย่างไร</span>
+            <p className={`text-[12px] font-semibold leading-relaxed mt-1 ${textMuted}`}>
               โอนผ่าน QR พร้อมเพย์แล้วแนบสลิปด้านบน หรือเติมเงินสดได้ที่จุดบริการการเงิน
               อาคาร 1 ชั้น 1 — เจ้าหน้าที่จะแตะบัตรแล้วเติมให้ในระบบ ยอดขึ้นในแอปทันที
             </p>
@@ -484,7 +484,7 @@ export default function StudentHome() {
           {/* ประวัติเงินเข้า-ออก วางไว้ในโมดัลยอดเงินเลย
               เพราะคำถามที่ตามมาทันทีหลังเห็นยอดคือ "ยอดนี้มาจากไหน หายไปไหน" */}
           <div className="space-y-2">
-            <span className={`text-xs font-extrabold block ${textPrimary}`}>ประวัติเงินเข้า-ออก</span>
+            <span className={`text-xs font-bold block ${textPrimary}`}>ประวัติเงินเข้า-ออก</span>
             <WalletHistory />
           </div>
         </div>
@@ -510,7 +510,7 @@ export default function StudentHome() {
             <button
               type="button"
               onClick={() => setLeaveView('form')}
-              className={`py-2 rounded-xl text-xs font-extrabold border transition-all ${
+              className={`py-2 rounded-xl text-xs font-bold border transition-all ${
                 leaveView === 'form'
                   ? 'bg-sbac-blue text-white border-sbac-blue'
                   : isDark ? 'bg-white/5 border-white/10 text-content-secondary' : 'bg-slate-50 border-slate-200 text-ink-secondary'
@@ -521,7 +521,7 @@ export default function StudentHome() {
             <button
               type="button"
               onClick={() => setLeaveView('history')}
-              className={`py-2 rounded-xl text-xs font-extrabold border transition-all ${
+              className={`py-2 rounded-xl text-xs font-bold border transition-all ${
                 leaveView === 'history'
                   ? 'bg-sbac-blue text-white border-sbac-blue'
                   : isDark ? 'bg-white/5 border-white/10 text-content-secondary' : 'bg-slate-50 border-slate-200 text-ink-secondary'
@@ -599,7 +599,7 @@ export default function StudentHome() {
 
               {/* Student Info */}
               <div className={`rounded-xl p-3 border ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'}`}>
-                <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${textMuted}`}>ข้อมูลผู้ยื่น</div>
+                <div className={`text-[11px] font-bold mb-1 ${textMuted}`}>ข้อมูลผู้ยื่น</div>
                 <div className={`text-xs font-semibold ${textSecondary}`}>
                   {user?.name} • รหัส {user?.id} • {user?.branch || 'IT'}
                 </div>
@@ -694,7 +694,7 @@ export default function StudentHome() {
           </div>
 
           <div className="space-y-3">
-            <span className={`text-xs font-extrabold uppercase tracking-wider block ${textMuted}`}>
+            <span className={`text-xs font-bold block ${textMuted}`}>
               ประวัติรายการตัดคะแนน
             </span>
             {behaviorLogs.length === 0 ? (
@@ -735,7 +735,7 @@ export default function StudentHome() {
         <div className="space-y-5">
           <div className="flex items-center justify-between">
             <p className={`text-xs font-bold ${textMuted}`}>ภาคเรียน 1/2569</p>
-            <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full ${scoreTier.chip} ${scoreTier.text}`}>
+            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${scoreTier.chip} ${scoreTier.text}`}>
               {scoreTier.emoji} {scoreTier.label}
             </span>
           </div>
@@ -766,7 +766,7 @@ export default function StudentHome() {
             </div>
             <div>
               <div className={`text-sm font-extrabold ${textPrimary}`}>{scoreTotal} / {scoreMax} คะแนน</div>
-              <div className={`text-[11px] mt-0.5 ${textMuted}`}>คะแนนเก็บรวม {SCORE_ITEMS.length} รายวิชา</div>
+              <div className={`text-[12px] mt-0.5 ${textMuted}`}>คะแนนเก็บรวม {SCORE_ITEMS.length} รายวิชา</div>
             </div>
           </div>
 
@@ -784,8 +784,8 @@ export default function StudentHome() {
                 >
                   <div className="flex justify-between items-baseline mb-1">
                     <span className={`text-xs font-bold ${textSecondary}`}>{item.subject}</span>
-                    <span className={`text-xs font-extrabold ${textPrimary}`}>
-                      {item.score}<span className={`text-[10px] font-normal ${textMuted}`}>/{item.total}</span>
+                    <span className={`text-xs font-bold ${textPrimary}`}>
+                      {item.score}<span className={`text-[11px] font-normal ${textMuted}`}>/{item.total}</span>
                     </span>
                   </div>
                   <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-white/5' : 'bg-slate-100'}`}>
@@ -833,7 +833,7 @@ export default function StudentHome() {
               >
                 <div>
                   <div className={`text-sm font-semibold ${textSecondary}`}>{item.subject}</div>
-                  <div className={`text-[10px] ${textMuted}`}>หน่วยกิต: {item.credit}</div>
+                  <div className={`text-[11px] ${textMuted}`}>หน่วยกิต: {item.credit}</div>
                 </div>
                 <span className={`text-sm font-extrabold px-2.5 py-1 rounded-full ${item.chip} ${item.color}`}>
                   {item.grade}
@@ -863,13 +863,13 @@ export default function StudentHome() {
                   isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
                 }`}>
                   <span className={`text-base font-extrabold block leading-none ${textPrimary}`}>{item.day}</span>
-                  <span className={`text-[10px] font-bold mt-1 block leading-none ${textMuted}`}>{item.month}</span>
+                  <span className={`text-[11px] font-bold mt-1 block leading-none ${textMuted}`}>{item.month}</span>
                 </div>
                 <div className="flex-1">
                   <div className={`text-sm font-bold ${textSecondary}`}>{item.subject}</div>
-                  <div className={`text-[10px] mt-0.5 ${textMuted}`}>{item.time}</div>
+                  <div className={`text-[11px] mt-0.5 ${textMuted}`}>{item.time}</div>
                 </div>
-                <span className={`text-[10px] font-extrabold px-2 py-1 rounded-md ${
+                <span className={`text-[11px] font-bold px-2 py-1 rounded-md ${
                   isDark ? 'bg-white/5 text-content-secondary' : 'bg-slate-100 text-ink-secondary'
                 }`}>
                   {item.room}
@@ -895,7 +895,7 @@ export default function StudentHome() {
             }`}>
               <div>
                 <div className={`text-sm font-bold ${textSecondary}`}>{doc.title}</div>
-                <div className={`text-[10px] ${textMuted}`}>{doc.sub}</div>
+                <div className={`text-[11px] ${textMuted}`}>{doc.sub}</div>
               </div>
               {doc.status === 'ready' ? (
                 <button 

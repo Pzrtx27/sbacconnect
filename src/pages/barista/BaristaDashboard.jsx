@@ -226,7 +226,7 @@ export default function BaristaDashboard() {
   };
 
   const tabClass = (name) =>
-    `flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-black transition-all ${
+    `flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all ${
       tab === name
         ? 'bg-amber-500 text-slate-950'
         : 'bg-neutral-900 text-content-secondary hover:bg-neutral-800'
@@ -246,7 +246,7 @@ export default function BaristaDashboard() {
             {/* บอกสถานะการเชื่อมต่อจริง ไม่ใช่จุดเขียวที่ติดค้างไว้เฉย ๆ
                 ถ้าเรียลไทม์หลุด บาริสต้าต้องรู้ว่าคิวมาช้ากว่าปกติ ไม่ใช่เดาเอา */}
             <span
-              className={`text-[10px] font-extrabold uppercase tracking-widest mt-1.5 flex items-center gap-1.5 ${
+              className={`text-[11px] font-bold mt-1.5 flex items-center gap-1.5 ${
                 live ? 'text-accent-emerald' : 'text-accent-amber'
               }`}
             >
@@ -298,7 +298,7 @@ export default function BaristaDashboard() {
             <button
               type="button"
               onClick={toggleSelectAll}
-              className="px-3 py-2.5 rounded-xl text-[11px] font-bold border border-neutral-800 text-content-secondary hover:bg-neutral-900 transition-colors"
+              className="px-3 py-2.5 rounded-xl text-[12px] font-bold border border-neutral-800 text-content-secondary hover:bg-neutral-900 transition-colors"
             >
               {allVisibleSelected ? 'ล้างการเลือก' : `เลือกทั้งหมด (${visibleOrders.length})`}
             </button>
@@ -309,7 +309,7 @@ export default function BaristaDashboard() {
             ปุ่มต่างกันตามแท็บ เพราะ DB ยอมให้ทำคนละอย่าง */}
         {selected.size > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30">
-            <span className="text-xs font-black text-accent-amber">
+            <span className="text-xs font-extrabold text-accent-amber">
               เลือกไว้ {selected.size} ใบ
             </span>
 
@@ -318,7 +318,7 @@ export default function BaristaDashboard() {
                 type="button"
                 onClick={bulkCancel}
                 disabled={bulkBusy}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-black bg-accent-rose text-white disabled:opacity-60 transition-all active:scale-95"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-extrabold bg-accent-rose text-white disabled:opacity-60 transition-all active:scale-95"
               >
                 <X size={13} aria-hidden="true" />
                 {bulkBusy ? 'กำลังทำรายการ...' : `ยกเลิกทั้ง ${selected.size} ใบ`}
@@ -328,7 +328,7 @@ export default function BaristaDashboard() {
                 type="button"
                 onClick={bulkArchive}
                 disabled={bulkBusy}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-black bg-accent-rose text-white disabled:opacity-60 transition-all active:scale-95"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-extrabold bg-accent-rose text-white disabled:opacity-60 transition-all active:scale-95"
               >
                 <Archive size={13} aria-hidden="true" />
                 {bulkBusy ? 'กำลังเก็บ...' : `เก็บ ${selected.size} ใบเข้าคลัง`}
@@ -394,7 +394,7 @@ export default function BaristaDashboard() {
                         className="w-5 h-5 mt-1 shrink-0 accent-amber-500 cursor-pointer"
                       />
                       <div className="min-w-0">
-                      <span className="text-[10px] text-content-secondary font-bold block">
+                      <span className="text-[11px] text-content-secondary font-bold block">
                         นักเรียน: {order.student_name} ({order.student_code || '—'})
                       </span>
                       <span className="text-2xl xl:text-3xl font-black text-white tracking-tight mt-1 block tabular-nums">
@@ -403,7 +403,7 @@ export default function BaristaDashboard() {
                       </div>
                     </div>
                     <span
-                      className={`text-[10px] font-extrabold px-2.5 py-1 rounded-md uppercase tracking-wider ${
+                      className={`text-[11px] font-bold px-2.5 py-1 rounded-md ${
                         order.status === 'paid'
                           ? 'bg-amber-500/10 text-accent-amber border border-amber-500/20'
                           : order.status === 'preparing'
@@ -437,12 +437,12 @@ export default function BaristaDashboard() {
                           )}
 
                           {item.note && (
-                            <div className="text-[11px] font-bold text-brand mt-1 leading-snug">
+                            <div className="text-[12px] font-bold text-brand mt-1 leading-snug">
                               📝 {item.note}
                             </div>
                           )}
 
-                          <div className="text-[10px] text-content-muted mt-1">
+                          <div className="text-[11px] text-content-muted mt-1">
                             {formatBaht(item.unit_price_satang)} ฿ / หน่วย
                           </div>
                         </div>
@@ -453,7 +453,7 @@ export default function BaristaDashboard() {
                   {/* หมายเหตุระดับทั้งออเดอร์ */}
                   {order.order_note && (
                     <div className="bg-blue-500/5 border border-blue-500/25 rounded-xl px-3 py-2">
-                      <span className="text-[10px] font-extrabold text-content-secondary uppercase tracking-wider block">
+                      <span className="text-[11px] font-bold text-content-secondary block">
                         หมายเหตุถึงร้าน
                       </span>
                       <span className="text-xs font-bold text-white">{order.order_note}</span>
@@ -476,7 +476,7 @@ export default function BaristaDashboard() {
                         <button
                           onClick={() => updateOrderStatus(order.id, 'preparing')}
                           disabled={busy}
-                          className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                          className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                         >
                           <Clock size={14} />
                           เริ่มชงเครื่องดื่ม
@@ -484,7 +484,7 @@ export default function BaristaDashboard() {
                         <button
                           onClick={() => updateOrderStatus(order.id, 'cancelled')}
                           disabled={busy}
-                          className="px-3 bg-neutral-800 hover:bg-neutral-700 text-accent-rose font-black py-2.5 rounded-xl text-xs transition-all disabled:opacity-50"
+                          className="px-3 bg-neutral-800 hover:bg-neutral-700 text-accent-rose font-extrabold py-2.5 rounded-xl text-xs transition-all disabled:opacity-50"
                           title="ยกเลิกออเดอร์"
                         >
                           <X size={14} />
@@ -496,7 +496,7 @@ export default function BaristaDashboard() {
                       <button
                         onClick={() => updateOrderStatus(order.id, 'done')}
                         disabled={busy}
-                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                       >
                         <Check size={14} />
                         เสร็จแล้ว / ส่งมอบ

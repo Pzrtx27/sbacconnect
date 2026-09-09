@@ -113,7 +113,7 @@ function ReadyDialog({ order, isDark, remaining, onClose, onPickedUp }) {
                 isDark ? 'bg-emerald-950/20 border-emerald-900/30' : 'bg-emerald-50 border-emerald-200'
               }`}
             >
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-accent-emerald block">
+              <span className="text-[11px] font-bold text-accent-emerald block">
                 รหัสรับของ
               </span>
               <span
@@ -133,7 +133,7 @@ function ReadyDialog({ order, isDark, remaining, onClose, onPickedUp }) {
                 type="button"
                 ref={closeRef}
                 onClick={onClose}
-                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3.5 rounded-2xl text-sm shadow-lg shadow-emerald-500/25 active:scale-95 transition-all"
+                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold py-3.5 rounded-2xl text-sm shadow-lg shadow-emerald-500/25 active:scale-95 transition-all"
               >
                 รับทราบ — เดี๋ยวไปรับ
               </button>
@@ -151,7 +151,7 @@ function ReadyDialog({ order, isDark, remaining, onClose, onPickedUp }) {
             </div>
 
             {remaining > 0 && (
-              <p className={`text-[11px] font-bold ${isDark ? 'text-content-secondary' : 'text-ink-muted'}`}>
+              <p className={`text-[12px] font-bold ${isDark ? 'text-content-secondary' : 'text-ink-muted'}`}>
                 ยังมีอีก {remaining} ใบที่พร้อมรับ
               </p>
             )}

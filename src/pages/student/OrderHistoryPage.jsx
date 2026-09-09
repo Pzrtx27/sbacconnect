@@ -60,7 +60,7 @@ export default function OrderHistoryPage() {
       <button
         type="button"
         onClick={() => navigate('/orders')}
-        className={`flex items-center gap-1.5 text-xs font-extrabold transition-colors ${
+        className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${
           isDark ? 'text-content-secondary hover:text-white' : 'text-ink-muted hover:text-sbac-navy'
         }`}
       >
@@ -97,7 +97,7 @@ export default function OrderHistoryPage() {
               setLoading(true);
               fetchHistory();
             }}
-            className="px-5 py-2.5 rounded-2xl text-xs font-extrabold bg-sbac-blue hover:bg-sbac-navy text-white transition-colors"
+            className="px-5 py-2.5 rounded-2xl text-xs font-bold bg-sbac-blue hover:bg-sbac-navy text-white transition-colors"
           >
             ลองโหลดใหม่
           </button>
@@ -143,11 +143,11 @@ export default function OrderHistoryPage() {
                     {extraCount > 0 ? ` และอีก ${extraCount} รายการ` : ''}
                   </div>
                   {first?.order_item_options?.length > 0 && (
-                    <div className="text-[10px] font-bold mt-0.5 text-accent-amber truncate">
+                    <div className="text-[11px] font-bold mt-0.5 text-accent-amber truncate">
                       {optionSummary(first.order_item_options.map((o) => ({ name: o.option_name })))}
                     </div>
                   )}
-                  <div className={`text-[10px] mt-0.5 transition-colors duration-300 ${textMuted}`}>
+                  <div className={`text-[11px] mt-0.5 transition-colors duration-300 ${textMuted}`}>
                     {new Date(order.created_at).toLocaleString('th-TH', {
                       day: '2-digit',
                       month: 'short',

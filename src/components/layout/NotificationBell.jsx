@@ -125,7 +125,7 @@ export default function NotificationBell() {
                   className="flex-1 min-w-0 text-left p-3.5"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className={`text-xs font-extrabold ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+                    <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
                       {n.title}
                     </span>
                     {!n.is_read && (

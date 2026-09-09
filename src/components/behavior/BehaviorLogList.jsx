@@ -41,7 +41,7 @@ export default function BehaviorLogList({ logs, loading, showStudentName = false
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               {showStudentName && (
-                <div className={`text-xs font-extrabold truncate ${textPrimary}`}>
+                <div className={`text-xs font-bold truncate ${textPrimary}`}>
                   {log.student_name} {log.student_code ? `(รหัส ${log.student_code})` : ''}
                 </div>
               )}

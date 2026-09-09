@@ -341,7 +341,7 @@ export default function EventManager() {
           <button
             type="button"
             onClick={startNew}
-            className="bg-sbac-blue hover:bg-sbac-navy text-white font-extrabold px-3 py-2 rounded-xl text-[11px] transition-all active:scale-95 flex items-center gap-1.5"
+            className="bg-sbac-blue hover:bg-sbac-navy text-white font-bold px-3 py-2 rounded-xl text-[12px] transition-all active:scale-95 flex items-center gap-1.5"
           >
             <CalendarPlus size={13} aria-hidden="true" />
             เพิ่มกิจกรรม
@@ -349,7 +349,7 @@ export default function EventManager() {
         )}
       </div>
 
-      <p className={`text-[10px] leading-relaxed ${isDark ? 'text-content-muted' : 'text-ink-muted'}`}>
+      <p className={`text-[11px] leading-relaxed ${isDark ? 'text-content-muted' : 'text-ink-muted'}`}>
         กิจกรรมที่บันทึกที่นี่จะขึ้นบนปฏิทินหน้าแรกของนักเรียนทันที ไม่ต้องรอให้เขาปิดแอปเปิดใหม่
       </p>
 
@@ -361,7 +361,7 @@ export default function EventManager() {
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className={`text-xs font-extrabold ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+            <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
               {draft.id ? 'แก้ไขกิจกรรม' : 'กิจกรรมใหม่'}
             </span>
             <button
@@ -444,7 +444,7 @@ export default function EventManager() {
                 </option>
               ))}
             </select>
-            <p className={`text-[10px] mt-1 ${isDark ? 'text-content-muted' : 'text-ink-muted'}`}>
+            <p className={`text-[11px] mt-1 ${isDark ? 'text-content-muted' : 'text-ink-muted'}`}>
               เลือกห้องแล้วนักเรียนห้องอื่นจะไม่เห็นกิจกรรมนี้เลย ครูกับฝ่ายวิชาการยังเห็นทุกห้อง
             </p>
           </div>
@@ -480,7 +480,7 @@ export default function EventManager() {
                 onChange={(e) => setDraft({ ...draft, all_day: e.target.checked })}
                 className="w-4 h-4 accent-sbac-blue"
               />
-              <span className={`text-[11px] font-bold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+              <span className={`text-[12px] font-bold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
                 ทั้งวัน
               </span>
             </label>
@@ -492,7 +492,7 @@ export default function EventManager() {
                 onChange={(e) => setDraft({ ...draft, is_published: e.target.checked })}
                 className="w-4 h-4 accent-sbac-blue"
               />
-              <span className={`text-[11px] font-bold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+              <span className={`text-[12px] font-bold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
                 เผยแพร่ให้นักเรียนเห็น
               </span>
             </label>
@@ -530,7 +530,7 @@ export default function EventManager() {
                   className="w-4 h-4 accent-sbac-blue"
                 />
                 <Repeat size={14} className="text-brand" aria-hidden="true" />
-                <span className={`text-[11px] font-bold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+                <span className={`text-[12px] font-bold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
                   ทำซ้ำทุกสัปดาห์
                   {draft.start_at && (
                     <> (ทุกวัน{DAY_NAMES_FULL[new Date(draft.start_at).getDay()]})</>
@@ -552,7 +552,7 @@ export default function EventManager() {
                   </div>
 
                   {draft.repeat_until && (
-                    <p className={`text-[10px] leading-relaxed ${isDark ? 'text-content-muted' : 'text-ink-muted'}`}>
+                    <p className={`text-[11px] leading-relaxed ${isDark ? 'text-content-muted' : 'text-ink-muted'}`}>
                       จะสร้างกิจกรรมทั้งหมด{' '}
                       <span className="font-extrabold text-brand">
                         {weeklyOccurrences(draft.start_at, draft.end_at || null, draft.repeat_until).length} ครั้ง
@@ -569,7 +569,7 @@ export default function EventManager() {
             type="button"
             onClick={save}
             disabled={saving}
-            className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-extrabold py-3 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-2"
+            className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-bold py-3 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-2"
           >
             <Save size={14} aria-hidden="true" />
             {saving ? 'กำลังบันทึก...' : draft.id ? 'บันทึกการแก้ไข' : 'เพิ่มลงปฏิทิน'}
@@ -612,7 +612,7 @@ export default function EventManager() {
             <button
               type="button"
               onClick={toggleSelectAll}
-              className={`px-3 py-2.5 rounded-xl text-[11px] font-bold border transition-colors ${
+              className={`px-3 py-2.5 rounded-xl text-[12px] font-bold border transition-colors ${
                 isDark
                   ? 'border-white/10 text-content-secondary hover:bg-white/5'
                   : 'border-border text-ink-secondary hover:bg-slate-50'
@@ -629,14 +629,14 @@ export default function EventManager() {
                 isDark ? 'bg-rose-500/10 border-rose-500/30' : 'bg-rose-50 border-rose-200'
               }`}
             >
-              <span className="text-xs font-extrabold text-accent-rose">
+              <span className="text-xs font-bold text-accent-rose">
                 เลือกไว้ {selected.size} รายการ
               </span>
               <button
                 type="button"
                 onClick={bulkDelete}
                 disabled={bulkDeleting}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-black bg-accent-rose text-white disabled:opacity-60 transition-all active:scale-95"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-extrabold bg-accent-rose text-white disabled:opacity-60 transition-all active:scale-95"
               >
                 <Trash2 size={13} aria-hidden="true" />
                 {bulkDeleting ? 'กำลังลบ...' : `ลบทั้ง ${selected.size} รายการ`}
@@ -678,7 +678,7 @@ export default function EventManager() {
 
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-start gap-2 flex-wrap">
-                  <span className={`text-xs font-extrabold ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+                  <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
                     {evt.title}
                   </span>
                   <span
@@ -702,7 +702,7 @@ export default function EventManager() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 flex-wrap text-[10px] font-semibold text-content-muted">
+                <div className="flex items-center gap-2 flex-wrap text-[11px] font-semibold text-content-muted">
                   <span>{thaiShortDate(evt.start)}</span>
                   <span>·</span>
                   <span>{eventTimeText(evt)}</span>

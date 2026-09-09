@@ -446,7 +446,7 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
                   <header className={`flex items-center justify-between px-5 py-3 border-b shrink-0 ${isDark ? 'border-white/10' : 'border-border'}`}>
                     <div className="min-w-0">
                       <h2 className="text-sm font-extrabold truncate">ผู้ช่วย SBAC Connect</h2>
-                      <p className="text-[11px] font-semibold text-content-muted">
+                      <p className="text-[12px] font-semibold text-content-muted">
                         ตอบจากข้อมูลจริงในระบบ
                       </p>
                     </div>
@@ -506,7 +506,7 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
                               type="button"
                               onClick={cancelRepair}
                               disabled={thinking}
-                              className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold border-2 transition-colors disabled:opacity-50 ${
+                              className={`flex-1 py-2.5 rounded-xl text-xs font-bold border-2 transition-colors disabled:opacity-50 ${
                                 isDark ? 'border-white/20 hover:bg-white/10' : 'border-border text-ink-secondary hover:bg-slate-50'
                               }`}
                             >
@@ -516,7 +516,7 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
                               type="button"
                               onClick={commitRepair}
                               disabled={thinking}
-                              className="flex-1 py-2.5 rounded-xl text-xs font-extrabold bg-sbac-blue hover:bg-sbac-navy text-white transition-colors disabled:opacity-60"
+                              className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-sbac-blue hover:bg-sbac-navy text-white transition-colors disabled:opacity-60"
                             >
                               {thinking ? 'กำลังส่ง...' : 'ยืนยันแจ้งซ่อม'}
                             </button>
@@ -530,7 +530,7 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
                                 key={action.path + action.label}
                                 type="button"
                                 onClick={() => goTo(action.path)}
-                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-extrabold border transition-colors ${
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-bold border transition-colors ${
                                   isDark
                                     ? 'border-white/15 text-brand hover:bg-white/10'
                                     : 'border-border text-brand hover:bg-sbac-blue-50'
@@ -571,7 +571,7 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
                               pushUser(action.label);
                               handleIntent(action.intent);
                             }}
-                            className={`px-3 py-1.5 rounded-full text-[11px] font-bold border transition-colors ${
+                            className={`px-3 py-1.5 rounded-full text-[12px] font-bold border transition-colors ${
                               isDark
                                 ? 'border-white/15 text-slate-200 hover:bg-white/10'
                                 : 'border-border text-ink-secondary hover:bg-slate-50'

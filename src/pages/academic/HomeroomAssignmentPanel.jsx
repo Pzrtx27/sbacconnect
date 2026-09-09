@@ -72,7 +72,7 @@ export default function HomeroomAssignmentPanel() {
           <div>
             <Users className="text-brand mb-2" size={24} />
             <div className={`text-sm font-extrabold ${textPrimary}`}>กำหนดครูประจำชั้น</div>
-            <div className={`text-[10px] mt-1 leading-snug ${textMuted}`}>ผูกครูกับห้องเรียน — ใช้กำหนดผู้อนุมัติใบลาขั้นที่ 1</div>
+            <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ผูกครูกับห้องเรียน — ใช้กำหนดผู้อนุมัติใบลาขั้นที่ 1</div>
           </div>
           <div className="mt-2.5 flex items-center justify-between">
             <span className="text-[9px] font-semibold text-brand">จัดการ</span>
@@ -97,7 +97,7 @@ export default function HomeroomAssignmentPanel() {
                   isDark ? 'bg-white/[0.02] border-white/5' : 'bg-slate-50 border-slate-100'
                 }`}
               >
-                <span className={`text-xs font-extrabold shrink-0 ${textPrimary}`}>{room.label}</span>
+                <span className={`text-xs font-bold shrink-0 ${textPrimary}`}>{room.label}</span>
                 <select
                   value={room.homeroom_teacher_id || ''}
                   onChange={(e) => handleAssign(room.id, e.target.value || null)}

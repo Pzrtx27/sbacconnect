@@ -173,7 +173,7 @@ export default function LoginPage() {
           {t.title}
         </h1>
         <div className="flex items-center justify-center gap-2 mt-1.5">
-          <p className={`text-[10px] font-extrabold uppercase tracking-[3px] transition-colors duration-300 ${
+          <p className={`text-[11px] font-bold transition-colors duration-300 ${
             isDark ? 'text-content-secondary' : 'text-content-muted'
           }`}>
             {t.subtitle}
@@ -188,7 +188,7 @@ export default function LoginPage() {
         transition={{ duration: 0.6, delay: 0.1 }}
         className="w-full max-w-md relative z-10"
       >
-        <div className={`rounded-[32px] p-8 transition-all duration-300 border ${
+        <div className={`rounded-3xl p-8 transition-all duration-300 border ${
           isDark 
             ? 'bg-neutral-900 border-neutral-800 shadow-2xl text-white' 
             : 'bg-surface-card shadow-xl border-slate-200 text-slate-900'
@@ -210,7 +210,7 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-5">
             {/* User ID field */}
             <div className="space-y-1.5">
-              <label htmlFor="login-user-id" className={`text-[11px] font-extrabold uppercase tracking-wide block transition-colors duration-300 ${
+              <label htmlFor="login-user-id" className={`text-[12px] font-bold block transition-colors duration-300 ${
                 isDark ? 'text-slate-200' : 'text-slate-600'
               }`}>
                 {t.labelUser}
@@ -242,7 +242,7 @@ export default function LoginPage() {
 
             {/* National ID / Password field */}
             <div className="space-y-1.5">
-              <label htmlFor="login-national-id" className={`text-[11px] font-extrabold uppercase tracking-wide block transition-colors duration-300 ${
+              <label htmlFor="login-national-id" className={`text-[12px] font-bold block transition-colors duration-300 ${
                 isDark ? 'text-slate-200' : 'text-slate-600'
               }`}>
                 {t.labelPass}
@@ -305,7 +305,7 @@ export default function LoginPage() {
               <button 
                 type="button" 
                 onClick={() => showToast(t.forgotToast, 'info')}
-                className="text-xs font-extrabold text-brand hover:underline transition-colors min-h-[44px] px-1 -mr-1 inline-flex items-center"
+                className="text-xs font-bold text-brand hover:underline transition-colors min-h-[44px] px-1 -mr-1 inline-flex items-center"
               >
                 {t.forgot}
               </button>
@@ -357,7 +357,7 @@ export default function LoginPage() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.4 }}
-        className={`flex items-center gap-2 max-w-sm px-4 py-2 mt-6 rounded-full border text-[10px] font-semibold ${
+        className={`flex items-center gap-2 max-w-sm px-4 py-2 mt-6 rounded-full border text-[11px] font-semibold ${
           isDark 
             ? 'bg-neutral-900/60 border-white/10 text-content-secondary' 
             : 'bg-slate-100/50 border-slate-200 text-content-muted'
@@ -374,7 +374,7 @@ export default function LoginPage() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
-        className={`text-[10px] font-bold text-center mt-8 space-y-1.5 relative z-10 transition-colors duration-300 ${
+        className={`text-[11px] font-bold text-center mt-8 space-y-1.5 relative z-10 transition-colors duration-300 ${
           isDark ? 'text-content-secondary' : 'text-content-muted'
         }`}
       >

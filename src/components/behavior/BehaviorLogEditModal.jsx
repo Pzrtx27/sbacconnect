@@ -84,7 +84,7 @@ export default function BehaviorLogEditModal({ log, onClose, onSave }) {
                 key={cat.id}
                 type="button"
                 onClick={() => { setCategoryId(cat.id); setReason(cat.label); setPoints(String(cat.default_points)); }}
-                className={`p-2 rounded-xl border text-[10px] font-bold text-left transition-all ${
+                className={`p-2 rounded-xl border text-[11px] font-bold text-left transition-all ${
                   categoryId === cat.id
                     ? 'border-sbac-blue bg-sbac-blue-50/20 text-brand'
                     : isDark ? 'border-white/5 bg-white/[0.02] text-content-secondary' : 'border-slate-100 bg-surface-card text-slate-600'

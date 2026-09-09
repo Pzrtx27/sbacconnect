@@ -143,7 +143,7 @@ function ConfirmDialog({
                     {message}
                   </p>
                   {detail && (
-                    <p className="text-[11px] font-semibold leading-relaxed text-content-muted">
+                    <p className="text-[12px] font-semibold leading-relaxed text-content-muted">
                       {detail}
                     </p>
                   )}
@@ -155,7 +155,7 @@ function ConfirmDialog({
                   type="button"
                   onClick={onCancel}
                   disabled={busy}
-                  className={`flex-1 font-extrabold py-3 rounded-2xl text-xs border-2 transition-all active:scale-95 disabled:opacity-50 ${
+                  className={`flex-1 font-bold py-3 rounded-2xl text-xs border-2 transition-all active:scale-95 disabled:opacity-50 ${
                     isDark
                       ? 'border-white/20 text-slate-200 hover:bg-white/10'
                       : 'border-border text-ink-secondary hover:bg-slate-50'
@@ -168,7 +168,7 @@ function ConfirmDialog({
                   ref={confirmRef}
                   onClick={onConfirm}
                   disabled={busy}
-                  className={`flex-1 font-extrabold py-3 rounded-2xl text-xs transition-all active:scale-95 disabled:opacity-60 ${confirmBtn}`}
+                  className={`flex-1 font-bold py-3 rounded-2xl text-xs transition-all active:scale-95 disabled:opacity-60 ${confirmBtn}`}
                 >
                   {busy ? 'กำลังทำรายการ...' : confirmLabel}
                 </button>
