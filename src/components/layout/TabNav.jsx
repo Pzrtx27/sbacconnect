@@ -40,9 +40,16 @@ export default function TabNav({ tabs, active, onChange, ariaLabel = 'หมว�
 
   return (
     /* sticky ใต้ header — เปลี่ยนหมวดได้โดยไม่ต้องเลื่อนกลับขึ้นหัวหน้า
-       -mx-4 px-4 ให้แถบกินเต็มขอบจอบนมือถือ แต่เนื้อหาข้างในยังตรงกับคอลัมน์หลัก */
+       -mx-4 px-4 ให้แถบกินเต็มขอบจอบนมือถือ แต่เนื้อหาข้างในยังตรงกับคอลัมน์หลัก
+
+       top ต้องเป็นความสูงของ header ไม่ใช่ 0 — ของเดิมตั้ง top-0 ทั้งที่ header
+       ก็ sticky top-0 อยู่ที่เดิมและ z-index สูงกว่า (40 > 30)
+       พอเลื่อนหน้าลง แถบแท็บจึงเลื่อนไปหยุดใต้ header พอดีแล้วมุดหายทั้งแถบ
+       เห็นชัดที่สุดในแท็บที่เนื้อหายาวอย่าง "กิจกรรม" กับ "นำเข้าข้อมูล"
+       ส่วนแท็บสั้น ๆ ที่ไม่ต้องเลื่อนจะไม่มีใครเจอปัญหานี้เลย
+       ค่าตัวแปรมาจาก Header.jsx ซึ่งวัดความสูงตัวเองด้วย ResizeObserver */
     <div
-      className={`sticky top-0 z-30 -mx-4 px-4 py-2 backdrop-blur-xl border-b transition-colors duration-300 ${
+      className={`sticky top-[var(--app-header-h,0px)] z-30 -mx-4 px-4 py-2 backdrop-blur-xl border-b transition-colors duration-300 ${
         isDark ? 'bg-surface-dark/85 border-white/10' : 'bg-surface/85 border-border'
       }`}
     >

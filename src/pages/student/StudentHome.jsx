@@ -235,7 +235,7 @@ export default function StudentHome() {
           บนคอมยังเป็นสองคอลัมน์เหมือนเดิม เมนูซ้าย ปฏิทินเป็นรางขวาที่ตรึงไว้
           ซึ่งไม่กินพื้นที่แนวตั้งของเนื้อหาหลักอยู่แล้ว จึงไม่ต้องพับ */}
       <div className="grid gap-6 xl:grid-cols-[1fr_380px] items-start">
-        <div className="order-2 xl:order-2 space-y-6 xl:sticky xl:top-24">
+        <div className="order-2 xl:order-2 space-y-6 xl:sticky xl:top-[calc(var(--app-header-h,0px)+1.5rem)]">
           {/* กิจกรรมที่กำลังจะมาถึง — สั้นและต้องเห็นโดยไม่ต้องกดอะไรเลย */}
           <UpcomingEvents />
 
