@@ -79,6 +79,16 @@
     }
   }
 
+  /* ปุ่ม "แสดงรหัสผ่าน" ที่ Edge/IE วาดเองไว้ในช่อง type="password"
+     แอปมีปุ่มรูปดวงตาของตัวเองอยู่ตำแหน่งเดียวกันเป๊ะ (ดู LoginPage.jsx)
+     ปล่อยไว้จะได้ดวงตาสองอันซ้อนกัน คนกดโดนของเบราว์เซอร์ซึ่งทำงานคนละแบบ
+     (ของเบราว์เซอร์ต้องกดค้าง ปล่อยแล้วซ่อนกลับทันที) แล้วสรุปว่าปุ่มของแอปเสีย
+     ::-ms-clear เอาออกด้วยเหตุผลเดียวกัน มันคือปุ่มกากบาทที่วางทับกันอยู่ */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none;
+  }
+
   html {
     font-family: 'Sarabun', 'IBM Plex Sans Thai', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
