@@ -56,7 +56,7 @@ export default function TopUpSlipForm() {
 
   const textPrimary = isDark ? 'text-white' : 'text-sbac-navy';
   const textMuted = isDark ? 'text-content-secondary' : 'text-ink-muted';
-  const boxClass = isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100';
+  const boxClass = isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100';
   const inputClass = isDark
     ? 'bg-neutral-900 border-white/20 text-white placeholder:text-content-muted focus:border-sbac-blue-light'
     : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue';

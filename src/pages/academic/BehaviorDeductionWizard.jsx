@@ -201,7 +201,7 @@ export default function BehaviorDeductionWizard() {
                     className={`p-2.5 rounded-xl border text-[11px] font-bold text-left transition-all ${
                       categoryId === cat.id
                         ? 'border-sbac-blue bg-sbac-blue-50/20 text-brand'
-                        : isDark ? 'border-white/5 bg-white/[0.02] text-content-secondary' : 'border-slate-100 bg-surface-card text-slate-600'
+                        : isDark ? 'border-white/10 bg-white/[0.03] text-content-secondary' : 'border-slate-100 bg-surface-card text-slate-600'
                     }`}
                   >
                     <div className="truncate">{cat.label}</div>
@@ -255,7 +255,7 @@ export default function BehaviorDeductionWizard() {
                     type="button"
                     onClick={() => handlePickClassroom(room.id)}
                     className={`p-3 rounded-xl border text-xs font-bold text-left transition-all ${
-                      isDark ? 'border-white/5 bg-white/[0.02] hover:bg-white/[0.05] text-content-secondary' : 'border-slate-100 bg-surface-card hover:bg-slate-50 text-slate-600'
+                      isDark ? 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06] text-content-secondary' : 'border-slate-100 bg-surface-card hover:bg-slate-50 text-slate-600'
                     }`}
                   >
                     {room.label}
@@ -296,7 +296,7 @@ export default function BehaviorDeductionWizard() {
                           type="button"
                           onClick={() => setSelectedStudent(s)}
                           className={`w-full text-left px-3 py-2.5 rounded-xl border transition-colors ${
-                            isDark ? 'border-white/5 hover:bg-white/5' : 'border-slate-100 hover:bg-slate-50'
+                            isDark ? 'border-white/10 hover:bg-white/5' : 'border-slate-100 hover:bg-slate-50'
                           }`}
                         >
                           <div className={`text-xs font-bold ${textPrimary}`}>{s.full_name}</div>
@@ -319,7 +319,7 @@ export default function BehaviorDeductionWizard() {
                 </>
               ) : (
                 <>
-                  <div className={`rounded-2xl border p-4 space-y-2 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'}`}>
+                  <div className={`rounded-2xl border p-4 space-y-2 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'}`}>
                     <div className={`text-sm font-extrabold ${textPrimary}`}>{selectedStudent.full_name}</div>
                     <div className={`text-[12px] font-semibold ${textMuted}`}>รหัส {selectedStudent.student_code || '—'} • ปัจจุบัน {selectedStudent.score} แต้ม</div>
                     <div className={`h-px my-1 ${isDark ? 'bg-white/10' : 'bg-slate-200'}`} />

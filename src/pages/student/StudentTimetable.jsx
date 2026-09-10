@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import PageHeader from '../../components/layout/PageHeader';
+import { READING_WIDTH } from '../../utils/layout';
+import { useMyClassInfo } from '../../hooks/useMyClassInfo';
 import { Calendar, AlertCircle, CalendarClock } from 'lucide-react';
 import {
   fetchBaseTimetable,
@@ -163,16 +166,21 @@ export default function StudentTimetable() {
     seed: { label: 'ตัวอย่าง (ห้องนี้ยังไม่ผูกกับชีต)', dot: 'bg-amber-500', tone: isDark ? 'bg-amber-950/30 text-accent-amber' : 'bg-amber-50 text-accent-amber' },
     error: { label: 'อ่านชีตไม่สำเร็จ', dot: 'bg-rose-500', tone: isDark ? 'bg-rose-950/30 text-accent-rose' : 'bg-rose-50 text-accent-rose' },
   };
+  /* ครูที่ปรึกษาของห้องตัวเอง — ดึงจากฐานข้อมูล (my_class_info)
+     ADVISOR_BY_CLASS ด้านบนเป็นค่าที่เขียนไว้ตายตัวตั้งแต่ยังไม่มีข้อมูลใน DB
+     ครอบแค่สองห้อง และไม่มีอะไรทำให้มันตามการเปลี่ยนครูประจำชั้นในระบบ
+     จึงเหลือไว้เป็นทางถอยสำหรับห้องอื่นที่ฝ่ายวิชาการเปิดดูเท่านั้น */
+  const { info: classInfo } = useMyClassInfo();
+  const advisorName =
+    (viewClassId === myClassId && classInfo?.advisor_name) ||
+    ADVISOR_BY_CLASS[viewClassId] ||
+    'ยังไม่ระบุ';
+
   const status = STATUS[source] || STATUS.loading;
 
   return (
-    <div className="space-y-6 xl:max-w-4xl">
-      <div className="flex justify-between items-center">
-        <h2 className={`text-xl font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
-          }`}>
-          <Calendar size={24} className="text-brand" />
-          ตารางสอน
-        </h2>
+    <div className={`space-y-6 ${READING_WIDTH}`}>
+      <PageHeader icon={Calendar} title="ตารางสอน">
         {/* aria-live ให้ screen reader ประกาศเองตอนตารางถูกแก้ระหว่างเปิดหน้าอยู่
             ไม่งั้นคนที่มองไม่เห็นจะไม่รู้เลยว่าคาบเปลี่ยนไปแล้ว */}
         <span
@@ -182,7 +190,7 @@ export default function StudentTimetable() {
           <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
           {status.label}
         </span>
-      </div>
+      </PageHeader>
 
       {/* สลับดูตารางห้องอื่น — เฉพาะฝ่ายวิชาการ และเฉพาะเมื่อมีมากกว่าหนึ่งห้อง
           ปุ่มเดียวที่กดแล้วไม่มีอะไรให้เลือกคือปุ่มที่ไม่ควรมี */}
@@ -230,13 +238,12 @@ export default function StudentTimetable() {
           <span className={isDark ? 'text-content-secondary' : 'text-ink-muted'}>ระดับชั้น / ห้อง</span>
           <span className={`font-bold transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
             {classLabel(viewClassId)}
-            {viewClassId === myClassId && user?.branch ? ` (${user.branch})` : ''}
           </span>
         </div>
         <div className="flex justify-between">
           <span className={isDark ? 'text-content-secondary' : 'text-ink-muted'}>อาจารย์ที่ปรึกษา</span>
           <span className={`font-bold transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
-            {ADVISOR_BY_CLASS[viewClassId] || 'ยังไม่ระบุ'}
+            {advisorName}
           </span>
         </div>
         <div className="flex justify-between">

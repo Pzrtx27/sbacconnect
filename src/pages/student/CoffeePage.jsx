@@ -7,8 +7,10 @@ import { showToast } from '../../components/ui/Toast';
 import Modal from '../../components/ui/Modal';
 import GlassCard from '../../components/layout/GlassCard';
 import {
-  ShoppingCart, History, Coffee, Minus, Plus, RefreshCw, Trash2, X, Check,
+  ShoppingCart, History, Minus, Plus, RefreshCw, Trash2, X, Check,
 } from 'lucide-react';
+import CoffeeCup from '../../components/ui/icons/CoffeeCup';
+import PageHeader from '../../components/layout/PageHeader';
 import { formatBaht } from '../../utils/identity';
 import DrinkIcon from '../../components/ui/DrinkIcon';
 import {
@@ -350,58 +352,45 @@ export default function CoffeePage() {
 
   return (
     <div className="space-y-6 pb-24 xl:pb-28">
-      {/* Header */}
-      <div
-        className={`flex justify-between items-center p-4 rounded-2xl border transition-colors duration-300 ${
-          isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
-        }`}
-      >
-        <h2 className={`text-xl font-extrabold flex items-center gap-2 ${textPrimary}`}>
-          <span className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-accent-amber shrink-0">
-            <Coffee size={18} aria-hidden="true" />
+      <PageHeader icon={CoffeeCup} title="SBAC Coffee" tone="amber">
+        {/* ปุ่มโหลดเมนูใหม่ — ทางออกเวลา realtime ไม่มา (เน็ตโรงเรียนตัด websocket บ่อย)
+            หรือร้านเพิ่งแก้เมนูแล้วอยากเห็นผลเดี๋ยวนั้นเลย */}
+        <button
+          type="button"
+          onClick={loadMenu}
+          disabled={loadingMenu || refreshingMenu}
+          aria-label="โหลดเมนูใหม่"
+          title="โหลดเมนูใหม่"
+          className={`w-9 h-9 flex items-center justify-center rounded-xl border transition-colors active:scale-95 disabled:opacity-50 ${
+            isDark
+              ? 'border-white/10 text-content-secondary hover:bg-white/10'
+              : 'border-slate-200 text-ink-secondary hover:bg-slate-100'
+          }`}
+        >
+          <RefreshCw
+            size={14}
+            className={loadingMenu || refreshingMenu ? 'animate-spin' : ''}
+            aria-hidden="true"
+          />
+        </button>
+        <button
+          onClick={() => navigate('/orders/history')}
+          className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl border active:scale-95 transition-all ${
+            isDark
+              ? 'bg-amber-500/20 text-accent-amber border-amber-500/30 hover:bg-amber-500/30'
+              : 'bg-amber-500/10 text-accent-amber border-amber-500/20 hover:bg-amber-500/20'
+          }`}
+        >
+          <History size={14} aria-hidden="true" />
+          ประวัติ
+        </button>
+        <span className={`text-xs font-bold ${textMuted}`}>
+          บัตร:{' '}
+          <span className={`font-extrabold ${isDark ? 'text-accent-amber' : 'text-sbac-navy'}`}>
+            {formatBaht(user?.balance_satang || 0)} ฿
           </span>
-          SBAC Coffee
-        </h2>
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* ปุ่มโหลดเมนูใหม่ — ทางออกเวลา realtime ไม่มา (เน็ตโรงเรียนตัด websocket บ่อย)
-              หรือร้านเพิ่งแก้เมนูแล้วอยากเห็นผลเดี๋ยวนั้นเลย */}
-          <button
-            type="button"
-            onClick={loadMenu}
-            disabled={loadingMenu || refreshingMenu}
-            aria-label="โหลดเมนูใหม่"
-            title="โหลดเมนูใหม่"
-            className={`w-9 h-9 flex items-center justify-center rounded-xl border transition-colors active:scale-95 disabled:opacity-50 ${
-              isDark
-                ? 'border-white/10 text-content-secondary hover:bg-white/10'
-                : 'border-slate-200 text-ink-secondary hover:bg-slate-100'
-            }`}
-          >
-            <RefreshCw
-              size={14}
-              className={loadingMenu || refreshingMenu ? 'animate-spin' : ''}
-              aria-hidden="true"
-            />
-          </button>
-          <button
-            onClick={() => navigate('/orders/history')}
-            className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl border active:scale-95 transition-all ${
-              isDark
-                ? 'bg-amber-500/20 text-accent-amber border-amber-500/30 hover:bg-amber-500/30'
-                : 'bg-amber-500/10 text-accent-amber border-amber-500/20 hover:bg-amber-500/20'
-            }`}
-          >
-            <History size={14} aria-hidden="true" />
-            ประวัติ
-          </button>
-          <span className={`text-xs font-bold ${textMuted}`}>
-            บัตร:{' '}
-            <span className={`font-extrabold ${isDark ? 'text-accent-amber' : 'text-sbac-navy'}`}>
-              {formatBaht(user?.balance_satang || 0)} ฿
-            </span>
-          </span>
-        </div>
-      </div>
+        </span>
+      </PageHeader>
 
       {/* ---------- เมนู ---------- */}
       {loadingMenu ? (
@@ -634,7 +623,7 @@ export default function CoffeePage() {
             </div>
 
             {/* จำนวน */}
-            <div className={`p-4 rounded-2xl border space-y-3 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'}`}>
+            <div className={`p-4 rounded-2xl border space-y-3 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'}`}>
               <div className="flex items-center justify-center gap-6">
                 <button
                   onClick={() => setEditing({ ...editing, qty: Math.max(1, editing.qty - 1) })}
@@ -714,7 +703,7 @@ export default function CoffeePage() {
                 <li
                   key={`${line.product.id}-${index}`}
                   className={`p-3 rounded-2xl border space-y-2 ${
-                    isDark ? 'bg-white/[0.04] border-white/10' : 'bg-slate-50 border-slate-200'
+                    isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-200'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">

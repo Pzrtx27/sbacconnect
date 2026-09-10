@@ -42,7 +42,7 @@ export default function WalletHistory({ limit = 50 }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const rowBase = `flex items-center gap-3 py-3 ${isDark ? 'border-white/5' : 'border-slate-100'}`;
+  const rowBase = `flex items-center gap-3 py-3 ${isDark ? 'border-white/10' : 'border-slate-100'}`;
 
   if (loading) {
     return (
@@ -76,7 +76,7 @@ export default function WalletHistory({ limit = 50 }) {
   if (items.length === 0) {
     return (
       <div className={`rounded-2xl border p-6 text-center ${
-        isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
+        isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
       }`}>
         <p className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-ink'}`}>ยังไม่มีรายการ</p>
         <p className="text-xs font-semibold text-content-muted mt-1 leading-relaxed">

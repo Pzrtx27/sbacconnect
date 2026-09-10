@@ -44,11 +44,19 @@ async function loadProfile() {
   if (!userRow) return null; // ล็อกอินผ่าน แต่ไม่มีแถวใน users = ยังไม่ถูกลงทะเบียน
 
   // ดึงข้อมูลส่วนที่เหลือแบบขนาน ลดเวลารอ
-  const [roleRes, profileRes, balanceRes] = await Promise.all([
+  const [roleRes, profileRes, teacherRes, balanceRes] = await Promise.all([
     supabase.from('user_roles').select('role').eq('user_id', userRow.id),
     supabase
       .from('student_profiles')
       .select('student_code, class_rooms(level, room_no)')
+      .eq('user_id', userRow.id)
+      .maybeSingle(),
+    /* แถวของตัวเองเท่านั้น — policy teacher_self_select ยอมให้อ่านได้อยู่แล้ว
+       นักเรียนยิงมาก็ได้ null กลับไปเฉย ๆ ไม่ต้องแยกเงื่อนไขตาม role ให้ยุ่ง
+       (ต้องรู้ role ก่อนถึงจะรู้ว่าควรยิงไหม แต่ role ก็มาจากคำสั่งในชุดนี้เอง) */
+    supabase
+      .from('teacher_profiles')
+      .select('teacher_code, department')
       .eq('user_id', userRow.id)
       .maybeSingle(),
     supabase.rpc('my_balance'),
@@ -70,6 +78,7 @@ async function loadProfile() {
   const role = dbRole === 'pos' || dbRole === 'cashier' ? 'barista' : dbRole;
 
   const sp = profileRes.data;
+  const tp = teacherRes.data;
   const room = sp?.class_rooms || null;
   const balanceSatang = Number(balanceRes.data ?? 0);
 
@@ -84,7 +93,14 @@ async function loadProfile() {
     class_id: room ? toClassId(room.level, room.room_no) : '',
     room: room?.room_no || '',
     year: room ? String(room.level).match(/\d+/)?.[0] || '' : '',
-    branch: '',
+    /* ป้ายห้องที่เอาไปแสดงได้ตรง ๆ เช่น 'ปวช.3/6'
+       ต่างจาก class_id ('m3_6') ที่เป็นคีย์ของตารางสอนใน sheets.js ไม่ใช่ของที่เอาให้คนอ่าน
+       หน้าแรกเคยไม่มีอะไรบอกห้องเลย มีแต่ ID กับสาขาที่ hardcode ไว้ */
+    class_label: room ? `${room.level}/${room.room_no}` : '',
+    // ฝั่งอาจารย์ — เดิมหน้าครูเขียนแผนกกับห้องที่ดูแลไว้ตายตัวในโค้ด
+    // ครูทุกคนจึงขึ้นข้อความเดียวกันหมดไม่ว่าจะสอนแผนกไหน
+    teacher_code: tp?.teacher_code || '',
+    department: tp?.department || '',
     session: '',
     // เก็บทั้งสองหน่วย: satang ไว้คำนวณ (แม่นยำ), baht ไว้แสดงผลให้เข้ากับ UI เดิม
     balance_satang: balanceSatang,

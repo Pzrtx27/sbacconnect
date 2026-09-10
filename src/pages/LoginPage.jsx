@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -7,7 +7,6 @@ import { showToast } from '../components/ui/Toast';
 import sbacLogo from '../assets/sbac_logo.png';
 import { 
   LogIn, 
-  Lock, 
   Sun, 
   Moon, 
   Eye, 
@@ -16,7 +15,8 @@ import {
   Globe,
   ShieldCheck,
   IdCard,
-  AlertTriangle
+  AlertTriangle,
+  Info
 } from 'lucide-react';
 
 /** หน้าเริ่มต้นของแต่ละ role (ต้องตรงกับ HOME_BY_ROLE ใน App.jsx) */
@@ -37,8 +37,14 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
+  /* กล่องบอกวิธีขอรหัสใหม่ — เปิดเองเมื่อล็อกอินไม่ผ่าน หรือกดปุ่ม "ลืมรหัสผ่าน?"
+     ของเดิมข้อความนี้เป็น toast ซึ่งหายไปเองใน 3 วินาที
+     คนที่กำลังจดว่าต้องไปตึกไหนชั้นไหนอ่านไม่ทัน แล้วไม่มีทางเรียกกลับมาดูซ้ำ
+     นอกจากกดปุ่มใหม่ให้มันเด้งอีกรอบ */
+  const [showHelp, setShowHelp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [lang, setLang] = useState('TH');
+  const passwordRef = useRef(null);
   const { login, authenticating } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -84,7 +90,42 @@ export default function LoginPage() {
     } else {
       setError(result.error);
       showToast(result.error, 'error');
+      /* ล็อกอินไม่ผ่านคือจังหวะเดียวที่คนอยากรู้ว่า "แล้วต้องไปเอารหัสใหม่ที่ไหน"
+         ของเดิมข้อความนี้ซ่อนอยู่หลังปุ่ม "ลืมรหัสผ่าน?" ที่ต้องรู้ก่อนว่าต้องกด
+         ตอนนี้ขึ้นเองพร้อมกับข้อความแจ้งเตือน ไม่ว่าจะเป็นบัญชีนักเรียนหรือของฝ่ายวิชาการ */
+      setShowHelp(true);
     }
+  };
+
+  /* ปุ่มรูปดวงตา — สลับ type ของ input อย่างเดียวไม่พอในทางปฏิบัติ
+
+     เบราว์เซอร์กันค่าที่ตัวจัดการรหัสผ่านกรอกให้ (autofill) ไม่ให้ถูกอ่านออกมาง่าย ๆ
+     Chrome จะยังวาดเป็นจุดไข่ปลาต่อไปแม้ type จะกลายเป็น text แล้ว
+     จนกว่าช่องนั้นจะถูก "ผู้ใช้แตะ" อีกครั้ง ซึ่งพอดีกับอาการที่รายงานเข้ามาเป๊ะ ๆ
+     คือกดดวงตาแล้วรหัสไม่โผล่ ทั้งที่สถานะในหน้าเว็บสลับไปแล้วจริง
+
+     สองอย่างที่ทำเพิ่ม:
+       preventDefault ตอน mousedown  - โฟกัสไม่หลุดออกจากช่องไปอยู่ที่ปุ่ม
+       focus + setSelectionRange     - นับเป็นการแตะช่องอีกครั้ง เบราว์เซอร์จึงยอมวาดตัวอักษรจริง
+     ทั้งคู่ไม่มีผลข้างเคียงกับเคสที่พิมพ์เอง (ซึ่งเดิมก็ทำงานถูกอยู่แล้ว) */
+  const togglePassword = () => {
+    const next = !showPassword;
+    setShowPassword(next);
+
+    // รอให้ React เปลี่ยน type ให้เสร็จก่อน ไม่งั้นไปตั้ง caret บนช่องที่ยังเป็น password อยู่
+    requestAnimationFrame(() => {
+      const el = passwordRef.current;
+      if (!el) return;
+      el.focus();
+      // ช่อง type="password" ห้ามเรียก setSelectionRange ในบางเบราว์เซอร์ — จึงทำเฉพาะตอนเปิดดู
+      if (next) {
+        try {
+          el.setSelectionRange(el.value.length, el.value.length);
+        } catch {
+          /* ไม่รองรับก็ไม่เป็นไร แค่ caret ไม่ไปอยู่ท้ายบรรทัด */
+        }
+      }
+    });
   };
 
   const toggleLanguage = () => {
@@ -111,18 +152,25 @@ export default function LoginPage() {
     btnLoading: lang === 'TH' ? 'กำลังตรวจสอบ...' : 'Authenticating...',
     secTitle: lang === 'TH' ? 'ระบบเชื่อมต่อปลอดภัย' : 'Secured Connection',
     secDesc: lang === 'TH' ? 'ข้อมูลถูกเข้ารหัสเพื่อความปลอดภัย' : 'Your data is encrypted for security',
-    forgotToast: lang === 'TH' 
-      ? 'กรุณานำบัตรประจำตัวนักเรียนติดต่อฝ่ายทะเบียน อาคาร 1 ชั้น 1 เพื่อรับรหัสผ่านใหม่' 
-      : 'Please contact the Registrar Office at Building 1, 1st Floor with your student ID card to reset your password.',
+    helpTitle: lang === 'TH' ? 'เข้าสู่ระบบไม่ได้ใช่ไหม' : 'Trouble signing in?',
+    /* ห้ามใส่เวลาทำการหรือเบอร์ติดต่อลงในข้อความนี้ถ้ายังไม่ได้ยืนยันกับฝ่ายทะเบียน
+       ข้อความบนหน้าล็อกอินคือสิ่งที่คนเชื่อแล้วเดินไปตามนั้นจริง */
+    helpBody: lang === 'TH'
+      ? 'กรุณานำบัตรประจำตัวนักเรียนหรือบัตรประชาชน ติดต่อฝ่ายทะเบียน อาคาร 1 ชั้น 1 เพื่อขอรหัสผ่านใหม่'
+      : 'Bring your student ID or national ID card to the Registrar Office, Building 1, 1st Floor, to request a new password.',
+    helpClose: lang === 'TH' ? 'ปิดข้อความนี้' : 'Dismiss',
   };
 
   return (
-    <div className={`min-h-screen relative flex flex-col items-center justify-center px-4 py-10 transition-colors duration-300 ${
+    /* ระยะห่างของทั้งหน้าคุมด้วย gap-6 ค่าเดียว
+       ของเดิมแต่ละก้อนถือ margin ของตัวเอง (mb-8 / mt-6 / mt-8) ช่องไฟจึงเป็น 32-24-32
+       ไม่เท่ากันสักช่วง และเวลาเพิ่มก้อนใหม่ก็ต้องเดาว่าควรใส่เท่าไหร่ถึงจะเข้าพวก */
+    <div className={`min-h-screen relative flex flex-col items-center justify-center gap-6 px-4 py-10 transition-colors duration-300 ${
       isDark ? 'bg-black text-white' : 'bg-slate-50 text-slate-900'
     }`}>
 
-      {/* Top Controls Bar */}
-      <div className="absolute top-5 right-5 z-20 flex items-center gap-3">
+      {/* Top Controls Bar — top/right ตรงกับ px-4 ของหน้า ไม่ใช่ 20px ที่เยื้องออกมา 4px */}
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-3">
         {/* Language Toggler */}
         <button
           onClick={toggleLanguage}
@@ -157,7 +205,7 @@ export default function LoginPage() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="text-center mb-8 relative z-10"
+        className="text-center relative z-10"
       >
         <div className="relative inline-block mb-4 group">
           <div className="w-28 h-28 inline-flex items-center justify-center p-1 relative z-10">
@@ -189,12 +237,12 @@ export default function LoginPage() {
         transition={{ duration: 0.6, delay: 0.1 }}
         className="w-full max-w-md relative z-10"
       >
-        <div className={`rounded-3xl p-8 transition-all duration-300 border ${
+        <div className={`rounded-3xl p-6 sm:p-8 space-y-6 transition-all duration-300 border ${
           isDark 
             ? 'bg-neutral-900 border-neutral-800 shadow-2xl text-white' 
             : 'bg-surface-card shadow-xl border-slate-200 text-slate-900'
         }`}>
-          <div className="mb-6">
+          <div>
             <h2 className={`text-xl font-bold flex items-center gap-2 transition-colors duration-300 ${
               isDark ? 'text-white' : 'text-sbac-navy'
             }`}>
@@ -208,9 +256,9 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5">
+          <form onSubmit={handleLogin} className="space-y-4">
             {/* User ID field */}
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <label htmlFor="login-user-id" className={`text-[12px] font-bold block transition-colors duration-300 ${
                 isDark ? 'text-slate-200' : 'text-slate-600'
               }`}>
@@ -242,7 +290,7 @@ export default function LoginPage() {
             </div>
 
             {/* National ID / Password field */}
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <label htmlFor="login-national-id" className={`text-[12px] font-bold block transition-colors duration-300 ${
                 isDark ? 'text-slate-200' : 'text-slate-600'
               }`}>
@@ -257,6 +305,7 @@ export default function LoginPage() {
                 {/* ห้ามใส่ inputMode="numeric" ตรงนี้ — รหัสประจำตัวนักเรียนขึ้นต้นด้วยตัวอักษร
                     (เช่น S0001 ดู 06_seed_real.example.sql) บนมือถือแป้นตัวเลขล้วนพิมพ์ S ไม่ได้เลย */}
                 <input
+                  ref={passwordRef}
                   type={showPassword ? 'text' : 'password'}
                   value={nationalId}
                   onChange={(e) => setNationalId(e.target.value)}
@@ -280,12 +329,20 @@ export default function LoginPage() {
                     และ aria-pressed เป็นตัวบอกสถานะ — ครบทั้งสองทางโดยไม่ขัดกันเอง */}
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={togglePassword}
+                  /* กันโฟกัสหลุดจากช่องไปอยู่ที่ปุ่มตอนกด — ดูเหตุผลเต็มที่ togglePassword */
+                  onMouseDown={(e) => e.preventDefault()}
                   aria-label={showPassword ? 'ซ่อนรหัสประจำตัว' : 'แสดงรหัสประจำตัว'}
                   aria-pressed={showPassword}
                   title={showPassword ? 'ซ่อนรหัสประจำตัว' : 'แสดงรหัสประจำตัว'}
-                  className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-xl transition-colors ${
-                    isDark ? 'text-content-muted hover:text-white hover:bg-white/5' : 'text-content-muted hover:text-slate-700 hover:bg-slate-100'
+                  /* z-10: ปุ่มของเราต้องอยู่บนสุดเสมอ ช่องรหัสผ่านมีไอคอนของตัวจัดการ
+                     รหัสผ่านในเบราว์เซอร์มาวางทับตำแหน่งเดียวกันนี้ได้ */
+                  className={`absolute right-1.5 top-1/2 -translate-y-1/2 z-10 w-11 h-11 flex items-center justify-center rounded-xl transition-colors ${
+                    showPassword
+                      ? 'text-brand bg-sbac-blue/10'
+                      : isDark
+                      ? 'text-content-muted hover:text-white hover:bg-white/5'
+                      : 'text-content-muted hover:text-slate-700 hover:bg-slate-100'
                   }`}
                 >
                   {showPassword ? <Eye size={17} aria-hidden="true" /> : <EyeOff size={17} aria-hidden="true" />}
@@ -312,7 +369,9 @@ export default function LoginPage() {
               </label>
               <button 
                 type="button" 
-                onClick={() => showToast(t.forgotToast, 'info')}
+                onClick={() => setShowHelp((v) => !v)}
+                aria-expanded={showHelp}
+                aria-controls="login-help"
                 className="text-xs font-bold text-brand hover:underline transition-colors min-h-[44px] px-1 -mr-1 inline-flex items-center"
               >
                 {t.forgot}
@@ -322,6 +381,7 @@ export default function LoginPage() {
             {/* Error Message */}
             {error && (
               <motion.div
+                role="alert"
                 initial={{ opacity: 0, y: -5 }}
                 animate={{ opacity: 1, y: 0 }}
                 role="alert"
@@ -331,6 +391,33 @@ export default function LoginPage() {
                     และเปลี่ยนสีตามข้อความไม่ได้ */}
                 <AlertTriangle size={15} className="shrink-0" aria-hidden="true" />
                 <span>{error}</span>
+              </motion.div>
+            )}
+
+            {/* วิธีขอรหัสใหม่ — ค้างอยู่จนกว่าจะกดปิด อ่านทันแน่นอน */}
+            {showHelp && (
+              <motion.div
+                id="login-help"
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`text-xs rounded-xl px-4 py-3 border flex items-start gap-2.5 ${
+                  isDark
+                    ? 'bg-sbac-blue/10 border-sbac-blue/25 text-slate-200'
+                    : 'bg-sbac-blue-50 border-sbac-blue/20 text-ink-secondary'
+                }`}
+              >
+                <Info size={16} className="text-brand shrink-0 mt-0.5" aria-hidden="true" />
+                <div className="space-y-1.5 min-w-0">
+                  <p className="font-extrabold text-brand">{t.helpTitle}</p>
+                  <p className="font-semibold leading-relaxed">{t.helpBody}</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowHelp(false)}
+                    className="text-[11px] font-bold text-brand hover:underline"
+                  >
+                    {t.helpClose}
+                  </button>
+                </div>
               </motion.div>
             )}
 
@@ -368,7 +455,7 @@ export default function LoginPage() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.4 }}
-        className={`flex items-center gap-2 max-w-sm px-4 py-2 mt-6 rounded-full border text-[11px] font-semibold ${
+        className={`flex items-center gap-2 max-w-sm px-4 py-2 rounded-full border text-[11px] font-semibold ${
           isDark 
             ? 'bg-neutral-900/60 border-white/10 text-content-secondary' 
             : 'bg-slate-100/50 border-slate-200 text-content-muted'
@@ -385,7 +472,7 @@ export default function LoginPage() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
-        className={`text-[11px] font-bold text-center mt-8 space-y-1.5 relative z-10 transition-colors duration-300 ${
+        className={`text-[11px] font-bold text-center space-y-1.5 relative z-10 transition-colors duration-300 ${
           isDark ? 'text-content-secondary' : 'text-content-muted'
         }`}
       >

@@ -24,7 +24,7 @@ export default function BehaviorLogList({ logs, loading, showStudentName = false
 
   if (logs.length === 0) {
     return (
-      <div className={`rounded-2xl p-6 border text-center ${isDark ? 'bg-white/[0.02] border-white/5' : 'bg-slate-50 border-slate-100'}`}>
+      <div className={`rounded-2xl p-6 border text-center ${isDark ? 'bg-white/[0.03] border-white/10' : 'bg-slate-50 border-slate-100'}`}>
         <CheckCircle2 size={28} className="text-accent-emerald mx-auto mb-2" aria-hidden="true" />
         <p className={`text-xs font-bold ${textPrimary}`}>ยังไม่มีรายการ</p>
       </div>
@@ -36,7 +36,7 @@ export default function BehaviorLogList({ logs, loading, showStudentName = false
       {logs.map((log) => (
         <li
           key={log.id}
-          className={`p-3.5 rounded-2xl border ${isDark ? 'bg-white/[0.02] border-white/5' : 'bg-slate-50/50 border-slate-100'}`}
+          className={`p-3.5 rounded-2xl border ${isDark ? 'bg-white/[0.03] border-white/10' : 'bg-slate-50/50 border-slate-100'}`}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">

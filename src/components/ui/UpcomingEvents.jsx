@@ -66,7 +66,7 @@ export default function UpcomingEvents({ limit = 3 }) {
             <li
               key={evt.id}
               className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${
-                isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
+                isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
               }`}
             >
               <div

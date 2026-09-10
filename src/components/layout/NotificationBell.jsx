@@ -112,7 +112,7 @@ export default function NotificationBell() {
                 className={`flex items-stretch gap-1 rounded-2xl border overflow-hidden transition-all ${
                   n.is_read
                     ? isDark
-                      ? 'bg-white/[0.02] border-white/5'
+                      ? 'bg-white/[0.03] border-white/10'
                       : 'bg-slate-50/50 border-slate-100'
                     : isDark
                     ? 'bg-sbac-blue/10 border-sbac-blue-light/30'

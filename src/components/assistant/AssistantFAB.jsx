@@ -192,10 +192,20 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
     [setMessages]
   );
 
-  // ทักทายครั้งแรกเท่านั้น — บทสนทนาเก็บไว้ที่ AssistantFAB จึงไม่หายตอนปิด-เปิดใหม่
+  /* ทักทายครั้งแรกเท่านั้น — บทสนทนาเก็บไว้ที่ AssistantFAB จึงไม่หายตอนปิด-เปิดใหม่
+
+     ต้องตัดสินใจจาก prev ข้างใน setMessages ไม่ใช่จาก messages.length ที่อ่านมาจากรอบ render
+     ของเดิมเช็คนอก setter — พอ React รัน effect ซ้ำตอน mount (โหมด dev ทำแบบนี้เป็นปกติ
+     และเป็นการจำลองสิ่งที่เกิดจริงเวลา component ถูก mount ซ้ำ) ทั้งสองรอบเห็น
+     messages.length เป็น 0 เท่ากัน เพราะ state ยังไม่ทันอัปเดต จึงยิงคำทักทายเข้าไปสองใบ
+     = เปิดกล่องแชทแล้วเจอข้อความต้อนรับซ้อนกันสองอัน ซึ่งเห็นได้จริงบนหน้าจอ
+
+     ในรูปแบบนี้ รอบที่สองอ่าน prev ที่มีคำทักทายอยู่แล้ว จึงคืนค่าเดิมกลับไปเฉย ๆ */
   useEffect(() => {
-    if (messages.length === 0) pushBot(greetingFor(user));
-  }, [messages.length, pushBot, user]);
+    setMessages((prev) =>
+      prev.length === 0 ? [{ id: nextId(), sender: 'bot', ...greetingFor(user) }] : prev
+    );
+  }, [setMessages, user]);
 
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -545,7 +555,7 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
                                   ? 'bg-rose-950/50 border border-rose-900/50 text-white rounded-bl-md'
                                   : 'bg-rose-50 border border-rose-200 text-ink rounded-bl-md'
                                 : isDark
-                                  ? 'bg-white/[0.07] border border-white/10 rounded-bl-md'
+                                  ? 'bg-white/10 border border-white/10 rounded-bl-md'
                                   : 'bg-slate-50 border border-border rounded-bl-md'
                           }`}
                         >

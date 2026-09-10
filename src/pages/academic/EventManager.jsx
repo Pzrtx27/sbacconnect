@@ -322,7 +322,7 @@ export default function EventManager() {
   return (
     <div
       className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${
-        isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
+        isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
       }`}
     >
       {confirmDialog}

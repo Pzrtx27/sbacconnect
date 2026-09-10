@@ -5,6 +5,9 @@ import { useNavigate } from 'react-router-dom';
 import { showToast } from '../../components/ui/Toast';
 import Modal from '../../components/ui/Modal';
 import GlassCard from '../../components/layout/GlassCard';
+import ProfileBanner from '../../components/layout/ProfileBanner';
+import { READING_WIDTH } from '../../utils/layout';
+import CoffeeCup from '../../components/ui/icons/CoffeeCup';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import TopUpSlipForm from '../../components/wallet/TopUpSlipForm';
 import BehaviorLogList from '../../components/behavior/BehaviorLogList';
@@ -20,7 +23,6 @@ import { useRealtimeTable } from '../../hooks/useRealtimeTable';
 import { fetchSubstitutionsForDate, todayISO, classLabel, PERIOD_TIMES } from '../../utils/timetable';
 import {
   Calendar,
-  Coffee,
   AlertCircle,
   Clock,
   UserCheck,
@@ -273,34 +275,22 @@ export default function TeacherHome() {
   const pendingLeavesCount = pendingLeaveRequests.length;
 
   return (
-    <div className="space-y-6 xl:max-w-4xl">
-      {/* Profile Header */}
-      <div className="bg-gradient-to-r from-sbac-navy to-sbac-blue p-6 rounded-3xl text-white shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-36 h-36 bg-white/5 rounded-full -mr-10 -mt-10 pointer-events-none" />
-        <div className="relative z-10 flex justify-between items-start gap-3">
-          <div className="space-y-1 min-w-0">
-            <span className="text-[11px] bg-white/20 text-white font-bold px-3 py-1 rounded-full inline-block mb-2">
-              อาจารย์ผู้สอน (Faculty Panel)
-            </span>
-            <h2 className="text-2xl font-extrabold truncate">{user?.name}</h2>
-            <p className="text-xs text-white/80">
-              อาจารย์ผู้ดูแลแผนกวิชาคอมพิวเตอร์ประจำชั้น ปวช.3/6 • SBAC Nonthaburi
-            </p>
-          </div>
-
-          {/* Wallet — เหมือนฝั่งนักเรียนทุกประการ (ดึง balance_satang เดียวกันจาก AuthContext) */}
-          <button
-            type="button"
-            onClick={() => setActiveModal('balance')}
-            className="shrink-0 p-3 rounded-2xl bg-white/15 hover:bg-white/20 border border-white/20 flex flex-col items-end active:scale-95 transition-all"
-          >
-            <span className="text-[9px] font-bold text-white/70">Wallet</span>
-            <span className="text-base font-extrabold text-white">
-              {formatBaht(user?.balance_satang || 0)} <span className="text-xs font-semibold text-white/80">฿</span>
-            </span>
-          </button>
-        </div>
-      </div>
+    <div className={`space-y-6 ${READING_WIDTH}`}>
+      {/* หัวหน้าแรก — ตัวเดียวกับฝั่งนักเรียน (ProfileBanner)
+          บรรทัดบรรยายเดิมเขียนไว้ตายตัวว่า "แผนกวิชาคอมพิวเตอร์ประจำชั้น ปวช.3/6"
+          ครูทุกคนจึงเห็นข้อความเดียวกันหมดไม่ว่าจะสอนแผนกไหน — เปลี่ยนเป็นค่าจริง
+          จาก teacher_profiles ช่องไหนที่ฝ่ายทะเบียนยังไม่ได้กรอกจะขึ้นขีดแทน */}
+      <ProfileBanner
+        roleLabel="อาจารย์ผู้สอน (Faculty Panel)"
+        name={user?.name}
+        balanceSatang={user?.balance_satang || 0}
+        onWalletClick={() => setActiveModal('balance')}
+        facts={[
+          { label: 'รหัสอาจารย์', value: user?.teacher_code },
+          { label: 'แผนกวิชา', value: user?.department },
+          { label: 'วิทยาลัย', value: 'SBAC นนทบุรี' },
+        ]}
+      />
 
       {/* รายการสอนแทนของวันนี้ — ขึ้นเฉพาะตอนมีจริง
           subsLoaded กันไม่ให้กล่องกะพริบขึ้นมาแวบหนึ่งตอนยังโหลดไม่เสร็จ */}
@@ -456,7 +446,7 @@ export default function TeacherHome() {
             <div className="flex items-center justify-between w-full p-1.5">
               <div className="flex items-center gap-3">
                 <div className={`p-2.5 rounded-xl ${isDark ? 'bg-amber-950/40 text-accent-amber' : 'bg-amber-50 text-accent-amber'}`}>
-                  <Coffee size={24} />
+                  <CoffeeCup size={24} />
                 </div>
                 <div>
                   <div className={`text-sm font-extrabold ${textPrimary}`}>สั่งเครื่องดื่มแผนกบาริสต้า (Barista Shop)</div>
@@ -529,7 +519,7 @@ export default function TeacherHome() {
               <div 
                 key={student.id} 
                 className={`p-3 rounded-2xl border flex flex-col gap-2.5 transition-all ${
-                  isDark ? 'bg-white/[0.02] border-white/5' : 'bg-slate-50/50 border-slate-100'
+                  isDark ? 'bg-white/[0.03] border-white/10' : 'bg-slate-50/50 border-slate-100'
                 }`}
               >
                 <div className="flex justify-between items-center">
@@ -640,7 +630,7 @@ export default function TeacherHome() {
             )}
 
             {selectedStudent && (
-              <div className={`mt-2 flex items-center justify-between gap-2 p-3 rounded-xl border ${isDark ? 'bg-white/[0.02] border-white/10' : 'bg-slate-50 border-slate-100'}`}>
+              <div className={`mt-2 flex items-center justify-between gap-2 p-3 rounded-xl border ${isDark ? 'bg-white/[0.03] border-white/10' : 'bg-slate-50 border-slate-100'}`}>
                 <div className="min-w-0">
                   <div className={`text-xs font-bold truncate ${textPrimary}`}>{selectedStudent.full_name}</div>
                   <div className={`text-[9px] font-semibold mt-0.5 ${textMuted}`}>
@@ -702,7 +692,7 @@ export default function TeacherHome() {
                       selectedCategoryId === cat.id
                         ? 'border-sbac-blue bg-sbac-blue-50/20 text-brand'
                         : isDark
-                        ? 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] text-content-secondary'
+                        ? 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06] text-content-secondary'
                         : 'border-slate-100 bg-surface-card hover:bg-slate-50 text-slate-600 shadow-sm'
                     }`}
                   >
@@ -762,7 +752,7 @@ export default function TeacherHome() {
       >
         <div className="space-y-6">
           <div className={`text-center py-4 rounded-2xl border transition-colors ${
-            isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
+            isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
           }`}>
             <span className={`text-5xl font-extrabold block ${textPrimary}`}>
               {formatBaht(user?.balance_satang || 0)}
@@ -780,7 +770,7 @@ export default function TeacherHome() {
           </button>
 
           <div className={`rounded-2xl border p-4 ${
-            isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
+            isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
           }`}>
             <span className={`text-xs font-bold block ${textPrimary}`}>เติมเงินอย่างไร</span>
             <p className={`text-[12px] font-semibold leading-relaxed mt-1 ${textMuted}`}>
