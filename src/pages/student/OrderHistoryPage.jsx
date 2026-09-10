@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useNavigate } from 'react-router-dom';
+import PageHeader from '../../components/layout/PageHeader';
+import { READING_WIDTH } from '../../utils/layout';
 import { supabase } from '../../config/supabase';
-import { ArrowLeft, RefreshCw, Receipt } from 'lucide-react';
+import { RefreshCw, Receipt } from 'lucide-react';
 import { formatBaht } from '../../utils/identity';
 import { ORDER_STATUS_TEXT, ORDER_STATUS_COLOR, productEmoji, optionSummary } from '../../utils/orders';
 
@@ -22,7 +23,6 @@ export default function OrderHistoryPage() {
   const { user } = useAuth();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -56,24 +56,14 @@ export default function OrderHistoryPage() {
   const textMuted = isDark ? 'text-content-secondary' : 'text-ink-muted';
 
   return (
-    <div className="space-y-5 xl:max-w-3xl">
-      <button
-        type="button"
-        onClick={() => navigate('/orders')}
-        className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${
-          isDark ? 'text-content-secondary hover:text-white' : 'text-ink-muted hover:text-sbac-navy'
-        }`}
-      >
-        <ArrowLeft size={16} aria-hidden="true" />
-        กลับไปหน้าสถานะการสั่งซื้อ
-      </button>
-
-      <h2 className={`text-xl font-extrabold flex items-center gap-2 transition-colors duration-300 ${textPrimary}`}>
-        <span className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-accent-amber shrink-0">
-          <Receipt size={18} aria-hidden="true" />
-        </span>
-        ประวัติการสั่งซื้อ
-      </h2>
+    <div className={`space-y-6 ${READING_WIDTH}`}>
+      <PageHeader
+        icon={Receipt}
+        title="ประวัติการสั่งซื้อ"
+        tone="amber"
+        backTo="/orders"
+        backLabel="กลับไปหน้าสถานะการสั่งซื้อ"
+      />
 
       {loading ? (
         <div className="text-center py-10">

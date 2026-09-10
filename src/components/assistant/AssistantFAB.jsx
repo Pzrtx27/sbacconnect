@@ -493,7 +493,7 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
                                   ? 'bg-rose-950/50 border border-rose-900/50 text-white rounded-bl-md'
                                   : 'bg-rose-50 border border-rose-200 text-ink rounded-bl-md'
                                 : isDark
-                                  ? 'bg-white/[0.07] border border-white/10 rounded-bl-md'
+                                  ? 'bg-white/10 border border-white/10 rounded-bl-md'
                                   : 'bg-slate-50 border border-border rounded-bl-md'
                           }`}
                         >

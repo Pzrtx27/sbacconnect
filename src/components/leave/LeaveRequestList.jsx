@@ -62,7 +62,7 @@ export default function LeaveRequestList({ requests, loading, mode = 'student', 
 
   if (requests.length === 0) {
     return (
-      <div className={`rounded-2xl p-8 border text-center ${isDark ? 'bg-white/[0.02] border-white/5' : 'bg-slate-50 border-slate-100'}`}>
+      <div className={`rounded-2xl p-8 border text-center ${isDark ? 'bg-white/[0.03] border-white/10' : 'bg-slate-50 border-slate-100'}`}>
         <CheckCircle2 size={32} className="text-accent-emerald mx-auto mb-2" aria-hidden="true" />
         <p className={`text-sm font-extrabold ${textPrimary}`}>ไม่มีรายการ</p>
       </div>
@@ -79,7 +79,7 @@ export default function LeaveRequestList({ requests, loading, mode = 'student', 
         return (
           <div
             key={req.id}
-            className={`p-4 border rounded-2xl space-y-2.5 ${isDark ? 'bg-slate-900 border-white/5' : 'bg-slate-50 border-slate-100'}`}
+            className={`p-4 border rounded-2xl space-y-2.5 ${isDark ? 'bg-slate-900 border-white/10' : 'bg-slate-50 border-slate-100'}`}
           >
             <div className="flex justify-between items-start gap-2">
               <div className="min-w-0">
@@ -102,7 +102,7 @@ export default function LeaveRequestList({ requests, loading, mode = 'student', 
               </span>
             </div>
 
-            <div className={`p-2.5 rounded-xl text-xs space-y-1 ${isDark ? 'bg-white/[0.02]' : 'bg-surface-card shadow-sm'}`}>
+            <div className={`p-2.5 rounded-xl text-xs space-y-1 ${isDark ? 'bg-white/[0.03]' : 'bg-surface-card shadow-sm'}`}>
               <div className="font-semibold">
                 <span className={textMuted}>ประเภท: </span>
                 <span className={textSecondary}>{LEAVE_TYPE_LABELS[req.leave_type]?.label || req.leave_type}</span>

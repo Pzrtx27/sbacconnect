@@ -94,7 +94,7 @@ export default function HomeroomAssignmentPanel() {
               <div
                 key={room.id}
                 className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${
-                  isDark ? 'bg-white/[0.02] border-white/5' : 'bg-slate-50 border-slate-100'
+                  isDark ? 'bg-white/[0.03] border-white/10' : 'bg-slate-50 border-slate-100'
                 }`}
               >
                 <span className={`text-xs font-bold shrink-0 ${textPrimary}`}>{room.label}</span>

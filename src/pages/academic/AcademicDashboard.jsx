@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import PageHeader from '../../components/layout/PageHeader';
 import { showToast } from '../../components/ui/Toast';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import BehaviorLogList from '../../components/behavior/BehaviorLogList';
@@ -489,18 +490,13 @@ export default function AcademicDashboard() {
   };
 
   return (
-    <div className="space-y-5">
-      <div className="flex justify-between items-center">
-        <h2 className={`text-xl font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
-          }`}>
-          <Settings size={24} className="text-brand" />
-          Academic Panel
-        </h2>
+    <div className="space-y-6">
+      <PageHeader icon={Settings} title="Academic Panel">
         <span className={`text-xs font-bold px-3 py-1 rounded-lg transition-colors duration-300 ${isDark ? 'bg-white/10 text-content-secondary' : 'bg-slate-100 text-ink-secondary'
           }`}>
           ห้อง {classLabel(selectedClassId)}
         </span>
-      </div>
+      </PageHeader>
 
       {/* แท็บ — เดิมเป็นหน้าเดียวยาว 7 หมวดรวด บนมือถือกว่าจะเลื่อนถึงใบลาที่รออนุมัติ
           ต้องผ่านฟอร์มตารางสอน ตัวอัปโหลด Excel และตารางพรีวิวรายชื่อทั้งหมดก่อน */}
@@ -518,7 +514,7 @@ export default function AcademicDashboard() {
             อนุมัติใบลา (ขั้นสุดท้าย) + กำหนดครูประจำชั้น (22_leave_requests.sql)
             ============================================================ */}
         <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${
-          isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
+          isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
         }`}>
           <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
             <ClipboardCheck size={18} className="text-brand" />
@@ -564,7 +560,7 @@ export default function AcademicDashboard() {
                   - มีตารางจริงแค่สองห้อง อีก 18 ห้องเลือกไปก็เจอหน้าว่างโดยไม่มีคำอธิบาย
                     ซึ่งดูเหมือนระบบพัง ทั้งที่คือห้องนั้นยังไม่มีใครใส่ตาราง
                 ตอนนี้แสดงเฉพาะห้องที่มีตารางอยู่จริงในฐานข้อมูล */}
-        <div className={`rounded-3xl border p-5 shadow-sm space-y-3 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
+        <div className={`rounded-3xl border p-5 shadow-sm space-y-3 transition-colors duration-300 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
           }`}>
           <div className="flex items-center justify-between gap-2">
             <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
@@ -608,7 +604,7 @@ export default function AcademicDashboard() {
         </div>
 
         {/* Timetable modification form */}
-        <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
+        <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
           }`}>
           <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
             }`}>
@@ -679,7 +675,7 @@ export default function AcademicDashboard() {
                             ? 'bg-white/5 text-content-secondary border-white/10 hover:bg-white/10'
                             : 'bg-slate-50 text-ink-secondary border-slate-200 hover:bg-slate-100'
                           : isDark
-                            ? 'bg-transparent text-content-muted border-white/5 border-dashed hover:bg-white/5'
+                            ? 'bg-transparent text-content-muted border-white/10 border-dashed hover:bg-white/5'
                             : 'bg-transparent text-ink-light border-slate-200 border-dashed hover:bg-slate-50'
                     }`}
                   >
@@ -701,7 +697,7 @@ export default function AcademicDashboard() {
           <div
             aria-live="polite"
             className={`rounded-2xl border px-4 py-3 text-xs ${
-              isDark ? 'bg-slate-950/40 border-white/5' : 'bg-slate-50 border-slate-200'
+              isDark ? 'bg-slate-950/40 border-white/10' : 'bg-slate-50 border-slate-200'
             }`}
           >
             {timetableLoading ? (
@@ -909,7 +905,7 @@ export default function AcademicDashboard() {
               (list_behavior_logs() กรองสิทธิ์ให้แล้วฝั่ง DB — ดู 21_behavior_crud_and_academic.sql)
             ============================================================ */}
         <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${
-          isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
+          isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
         }`}>
           <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
             <Award size={18} className="text-brand" />
@@ -961,7 +957,7 @@ export default function AcademicDashboard() {
           className="space-y-6"
         >
         {/* Excel sync panel — เต็มความกว้างเสมอ เพราะมีตารางพรีวิวรายชื่อนักเรียนอยู่ข้างใน */}
-        <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
+        <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
           }`}>
           <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
             }`}>
@@ -998,7 +994,7 @@ export default function AcademicDashboard() {
           </div>
 
           {/* Encryption Settings */}
-          <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-950/40 border-white/5' : 'bg-slate-50 border-slate-100'
+          <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-950/40 border-white/10' : 'bg-slate-50 border-slate-100'
             } space-y-3`}>
             <div className="flex items-center gap-1.5">
               <Key size={14} className="text-brand" />
@@ -1086,7 +1082,7 @@ export default function AcademicDashboard() {
             className={`border-2 border-dashed rounded-3xl p-6 text-center cursor-pointer transition-all duration-200 ${dragOver
               ? 'bg-sbac-blue/5 border-sbac-blue scale-[1.01]'
               : isDark
-                ? 'border-white/15 bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/30'
+                ? 'border-white/15 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/30'
                 : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/50 hover:border-slate-400'
               }`}
             onClick={() => document.getElementById('excelFileInput').click()}
@@ -1126,7 +1122,7 @@ export default function AcademicDashboard() {
                 </button>
               </div>
 
-              <div className={`rounded-2xl border max-h-48 overflow-y-auto divide-y ${isDark ? 'bg-slate-950/40 border-white/5 divide-white/5' : 'bg-slate-50 border-slate-100 divide-slate-100'
+              <div className={`rounded-2xl border max-h-48 overflow-y-auto divide-y ${isDark ? 'bg-slate-950/40 border-white/10 divide-white/5' : 'bg-slate-50 border-slate-100 divide-slate-100'
                 }`}>
                 {parsedStudents.slice(0, 5).map((row, idx) => {
                   const norm = normalizeStudent(row);
@@ -1164,7 +1160,7 @@ export default function AcademicDashboard() {
                   );
                 })}
                 {parsedStudents.length > 5 && (
-                  <div className="p-2 text-center text-[9px] text-content-muted font-semibold bg-slate-900/10 dark:bg-white/[0.01]">
+                  <div className="p-2 text-center text-[9px] text-content-muted font-semibold bg-slate-900/10 dark:bg-white/[0.03]">
                     และนักเรียนคนอื่น ๆ อีก {parsedStudents.length - 5} รายการ
                   </div>
                 )}

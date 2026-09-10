@@ -71,7 +71,7 @@ export default function GateEntryLog({ limit = 14 }) {
   if (items.length === 0) {
     return (
       <div className={`rounded-2xl border p-6 text-center ${
-        isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
+        isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
       }`}>
         <p className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-ink'}`}>ยังไม่มีบันทึกการเข้า</p>
         <p className="text-xs font-semibold text-content-muted mt-1 leading-relaxed">
