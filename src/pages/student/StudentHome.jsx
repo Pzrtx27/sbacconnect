@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { showToast } from '../../components/ui/Toast';
 import Modal from '../../components/ui/Modal';
 import GlassCard from '../../components/layout/GlassCard';
+import ProfileBanner from '../../components/layout/ProfileBanner';
+import CoffeeCup from '../../components/ui/icons/CoffeeCup';
 import AcademicCalendar from '../../components/ui/AcademicCalendar';
 import UpcomingEvents from '../../components/ui/UpcomingEvents';
 import TopUpSlipForm from '../../components/wallet/TopUpSlipForm';
@@ -17,6 +19,7 @@ import LeaveRequestList from '../../components/leave/LeaveRequestList';
 import WalletHistory from '../../components/wallet/WalletHistory';
 import GateEntryLog from '../../components/gate/GateEntryLog';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
+import { useMyClassInfo } from '../../hooks/useMyClassInfo';
 import {
   Clock,
   Award,
@@ -31,7 +34,6 @@ import {
   History,
   Receipt,
   QrCode,
-  Coffee,
   CalendarDays,
   ChevronDown
 } from 'lucide-react';
@@ -64,6 +66,10 @@ export default function StudentHome() {
   // ของเดิมผูกกับ localStorage (sbac_behavior_logs) ซึ่งเป็นคนละชุดกับที่อาจารย์บันทึกจริง
   const [behaviorScore, setBehaviorScore] = useState(100);
   const [behaviorLogs, setBehaviorLogs] = useState([]);
+
+  /* ห้องเรียนและครูที่ปรึกษาของตัวเอง — ชื่อครูอยู่ในตาราง users ที่ RLS กันไว้
+     จึงต้องผ่าน RPC my_class_info() ดู src/hooks/useMyClassInfo.js */
+  const { info: classInfo, loading: classInfoLoading } = useMyClassInfo();
 
   const loadBehavior = useCallback(async () => {
     const { data, error } = await supabase.rpc('my_behavior_logs');
@@ -184,8 +190,6 @@ export default function StudentHome() {
   const textPrimary = isDark ? 'text-white' : 'text-sbac-navy';
   const textSecondary = isDark ? 'text-slate-200' : 'text-ink-secondary';
   const textMuted = isDark ? 'text-content-secondary' : 'text-ink-muted';
-  const bgSubtle = isDark ? 'bg-white/[0.06]' : 'bg-slate-50/50';
-  const borderSubtle = isDark ? 'border-white/10' : 'border-slate-100';
   const bgInput = isDark ? 'bg-neutral-900 border-white/20 text-white placeholder:text-content-muted focus:border-sbac-blue-light' : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue';
 
   // สรุปคะแนนเก็บ — ใช้ในโมดัล "คะแนนระหว่างภาค"
@@ -197,32 +201,31 @@ export default function StudentHome() {
 
   return (
     <div className="space-y-6">
-      {/* Profile Section */}
-      <div className={`flex justify-between items-end p-4 rounded-3xl border transition-colors duration-300 ${bgSubtle} ${borderSubtle}`}>
-        <div>
-          <span className="text-[11px] text-brand font-bold block mb-1">
-            Welcome back
-          </span>
-          <h2 className={`text-xl font-extrabold ${textPrimary}`}>
-            {user?.name || 'นักเรียน SBAC'}
-          </h2>
-          <p className={`text-xs mt-0.5 ${textMuted}`}>
-            ID: {user?.id} • {user?.branch || 'เทคโนโลยีสารสนเทศ'}
-          </p>
-        </div>
+      {/* หัวหน้าแรก — ใช้ตัวเดียวกับหน้าอาจารย์ (ProfileBanner)
+          ของเดิมฝั่งนักเรียนเป็นกล่องเทาจาง ๆ ที่บอกได้แค่ชื่อกับ "ID • เทคโนโลยีสารสนเทศ"
+          ซึ่งสาขานั้น hardcode ไว้ในหน้าเว็บ ไม่ได้มาจากฐานข้อมูล — นักเรียนสาขาอื่น
+          ก็ขึ้นว่าเทคโนโลยีสารสนเทศเหมือนกันหมด ส่วนห้องเรียนที่รู้อยู่แล้วกลับไม่ได้แสดง
 
-        <div 
-          onClick={() => setActiveModal('balance')}
-          className={`p-3 rounded-2xl border shadow-sm flex flex-col items-end cursor-pointer active:scale-95 transition-all ${
-            isDark ? 'bg-white/[0.06] border-white/10' : 'bg-white/80 border-slate-200'
-          }`}
-        >
-          <span className={`text-[9px] font-bold ${textMuted}`}>Wallet</span>
-          <span className="text-base font-extrabold text-brand">
-            {formatBaht(user?.balance_satang || 0)} <span className={`text-xs font-semibold ${textSecondary}`}>฿</span>
-          </span>
-        </div>
-      </div>
+          ตอนนี้เป็นสามอย่างที่มาจากฐานข้อมูลจริงทั้งหมด:
+          รหัสประจำตัว / ระดับชั้น-ห้อง / ครูที่ปรึกษา */}
+      <ProfileBanner
+        roleLabel="นักเรียน (Student Panel)"
+        name={user?.name || 'นักเรียน SBAC'}
+        balanceSatang={user?.balance_satang || 0}
+        onWalletClick={() => setActiveModal('balance')}
+        facts={[
+          { label: 'รหัสประจำตัว', value: user?.id },
+          { label: 'ระดับชั้น', value: user?.class_label },
+          {
+            label: 'ครูที่ปรึกษา',
+            wide: true,
+            /* กำลังโหลดกับยังไม่ได้กำหนด เป็นคนละเรื่องกัน
+               ถ้าขึ้น "ยังไม่ได้กำหนด" ตอนที่ยังโหลดไม่เสร็จ นักเรียนจะเข้าใจผิด
+               แล้วไปถามฝ่ายวิชาการทั้งที่ข้อมูลมีอยู่ */
+            value: classInfoLoading ? 'กำลังโหลด...' : classInfo?.advisor_name || 'ยังไม่ได้กำหนด',
+          },
+        ]}
+      />
 
       {/* ลำดับบนมือถือ: เมนู -> กิจกรรม -> ปฏิทิน (พับไว้)
           ของเดิมเรียง กิจกรรม -> ปฏิทิน -> เมนู ซึ่งแปลว่าเปิดแอปมาต้องเลื่อนผ่าน
@@ -245,7 +248,7 @@ export default function StudentHome() {
               aria-controls="student-calendar"
               className={`w-full min-h-[48px] px-4 rounded-2xl border flex items-center justify-between gap-2 text-sm font-extrabold transition-colors ${
                 isDark
-                  ? 'bg-white/[0.04] border-white/5 text-white hover:bg-white/[0.07]'
+                  ? 'bg-white/[0.06] border-white/10 text-white hover:bg-white/10'
                   : 'bg-surface-card border-slate-100 text-ink hover:bg-slate-50'
               }`}
             >
@@ -415,7 +418,7 @@ export default function StudentHome() {
           <div className="flex flex-col h-full justify-between min-h-[110px]">
             <div>
               <div className="w-9 h-9 rounded-2xl bg-amber-500/10 flex items-center justify-center text-accent-amber mb-2">
-                <Coffee size={22} aria-hidden="true" />
+                <CoffeeCup size={22} aria-hidden="true" />
               </div>
               <div className={`text-sm font-extrabold ${textPrimary}`}>สั่งกาแฟบาริสต้า</div>
               <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>SBAC Barista Coffee</div>
@@ -451,7 +454,7 @@ export default function StudentHome() {
       >
         <div className="space-y-6">
           <div className={`text-center py-4 rounded-2xl border transition-colors ${
-            isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
+            isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
           }`}>
             <span className={`text-5xl font-extrabold block ${textPrimary}`}>
               {formatBaht(user?.balance_satang || 0)}
@@ -472,7 +475,7 @@ export default function StudentHome() {
           </button>
 
           <div className={`rounded-2xl border p-4 ${
-            isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
+            isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
           }`}>
             <span className={`text-xs font-bold block ${textPrimary}`}>เติมเงินอย่างไร</span>
             <p className={`text-[12px] font-semibold leading-relaxed mt-1 ${textMuted}`}>
@@ -598,10 +601,11 @@ export default function StudentHome() {
               </div>
 
               {/* Student Info */}
-              <div className={`rounded-xl p-3 border ${isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'}`}>
+              <div className={`rounded-xl p-3 border ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'}`}>
                 <div className={`text-[11px] font-bold mb-1 ${textMuted}`}>ข้อมูลผู้ยื่น</div>
                 <div className={`text-xs font-semibold ${textSecondary}`}>
-                  {user?.name} • รหัส {user?.id} • {user?.branch || 'IT'}
+                  {user?.name} • รหัส {user?.id}
+                  {user?.class_label ? ` • ${user.class_label}` : ''}
                 </div>
               </div>
 
@@ -643,7 +647,7 @@ export default function StudentHome() {
             </span>
           </div>
           <div className={`border-t pt-4 text-left space-y-3 text-sm font-semibold ${textSecondary} ${
-            isDark ? 'border-white/5' : 'border-slate-100'
+            isDark ? 'border-white/10' : 'border-slate-100'
           }`}>
             <div className="flex justify-between">
               <span>ค่าเทอม 1/2569</span>
@@ -665,7 +669,7 @@ export default function StudentHome() {
       <Modal isOpen={activeModal === 'behavior'} onClose={() => setActiveModal(null)} title="📊 คะแนนความประพฤติ">
         <div className="space-y-6">
           <div className={`text-center py-5 border rounded-2xl ${
-            isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
+            isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
           }`}>
             <span className={`text-5xl font-extrabold block ${
               behaviorScore >= 90 ? 'text-accent-emerald' :
@@ -699,7 +703,7 @@ export default function StudentHome() {
             </span>
             {behaviorLogs.length === 0 ? (
               <div className={`rounded-2xl p-6 border text-center transition-all ${
-                isDark ? 'bg-white/[0.02] border-white/5' : 'bg-slate-50 border-slate-100'
+                isDark ? 'bg-white/[0.03] border-white/10' : 'bg-slate-50 border-slate-100'
               }`}>
                 <div className="inline-flex p-3 rounded-full bg-emerald-500/10 text-accent-emerald mb-2">
                   <CheckCircle2 size={24} />
@@ -711,7 +715,7 @@ export default function StudentHome() {
               <div className="space-y-2.5">
                 {behaviorLogs.map((item) => (
                   <div key={item.id} className={`flex justify-between items-center text-sm font-semibold border-b pb-2 ${
-                    isDark ? 'border-white/5' : 'border-slate-50'
+                    isDark ? 'border-white/10' : 'border-slate-50'
                   }`}>
                     <div>
                       <span className={textSecondary}>{item.reason}</span>
@@ -742,7 +746,7 @@ export default function StudentHome() {
 
           {/* การ์ดสรุป: วงกลมแสดงเปอร์เซ็นต์รวม */}
           <div className={`rounded-2xl border p-4 flex items-center gap-4 ${
-            isDark ? 'bg-white/[0.04] border-white/10' : 'bg-slate-50 border-slate-100'
+            isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
           }`}>
             <div className="relative w-16 h-16 shrink-0">
               <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
@@ -807,7 +811,7 @@ export default function StudentHome() {
       <Modal isOpen={activeModal === 'grade'} onClose={() => setActiveModal(null)} title="🎓 ผลการเรียน">
         <div className="space-y-4">
           <div className={`flex justify-between items-center p-3 rounded-xl border ${
-            isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
+            isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
           }`}>
             <span className={`text-sm font-bold ${textPrimary}`}>ภาคเรียน 1/2569</span>
             <span className="text-sm font-extrabold text-brand">GPA: 3.45</span>
@@ -828,7 +832,7 @@ export default function StudentHome() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: idx * 0.06, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
                 className={`flex justify-between items-center border-b pb-2.5 ${
-                  isDark ? 'border-white/5' : 'border-slate-50'
+                  isDark ? 'border-white/10' : 'border-slate-50'
                 }`}
               >
                 <div>
@@ -857,10 +861,10 @@ export default function StudentHome() {
               { day: '24', month: 'ก.ค.', subject: 'การออกแบบกราฟิกพื้นฐาน', time: '08:30 – 10:30 น.', room: 'ห้อง 1406' },
             ].map((item, idx) => (
               <div key={idx} className={`flex gap-4 items-center border-b pb-2 ${
-                isDark ? 'border-white/5' : 'border-slate-50'
+                isDark ? 'border-white/10' : 'border-slate-50'
               }`}>
                 <div className={`rounded-xl px-3 py-1.5 text-center min-w-[55px] border ${
-                  isDark ? 'bg-white/[0.04] border-white/5' : 'bg-slate-50 border-slate-100'
+                  isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
                 }`}>
                   <span className={`text-base font-extrabold block leading-none ${textPrimary}`}>{item.day}</span>
                   <span className={`text-[11px] font-bold mt-1 block leading-none ${textMuted}`}>{item.month}</span>
@@ -890,7 +894,7 @@ export default function StudentHome() {
           ].map((doc, idx) => (
             <div key={idx} className={`flex justify-between items-center p-3 border rounded-xl transition-all ${
               isDark 
-                ? 'border-white/5 hover:bg-white/5' 
+                ? 'border-white/10 hover:bg-white/5' 
                 : 'border-slate-100 hover:bg-slate-50'
             }`}>
               <div>
