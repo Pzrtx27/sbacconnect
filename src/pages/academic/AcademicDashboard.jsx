@@ -490,16 +490,27 @@ export default function AcademicDashboard() {
 
   return (
     <div className="space-y-5">
-      <div className="flex justify-between items-center">
-        <h2 className={`text-xl font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
-          }`}>
-          <Settings size={24} className="text-brand" />
-          Academic Panel
-        </h2>
-        <span className={`text-xs font-bold px-3 py-1 rounded-lg transition-colors duration-300 ${isDark ? 'bg-white/10 text-content-secondary' : 'bg-slate-100 text-ink-secondary'
-          }`}>
-          ห้อง {classLabel(selectedClassId)}
-        </span>
+      {/* หัวหน้า — เดิมเขียนว่า "Academic Panel" ซึ่งเป็นคำอังกฤษคำเดียวในหน้าที่เหลือ
+          เป็นภาษาไทยทั้งหมด และผู้ใช้จริงคือเจ้าหน้าที่ฝ่ายวิชาการของวิทยาลัยไทย
+          ส่วนป้าย "ห้อง ปวช.3/6" ย้ายไปอยู่ในแท็บตารางสอนที่เดียว เพราะการเลือกห้อง
+          มีผลแค่กับแท็บนั้น อยู่บนหัวตลอดเวลาแล้วอ่านเหมือนว่าทั้งหน้ากรองด้วยห้องนี้
+          ทั้งที่แท็บนักเรียน/กิจกรรม/นำเข้าข้อมูลไม่ได้กรองอะไรเลย */}
+      <div className="flex justify-between items-center gap-3">
+        <div className="min-w-0">
+          <h2
+            className={`text-xl font-extrabold flex items-center gap-2 transition-colors duration-300 ${
+              isDark ? 'text-white' : 'text-sbac-navy'
+            }`}
+          >
+            <span className="w-8 h-8 rounded-xl bg-sbac-blue/10 flex items-center justify-center text-brand shrink-0">
+              <Settings size={18} aria-hidden="true" />
+            </span>
+            ฝ่ายวิชาการ
+          </h2>
+          <p className={`text-xs font-semibold mt-1 ${isDark ? 'text-content-secondary' : 'text-ink-muted'}`}>
+            {user?.name || 'เจ้าหน้าที่ฝ่ายวิชาการ'}
+          </p>
+        </div>
       </div>
 
       {/* แท็บ — เดิมเป็นหน้าเดียวยาว 7 หมวดรวด บนมือถือกว่าจะเลื่อนถึงใบลาที่รออนุมัติ
@@ -516,21 +527,27 @@ export default function AcademicDashboard() {
         >
         {/* ============================================================
             อนุมัติใบลา (ขั้นสุดท้าย) + กำหนดครูประจำชั้น (22_leave_requests.sql)
+
+            ไม่มีการ์ดครอบอีกชั้นแล้ว: ของที่อยู่ข้างในเป็นการ์ดอยู่แล้วทั้งคู่
+            (HomeroomAssignmentPanel เป็น GlassCard, LeaveRequestList ออกมาเป็นการ์ดรายใบ)
+            การ์ดซ้อนการ์ดกินขอบซ้ายขวาไปสองชั้นทั้งที่จอมือถือกว้างแค่ 375px
+            และทำให้เส้นขอบสองเส้นวิ่งขนานกันห่างกัน 20px ซึ่งไม่ได้สื่ออะไรเลย
             ============================================================ */}
-        <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${
-          isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
-        }`}>
-          <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
-            <ClipboardCheck size={18} className="text-brand" />
+        <section aria-labelledby="head-leaves" className="space-y-3">
+          <h3
+            id="head-leaves"
+            className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'}`}
+          >
+            <ClipboardCheck size={18} className="text-brand" aria-hidden="true" />
             อนุมัติใบลา (ขั้นสุดท้าย)
           </h3>
 
-          <div className="grid gap-4 xl:grid-cols-[280px_1fr] items-start">
+          <div className="grid gap-4 xl:grid-cols-[300px_1fr] items-start">
             <HomeroomAssignmentPanel />
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <span className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
-                <ListChecks size={14} />
+                <ListChecks size={14} aria-hidden="true" />
                 รอฝ่ายวิชาการอนุมัติ ({pendingAcademicLeaves.length})
               </span>
               <div className="max-h-[420px] overflow-y-auto pr-1">
@@ -543,7 +560,7 @@ export default function AcademicDashboard() {
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
         {/* คิวใบแจ้งซ่อมจริงจากผู้ช่วย SBAC Connect (23_repair_tickets.sql) */}
         <RepairTicketQueue />
@@ -569,10 +586,12 @@ export default function AcademicDashboard() {
           <div className="flex items-center justify-between gap-2">
             <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
               }`}>
-              <Settings size={18} className="text-brand" />
+              {/* ไอคอนฟันเฟืองสื่อว่า "ตั้งค่า" ซึ่งไม่ใช่สิ่งที่ส่วนนี้ทำ
+                  ส่วนนี้เลือกห้องเรียนที่จะแก้ตาราง จึงใช้ไอคอนกลุ่มคน */}
+              <Users size={18} className="text-brand" aria-hidden="true" />
               ห้องที่กำลังจัดการ
             </h3>
-            <span className="text-[11px] font-bold text-content-muted">
+            <span className="text-xs font-bold text-content-muted">
               {classIds.length > 0 ? `${classIds.length} ห้อง` : ''}
             </span>
           </div>
@@ -908,20 +927,22 @@ export default function AcademicDashboard() {
             - รายการทั้งหมด: role academic เห็น/แก้ไข/ลบได้ทุกรายการของทุกครู
               (list_behavior_logs() กรองสิทธิ์ให้แล้วฝั่ง DB — ดู 21_behavior_crud_and_academic.sql)
             ============================================================ */}
-        <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${
-          isDark ? 'bg-white/[0.04] border-white/5' : 'bg-surface-card border-slate-100'
-        }`}>
-          <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
-            <Award size={18} className="text-brand" />
+        {/* การ์ดครอบถูกถอดออกด้วยเหตุผลเดียวกับแท็บ "รอดำเนินการ" — ดูคอมเมนต์ที่นั่น */}
+        <section aria-labelledby="head-behavior" className="space-y-3">
+          <h3
+            id="head-behavior"
+            className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'}`}
+          >
+            <Award size={18} className="text-brand" aria-hidden="true" />
             จัดการพฤติกรรมและการตัดคะแนนนักเรียน
           </h3>
 
-          <div className="grid gap-4 xl:grid-cols-[280px_1fr] items-start">
+          <div className="grid gap-4 xl:grid-cols-[300px_1fr] items-start">
             <BehaviorDeductionWizard />
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <span className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
-                <ListChecks size={14} />
+                <ListChecks size={14} aria-hidden="true" />
                 รายการทั้งหมด ({allBehaviorLogs.length})
               </span>
               <div className="max-h-[420px] overflow-y-auto pr-1">
@@ -935,7 +956,7 @@ export default function AcademicDashboard() {
               </div>
             </div>
           </div>
-        </div>
+        </section>
         </div>
       )}
 
@@ -983,19 +1004,18 @@ export default function AcademicDashboard() {
             เชื่อมต่อข้อมูลรายชื่อนักเรียนจากระบบทะเบียน Excel พร้อมตัวเลือกเข้ารหัสเลขบัตรประชาชน (National ID) ด้วย SHA-256 Hashing หรือ AES-256
           </p>
 
-          {/* Action Buttons for Template / Database Export */}
-          <div className="flex gap-2">
-            <button
-              onClick={downloadTemplate}
-              className={`flex-1 border font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 ${isDark
-                ? 'border-white/10 text-content-secondary hover:bg-white/5'
-                : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
-                }`}
-            >
-              <Download size={14} />
-              ดาวน์โหลดเทมเพลต CSV
-            </button>
-          </div>
+          {/* เดิมห่อปุ่มเดียวไว้ใน flex ที่มี gap แล้วให้ปุ่มเป็น flex-1
+              เหลือปุ่มเดียวมานานแล้ว (ปุ่ม export ถูกถอดออก) — ตัดกล่องทิ้งไปเลย */}
+          <button
+            onClick={downloadTemplate}
+            className={`w-full border font-bold py-3 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 ${isDark
+              ? 'border-white/10 text-content-secondary hover:bg-white/5'
+              : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
+              }`}
+          >
+            <Download size={14} aria-hidden="true" />
+            ดาวน์โหลดเทมเพลต CSV
+          </button>
 
           {/* Encryption Settings */}
           <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-950/40 border-white/5' : 'bg-slate-50 border-slate-100'
@@ -1007,7 +1027,15 @@ export default function AcademicDashboard() {
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            {/* สามคอลัมน์ตายตัวบนจอ 375px = ปุ่มกว้างราว 100px ต่ออัน
+                คำอธิบายไทยที่ 9px ในนั้นเละจนอ่านไม่ออก (สระบน/ล่างทับกัน)
+                มือถือเรียงลงเป็นแถวเดียว จอกว้างค่อยแบ่งสามคอลัมน์
+                และคำอธิบายขึ้นมาที่ 11px ซึ่งเป็นขั้นต่ำที่ตัวไทยยังอ่านออก */}
+            <div
+              role="radiogroup"
+              aria-label="วิธีเข้ารหัสเลขบัตรประชาชน"
+              className="grid grid-cols-1 sm:grid-cols-3 gap-2"
+            >
               {[
                 { id: 'sha256', label: 'SHA-256 Hash', desc: 'ปลอดภัยที่สุด (ถอดกลับไม่ได้)' },
                 { id: 'aes256', label: 'AES-256 GCM', desc: 'สองทาง (ถอดรหัสคืนได้)' },
@@ -1016,16 +1044,18 @@ export default function AcademicDashboard() {
                 <button
                   key={mode.id}
                   type="button"
+                  role="radio"
+                  aria-checked={encryptionMode === mode.id}
                   onClick={() => setEncryptionMode(mode.id)}
-                  className={`px-2 py-3 rounded-xl border text-left transition-all ${encryptionMode === mode.id
+                  className={`px-3 py-3 rounded-xl border text-left transition-colors ${encryptionMode === mode.id
                     ? 'bg-sbac-blue/10 border-sbac-blue text-brand ring-2 ring-sbac-blue/20'
                     : isDark
                       ? 'bg-neutral-900 border-white/10 hover:bg-neutral-800 text-content-secondary'
-                      : 'bg-surface-card border-slate-200 hover:bg-slate-50 text-slate-600'
+                      : 'bg-surface-card border-slate-200 hover:bg-slate-50 text-ink-secondary'
                     }`}
                 >
                   <div className="text-xs font-bold">{mode.label}</div>
-                  <div className="text-[9px] opacity-75 mt-0.5 leading-tight">{mode.desc}</div>
+                  <div className="text-[11px] opacity-80 mt-0.5 leading-snug">{mode.desc}</div>
                 </button>
               ))}
             </div>
@@ -1037,11 +1067,15 @@ export default function AcademicDashboard() {
                   คีย์หลักความปลอดภัย (Encryption Passphrase) <span className="text-accent-rose">*จำเป็นในการถอดรหัส</span>
                 </label>
                 <div className="relative">
+                  {/* ช่องนี้เคยตั้งแต่ "สีเส้นขอบ" (border-white/15) โดยไม่ได้ใส่คลาส border
+                      Tailwind preflight ตั้ง border-width: 0 ให้ทุก element อยู่แล้ว
+                      สีที่ตั้งไว้จึงไม่ถูกวาดออกมาเลย — ช่องกรอกไม่มีขอบทั้งสองธีม
+                      และ focus:border-* ที่เขียนไว้ก็ไม่มีผลตามไปด้วย */}
                   <input
                     type={showSecretKey ? 'text' : 'password'}
                     value={secretKey}
                     onChange={(e) => setSecretKey(e.target.value)}
-                    className={`w-full rounded-xl pl-4 pr-10 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
+                    className={`w-full rounded-xl border pl-4 pr-12 py-3 text-xs font-semibold focus:outline-none transition-colors duration-200 ${isDark
                       ? 'bg-neutral-900 border-white/15 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50'
                       : 'bg-surface-card border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue'
                       }`}
@@ -1057,7 +1091,9 @@ export default function AcademicDashboard() {
                     aria-pressed={showSecretKey}
                     className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-xl text-content-muted hover:text-ink-secondary transition-colors"
                   >
-                    {showSecretKey ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
+                    {/* ทิศทางเดียวกับปุ่มในหน้าล็อกอิน: ไอคอนบอกสถานะปัจจุบัน
+                        ตาเปิด = คีย์ถูกแสดงอยู่ / ตาขีดฆ่า = ถูกซ่อนอยู่ */}
+                    {showSecretKey ? <Eye size={15} aria-hidden="true" /> : <EyeOff size={15} aria-hidden="true" />}
                   </button>
                 </div>
               </div>

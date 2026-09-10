@@ -30,6 +30,7 @@ import {
   Search,
   ChevronRight,
   TrendingUp,
+  TrendingDown,
   UserX,
   XCircle,
   QrCode,
@@ -661,7 +662,7 @@ export default function TeacherHome() {
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => { setBehaviorActionType('deduct'); setBehaviorReason(''); setSelectedCategoryId(null); }}
-              className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center ${
+              className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center gap-1.5 text-center ${
                 behaviorActionType === 'deduct'
                   ? 'bg-rose-500 text-white border-rose-500 shadow-sm'
                   : isDark
@@ -669,11 +670,12 @@ export default function TeacherHome() {
                   : 'bg-rose-50 border-rose-100 text-accent-rose hover:bg-rose-100/50'
               }`}
             >
-              ⚠️ ตัดคะแนนความประพฤติ
+              <TrendingDown size={16} aria-hidden="true" />
+              ตัดคะแนนความประพฤติ
             </button>
             <button
               onClick={() => { setBehaviorActionType('add'); setBehaviorReason(''); setSelectedCategoryId(null); }}
-              className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center ${
+              className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center gap-1.5 text-center ${
                 behaviorActionType === 'add'
                   ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
                   : isDark
@@ -681,7 +683,8 @@ export default function TeacherHome() {
                   : 'bg-emerald-50 border-emerald-100 text-accent-emerald hover:bg-emerald-100/50'
               }`}
             >
-              ⭐ เพิ่มคะแนนความดี
+              <TrendingUp size={16} aria-hidden="true" />
+              เพิ่มคะแนนความดี
             </button>
           </div>
 

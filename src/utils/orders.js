@@ -13,10 +13,15 @@ export const ORDER_STATUS_TEXT = {
   cancelled: 'ยกเลิกแล้ว',
 };
 
+/* ป้ายสถานะแบบยาว ใช้ในหน้า "สถานะการสั่งซื้อ" ของนักเรียน
+   เดิมมีอีโมจิ ⏳ ☕ ✓ ต่อท้ายสามในสี่สถานะ ซึ่งมีปัญหาสองอย่าง:
+     - ป้ายพวกนี้อยู่ในกล่องที่มีสีบอกสถานะอยู่แล้ว อีโมจิจึงเป็นข้อมูลซ้ำ
+     - อีโมจิถูกวาดด้วยฟอนต์ของเครื่องผู้ใช้ ป้ายจึงกว้างไม่เท่ากันในแต่ละเครื่อง
+       และ 'ยกเลิกแล้ว' ที่ไม่มีอีโมจิเลยยิ่งทำให้ความกว้างไม่สม่ำเสมอ */
 export const ORDER_STATUS_TEXT_LONG = {
-  paid: 'รอรับออเดอร์ ⏳',
-  preparing: 'กำลังชงเครื่องดื่ม ☕',
-  done: 'รับเครื่องดื่มแล้ว ✓',
+  paid: 'รอรับออเดอร์',
+  preparing: 'กำลังชงเครื่องดื่ม',
+  done: 'รับเครื่องดื่มแล้ว',
   cancelled: 'ยกเลิกแล้ว',
 };
 
@@ -35,17 +40,127 @@ export const ORDER_STATUS_COLOR = {
     'bg-slate-100 text-content-muted border-slate-200 dark:bg-slate-800 dark:text-content-muted dark:border-slate-700',
 };
 
-/** อีโมจิของเครื่องดื่ม — products ใน DB ไม่มีคอลัมน์เก็บรูป
- *  เดาจากชื่อสินค้าเพื่อให้หน้าตายังน่าใช้เหมือนเดิม */
-export function productEmoji(name = '', category = '') {
+/* ---------- รูปเมนู ----------
+   products ใน DB ไม่มีคอลัมน์รูป (มีแต่ image_url ที่ยังไม่มีใครอัปโหลด)
+   จึงต้องเดา "ทรงภาชนะ" จากหมวดกับชื่อเมนู แล้วให้ DrinkIcon วาดเป็นเส้นให้
+
+   ของเดิมคืนอีโมจิ (☕ 🥛 🍵) ซึ่งมีบั๊กที่เห็นได้ในหน้าเมนูจริง:
+     'ขนมปังปิ้ง' โดนกฎ n.includes('นม') ดักไปก่อน เพราะคำว่า "ขนม" มี "นม" อยู่ข้างใน
+     ขนมปังจึงขึ้นเป็นแก้วนม 🥛 มาตลอด
+   ตัวนี้ดูหมวด (category) ก่อนเสมอ แล้วค่อยไล่คำในชื่อตามลำดับที่ควบคุมไว้
+   โดย 'ขนมปัง' อยู่บนสุด จะได้ไม่โดน 'นม' ดักอีก */
+
+const CATEGORY_ALIASES = {
+  coffee: 'coffee',
+  espresso: 'coffee',
+  กาแฟ: 'coffee',
+  tea: 'tea',
+  ชา: 'tea',
+  milk: 'milk',
+  นม: 'milk',
+  soda: 'soda',
+  soft_drink: 'soda',
+  โซดา: 'soda',
+  น้ำอัดลม: 'soda',
+  snack: 'snack',
+  bakery: 'snack',
+  food: 'snack',
+  ขนม: 'snack',
+  เบเกอรี่: 'snack',
+  ของว่าง: 'snack',
+};
+
+/** หมวดจาก DB -> หมวดมาตรฐานของหน้าเว็บ (null = ไม่รู้จัก ให้ไปเดาจากชื่อแทน) */
+function normalizeCategory(category) {
+  const key = String(category || '').trim().toLowerCase();
+  return CATEGORY_ALIASES[key] || null;
+}
+
+/** ป้ายหัวข้อหมวดในหน้าเมนู
+ *  DB เก็บหมวดเป็น 'coffee' / 'snack' / 'tea' ซึ่งไม่ควรโผล่ให้ผู้ใช้เห็นดิบ ๆ
+ *  หมวดที่ยังไม่รู้จักคืนค่าเดิมกลับไป ร้านตั้งชื่อหมวดเป็นภาษาไทยเองก็ใช้ได้ทันที */
+const CATEGORY_LABELS = {
+  coffee: 'กาแฟ',
+  tea: 'ชา',
+  milk: 'นมและโกโก้',
+  soda: 'น้ำอัดลม',
+  snack: 'ของว่าง',
+};
+
+export function categoryLabel(category) {
+  const norm = normalizeCategory(category);
+  if (norm) return CATEGORY_LABELS[norm];
+  const raw = String(category || '').trim();
+  return raw || 'อื่น ๆ';
+}
+
+/* คำในชื่อเมนู -> ทรงภาชนะ เรียงจากเฉพาะไปกว้าง ตัวแรกที่แมตช์ชนะ
+   'ขนมปัง' ต้องอยู่เหนือ 'นม' เสมอ ไม่งั้นเจอบั๊กเดิมอีกรอบ */
+const NAME_SHAPES = [
+  [['ขนมปัง', 'ปังปิ้ง', 'โทสต์', 'toast', 'bread', 'ครัวซองต์', 'croissant'], 'bread'],
+  [['คุกกี้', 'cookie', 'เค้ก', 'cake', 'บราวนี่', 'brownie', 'วาฟเฟิล', 'waffle'], 'cookie'],
+  [['เอสเปรสโซ', 'espresso', 'อเมริกาโน', 'americano', 'ลองแบล็ค', 'long black', 'กาแฟดำ'], 'espresso'],
+  [['ชานม', 'ไข่มุก', 'boba', 'bubble', 'ชาไทย', 'ชาเย็น'], 'bubble'],
+  [['มัทฉะ', 'matcha', 'ชาเขียว', 'green tea'], 'matcha'],
+  [['โกโก้', 'cocoa', 'ช็อกโก', 'ช็อคโก', 'chocolate', 'มอคค่า', 'mocha'], 'cocoa'],
+  [['ลาเต้', 'latte', 'คาปูชิโน', 'cappuccino', 'นมสด', 'มัคคิอาโต', 'macchiato'], 'latte'],
+  [['เป๊ปซี่', 'pepsi', 'โค้ก', 'coke', 'โซดา', 'soda', 'น้ำอัดลม', 'สไปรท์', 'sprite'], 'soda'],
+  [['ชา', 'tea'], 'tea'],
+  [['นม', 'milk'], 'latte'],
+  [['กาแฟ', 'coffee'], 'cup'],
+];
+
+/** ทรงเริ่มต้นของแต่ละหมวด ใช้ตอนชื่อเมนูไม่บอกอะไรเลย เช่น "เมนูพิเศษประจำวัน" */
+const CATEGORY_SHAPES = {
+  coffee: 'cup',
+  tea: 'tea',
+  milk: 'latte',
+  soda: 'soda',
+  snack: 'cookie',
+};
+
+/**
+ * เลือกทรงภาชนะให้เมนูหนึ่งรายการ
+ * คืนคีย์ที่ <DrinkIcon shape="..."> รู้จัก (ดู components/ui/DrinkIcon.jsx)
+ */
+export function drinkShapeFor(name = '', category = '') {
+  const cat = normalizeCategory(category);
   const n = String(name).toLowerCase();
-  if (n.includes('ลาเต้') || n.includes('latte') || n.includes('นม')) return '🥛';
-  if (n.includes('โกโก้') || n.includes('cocoa') || n.includes('ช็อค')) return '🍫';
-  if (n.includes('ชาเขียว') || n.includes('มัทฉะ')) return '🍵';
-  if (n.includes('ชา') || String(category).toLowerCase() === 'tea') return '🧋';
-  if (n.includes('เป๊ปซี่') || n.includes('โซดา') || n.includes('น้ำอัดลม')) return '🥤';
-  if (n.includes('ขนมปัง') || String(category).toLowerCase() === 'snack') return '🍞';
-  return '☕';
+
+  /* ของกินไม่ใช่เครื่องดื่ม ตัดจบที่หมวดเลย ไม่ต้องไปเสี่ยงกับคำในชื่อ
+     (ชื่อขนมมีคำว่า "ชา" หรือ "นม" ปนได้ตลอด เช่น "ขนมปังชาไทย") */
+  if (cat === 'snack') {
+    for (const [keys, shape] of NAME_SHAPES.slice(0, 2)) {
+      if (keys.some((k) => n.includes(k))) return shape;
+    }
+    return 'cookie';
+  }
+
+  for (const [keys, shape] of NAME_SHAPES) {
+    if (keys.some((k) => n.includes(k))) return shape;
+  }
+
+  return CATEGORY_SHAPES[cat] || 'cup';
+}
+
+/* โทนสีของแต่ละทรง — ให้กริดเมนูอ่านเป็น "ระบบ" ไม่ใช่ช่องสีเดียวกันเรียงกันสิบช่อง
+   ใช้ token ของแอป (accent-*) ที่ผ่าน AA ทั้งสองธีมอยู่แล้ว ไม่ตั้งสีดิบเอง
+   เพราะพอสลับธีมแล้วคู่คอนทราสต์จะหลุดทันที */
+const SHAPE_TONES = {
+  espresso: { icon: 'text-accent-amber',   tile: 'bg-amber-500/10 ring-1 ring-inset ring-amber-500/25' },
+  cup:      { icon: 'text-accent-amber',   tile: 'bg-amber-500/10 ring-1 ring-inset ring-amber-500/25' },
+  cocoa:    { icon: 'text-accent-amber',   tile: 'bg-amber-500/10 ring-1 ring-inset ring-amber-500/25' },
+  bread:    { icon: 'text-accent-amber',   tile: 'bg-amber-500/10 ring-1 ring-inset ring-amber-500/25' },
+  cookie:   { icon: 'text-accent-amber',   tile: 'bg-amber-500/10 ring-1 ring-inset ring-amber-500/25' },
+  latte:    { icon: 'text-accent-cyan',    tile: 'bg-cyan-500/10 ring-1 ring-inset ring-cyan-500/25' },
+  matcha:   { icon: 'text-accent-emerald', tile: 'bg-emerald-500/10 ring-1 ring-inset ring-emerald-500/25' },
+  tea:      { icon: 'text-accent-emerald', tile: 'bg-emerald-500/10 ring-1 ring-inset ring-emerald-500/25' },
+  bubble:   { icon: 'text-accent-violet',  tile: 'bg-violet-500/10 ring-1 ring-inset ring-violet-500/25' },
+  soda:     { icon: 'text-accent-rose',    tile: 'bg-rose-500/10 ring-1 ring-inset ring-rose-500/25' },
+};
+
+export function drinkTone(shape) {
+  return SHAPE_TONES[shape] || SHAPE_TONES.cup;
 }
 
 /** สร้าง idempotency key ที่ไม่ซ้ำ — กันตัดเงินซ้ำถ้าเน็ตสะดุดแล้วกดส่งใหม่ */

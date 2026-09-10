@@ -15,7 +15,8 @@ import {
   User, 
   Globe,
   ShieldCheck,
-  IdCard
+  IdCard,
+  AlertTriangle
 } from 'lucide-react';
 
 /** หน้าเริ่มต้นของแต่ละ role (ต้องตรงกับ HOME_BY_ROLE ใน App.jsx) */
@@ -271,16 +272,23 @@ export default function LoginPage() {
                   id="login-national-id"
                   autoComplete="current-password"
                 />
+                {/* ไอคอนบอก "สถานะตอนนี้" ไม่ใช่ "สิ่งที่จะเกิดถ้ากด"
+                    ตาเปิด = ตอนนี้อ่านรหัสได้ / ตาขีดฆ่า = ตอนนี้ถูกซ่อนอยู่
+                    ของเดิมสลับกัน (ซ่อนอยู่แต่โชว์ตาเปิด) ซึ่งอ่านแล้วขัดกับสิ่งที่เห็นในช่อง
+                    เพราะตอนนั้นในช่องเป็นจุดดำ ๆ แต่ไอคอนบอกว่าตาเปิด
+                    ส่วนคำอ่านของ screen reader ยังเป็นคำสั่ง ("แสดง/ซ่อน") เหมือนเดิม
+                    และ aria-pressed เป็นตัวบอกสถานะ — ครบทั้งสองทางโดยไม่ขัดกันเอง */}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'ซ่อนรหัสประจำตัว' : 'แสดงรหัสประจำตัว'}
                   aria-pressed={showPassword}
+                  title={showPassword ? 'ซ่อนรหัสประจำตัว' : 'แสดงรหัสประจำตัว'}
                   className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-xl transition-colors ${
                     isDark ? 'text-content-muted hover:text-white hover:bg-white/5' : 'text-content-muted hover:text-slate-700 hover:bg-slate-100'
                   }`}
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? <Eye size={17} aria-hidden="true" /> : <EyeOff size={17} aria-hidden="true" />}
                 </button>
               </div>
             </div>
@@ -316,9 +324,12 @@ export default function LoginPage() {
               <motion.div
                 initial={{ opacity: 0, y: -5 }}
                 animate={{ opacity: 1, y: 0 }}
+                role="alert"
                 className="text-xs text-accent-rose dark:text-accent-rose font-bold bg-rose-500/10 px-4 py-3 rounded-xl border border-rose-500/20 flex items-center gap-2"
               >
-                <span>⚠️</span>
+                {/* เดิมใช้อีโมจิ ⚠️ ซึ่งวาดด้วยฟอนต์ของเครื่องผู้ใช้ คนละภาษากับไอคอนอื่นทั้งหน้า
+                    และเปลี่ยนสีตามข้อความไม่ได้ */}
+                <AlertTriangle size={15} className="shrink-0" aria-hidden="true" />
                 <span>{error}</span>
               </motion.div>
             )}

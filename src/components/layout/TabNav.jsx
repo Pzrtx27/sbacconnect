@@ -68,8 +68,17 @@ export default function TabNav({ tabs, active, onChange, ariaLabel = 'หมว�
               tabIndex={isActive ? 0 : -1}
               onClick={() => onChange(tab.id)}
               /* min-h 44px = ขนาดพื้นที่กดขั้นต่ำบนมือถือ (เท่ากับ BottomNav)
-                 shrink-0 กันไม่ให้ข้อความถูกบีบจนตัดคำ — ให้ขึ้นบรรทัดใหม่แทน */
-              className={`relative shrink-0 flex items-center gap-1.5 px-3.5 min-h-[44px] rounded-2xl
+
+                 flex-1 ทำให้แท็บใน "แต่ละบรรทัด" ยืดเต็มความกว้างเสมอ
+                 ของเดิมเป็น shrink-0 คือกว้างตามความยาวข้อความ พอมีห้าแท็บแล้วตกบรรทัด
+                 จะได้ 3 อันบรรทัดบน + 2 อันบรรทัดล่าง แล้วเหลือช่องว่างโบ๋ท้ายบรรทัดล่าง
+                 ขอบขวาของสองบรรทัดไม่ตรงกัน ดูเหมือนวางไม่เสร็จ
+                 ตอนนี้ทุกบรรทัดชนขอบพอดีทั้งซ้ายและขวา ไม่ว่าจะตกกี่บรรทัด
+
+                 min-w กันแท็บสั้น ๆ อย่าง "นักเรียน" ถูกบีบจนตัวหนังสือขึ้นสองบรรทัด
+                 บนจอกว้าง (xl) ทั้งห้าแท็บอยู่บรรทัดเดียวอยู่แล้ว จึงคืนเป็นกว้างตามข้อความ
+                 ไม่งั้นแท็บจะถูกยืดออกไปกว้างอันละ 200px+ ซึ่งดูโล่งเกินไป */
+              className={`relative flex-1 min-w-[6.5rem] xl:flex-none flex items-center justify-center gap-1.5 px-3.5 min-h-[44px] rounded-2xl
                           text-xs font-bold transition-colors duration-200 ${
                 isActive
                   ? 'text-white'

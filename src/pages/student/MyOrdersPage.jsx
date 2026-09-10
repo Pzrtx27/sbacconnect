@@ -6,9 +6,11 @@ import { formatBaht } from '../../utils/identity';
 import {
   ORDER_STATUS_TEXT_LONG,
   ORDER_STATUS_COLOR,
-  productEmoji,
+  drinkShapeFor,
+  drinkTone,
   optionSummary,
 } from '../../utils/orders';
+import DrinkIcon from '../../components/ui/DrinkIcon';
 import { useMyOrders } from '../../contexts/OrdersContext';
 
 /* หน้านี้แสดงออเดอร์ที่ยัง "ไม่จบเรื่อง" ในสายตาของนักเรียน:
@@ -139,7 +141,9 @@ export default function MyOrdersPage() {
             isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
           }`}
         >
-          <div className="text-5xl">☕</div>
+          <div className={`w-14 h-14 rounded-2xl mx-auto flex items-center justify-center ${drinkTone('cup').tile} ${drinkTone('cup').icon}`}>
+            <DrinkIcon shape="cup" size={30} />
+          </div>
           <h3 className={`text-sm font-extrabold ${textPrimary}`}>ยังไม่มีคำสั่งซื้อที่ดำเนินการอยู่</h3>
           <p className={`text-xs leading-relaxed ${textMuted}`}>
             สามารถสั่งเครื่องดื่มแก้วโปรดของคุณได้ง่ายๆ ผ่านแถบสั่งกาแฟด้านล่าง
@@ -183,13 +187,15 @@ export default function MyOrdersPage() {
               <div className="space-y-3">
                 {order.order_items?.map((item, idx) => (
                   <div key={idx} className="flex gap-3 items-center">
-                    <div
-                      className={`text-2xl p-2 rounded-xl transition-colors duration-300 ${
-                        isDark ? 'bg-white/10' : 'bg-slate-50'
-                      }`}
-                    >
-                      {productEmoji(item.products?.name, item.products?.category)}
-                    </div>
+                    {(() => {
+                      const shape = drinkShapeFor(item.products?.name, item.products?.category);
+                      const tone = drinkTone(shape);
+                      return (
+                        <div className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center ${tone.tile} ${tone.icon}`}>
+                          <DrinkIcon shape={shape} size={24} />
+                        </div>
+                      );
+                    })()}
                     <div className="flex-1 min-w-0">
                       <div className={`text-sm font-extrabold ${textPrimary}`}>
                         {item.products?.name || 'สินค้า'}

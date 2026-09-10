@@ -5,7 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../config/supabase';
 import { ArrowLeft, RefreshCw, Receipt } from 'lucide-react';
 import { formatBaht } from '../../utils/identity';
-import { ORDER_STATUS_TEXT, ORDER_STATUS_COLOR, productEmoji, optionSummary } from '../../utils/orders';
+import { ORDER_STATUS_TEXT, ORDER_STATUS_COLOR, drinkShapeFor, drinkTone, optionSummary } from '../../utils/orders';
+import DrinkIcon from '../../components/ui/DrinkIcon';
 
 /* ประวัติการสั่งซื้อทั้งหมด แยกจากหน้าสถานะปัจจุบัน (/orders)
    จัดเป็นลิสต์แถวเดียวต่อออเดอร์ แบบแอปช้อปปิ้ง (Shopee / LINE MAN)
@@ -128,13 +129,15 @@ export default function OrderHistoryPage() {
             const extraCount = items.length - 1;
             return (
               <div key={order.id} className="flex items-center gap-3 p-4">
-                <div
-                  className={`text-xl w-11 h-11 shrink-0 rounded-xl flex items-center justify-center transition-colors duration-300 ${
-                    isDark ? 'bg-white/10' : 'bg-slate-50'
-                  }`}
-                >
-                  {productEmoji(first?.products?.name, first?.products?.category)}
-                </div>
+                {(() => {
+                  const shape = drinkShapeFor(first?.products?.name, first?.products?.category);
+                  const tone = drinkTone(shape);
+                  return (
+                    <div className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center ${tone.tile} ${tone.icon}`}>
+                      <DrinkIcon shape={shape} size={24} />
+                    </div>
+                  );
+                })()}
 
                 <div className="flex-1 min-w-0">
                   <div className={`text-sm font-extrabold truncate transition-colors duration-300 ${textPrimary}`}>

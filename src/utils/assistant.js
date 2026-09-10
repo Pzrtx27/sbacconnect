@@ -15,6 +15,22 @@
    3) พาไปหน้าที่ทำงานจริง แทนที่จะอธิบายว่าปุ่มอยู่ตรงไหน
 */
 
+import { supabase } from '../config/supabase';
+import { formatBaht } from './identity';
+import { categoryLabel } from './orders';
+import {
+  DAY_LABELS,
+  PERIOD_TIMES,
+  applySubstitutions,
+  classLabel,
+  describeDate,
+  fetchBaseTimetable,
+  fetchSubstitutions,
+  isSchoolDay,
+  todayISO,
+  weekdayKeyOf,
+} from './timetable';
+
 /** ปุ่มลัดใต้ช่องพิมพ์ — ต่างกันตาม role เพราะเมนูของแต่ละ role ไม่เหมือนกัน
  *
  *  ป้ายต้องสั้น: กล่องแชทกว้างราว 360px ป้ายยาวอย่าง 'ใบแจ้งซ่อมของฉัน' หรือ
@@ -25,6 +41,7 @@
 export function quickActionsFor(role) {
   const repair = { label: 'แจ้งซ่อม', intent: 'repair' };
   const myRepairs = { label: 'ใบซ่อมของฉัน', intent: 'repair_status' };
+  const menu = { label: 'เมนูวันนี้', intent: 'menu' };
 
   if (role === 'academic') {
     return [
@@ -39,6 +56,7 @@ export function quickActionsFor(role) {
     return [
       { label: 'ใบลารออนุมัติ', intent: 'leave' },
       { label: 'กิจกรรม', intent: 'events' },
+      menu,
       repair,
       myRepairs,
     ];
@@ -50,7 +68,10 @@ export function quickActionsFor(role) {
 
   return [
     { label: 'ยอดเงิน', intent: 'balance' },
+    { label: 'ตารางวันนี้', intent: 'timetable' },
+    { label: 'เมนูวันนี้', intent: 'menu' },
     { label: 'คะแนนพฤติกรรม', intent: 'behavior' },
+    { label: 'เวลาเข้าเรียน', intent: 'gate' },
     { label: 'กิจกรรม', intent: 'events' },
     { label: 'สถานะใบลา', intent: 'leave' },
     repair,
@@ -63,26 +84,67 @@ export function quickActionsFor(role) {
 const INTENTS = [
   { id: 'repair_status', keywords: ['สถานะแจ้งซ่อม', 'ใบแจ้งซ่อม', 'แจ้งซ่อมของฉัน', 'ตามเรื่องซ่อม', 'ซ่อมถึงไหน', 'เลขที่แจ้ง'] },
   { id: 'repair', keywords: ['แจ้งซ่อม', 'ซ่อม', 'แอร์', 'พัดลม', 'โปรเจคเตอร์', 'projector', 'หลอดไฟ', 'ไฟดับ', 'ไฟไม่ติด', 'น้ำรั่ว', 'ประปา', 'ชักโครก', 'เน็ตไม่ติด', 'wifi', 'ไวไฟ', 'เครื่องเสียง', 'ลำโพง', 'พัง', 'เสีย', 'ไม่เย็น'] },
+  /* 'menu' ต้องมาก่อน 'orders' เพราะคนถามว่า "มีกาแฟอะไรบ้าง" อยากได้รายการเมนู
+     ไม่ใช่สถานะออเดอร์ของตัวเอง — ทั้งสองอันมีคำว่า "กาแฟ" เหมือนกัน */
+  { id: 'menu', keywords: ['เมนู', 'มีอะไรขาย', 'ขายอะไร', 'ราคากาแฟ', 'ราคาเครื่องดื่ม', 'กี่บาท', 'ราคา', 'menu'] },
   { id: 'balance', keywords: ['ยอดเงิน', 'เงินเหลือ', 'คงเหลือ', 'เติมเงิน', 'wallet', 'กระเป๋าเงิน', 'เงินในบัตร', 'balance'] },
+  { id: 'wallet_history', keywords: ['รายการเงิน', 'ประวัติเงิน', 'เงินหายไปไหน', 'ใช้เงินไปเท่าไร', 'เงินเข้าออก', 'ประวัติการใช้จ่าย'] },
+  { id: 'gate', keywords: ['เข้าโรงเรียน', 'เวลาเข้า', 'สแกนเข้า', 'ประตู', 'มาสาย', 'เข้าเรียนกี่โมง', 'ตอกบัตร'] },
   { id: 'behavior', keywords: ['ความประพฤติ', 'คะแนนพฤติกรรม', 'ตัดคะแนน', 'พฤติกรรม', 'โดนหัก'] },
-  { id: 'events', keywords: ['กิจกรรม', 'ปฏิทิน', 'อีเวนต์', 'event', 'วันหยุด', 'สอบ', 'รด.', 'กำหนดส่ง'] },
+  { id: 'events', keywords: ['กิจกรรม', 'ปฏิทิน', 'อีเวนต์', 'event', 'events', 'วันหยุด', 'สอบ', 'รด.', 'กำหนดส่ง'] },
   { id: 'leave', keywords: ['ใบลา', 'ลาป่วย', 'ลากิจ', 'ขอลา', 'ยื่นลา', 'ลาเรียน', 'อนุมัติลา'] },
-  { id: 'orders', keywords: ['ออเดอร์', 'คำสั่งซื้อ', 'กาแฟ', 'เครื่องดื่ม', 'สั่งน้ำ', 'คิว', 'order'] },
-  { id: 'timetable', keywords: ['ตารางเรียน', 'ตารางสอน', 'ตาราง', 'คาบ', 'เรียนอะไร'] },
+  { id: 'orders', keywords: ['ออเดอร์', 'คำสั่งซื้อ', 'รหัสรับของ', 'กาแฟ', 'เครื่องดื่ม', 'สั่งน้ำ', 'คิว', 'order', 'orders']  },
+  { id: 'timetable', keywords: ['ตารางเรียน', 'ตารางสอน', 'ตาราง', 'คาบ', 'เรียนอะไร', 'สอนอะไร', 'วิชาอะไร'] },
   { id: 'password', keywords: ['ลืมรหัส', 'เปลี่ยนรหัส', 'รหัสผ่าน', 'password', 'reset', 'เข้าระบบไม่ได้', 'ล็อกอินไม่ได้'] },
   { id: 'greeting', keywords: ['สวัสดี', 'หวัดดี', 'hello', 'hi', 'ดีครับ', 'ดีค่ะ'] },
-  { id: 'thanks', keywords: ['ขอบคุณ', 'ขอบใจ', 'thank'] },
-  { id: 'help', keywords: ['ช่วย', 'ทำอะไรได้', 'help', 'เมนู', 'คำสั่ง'] },
+  { id: 'thanks', keywords: ['ขอบคุณ', 'ขอบใจ', 'thank', 'thanks'] },
+  { id: 'help', keywords: ['ช่วยอะไรได้', 'ทำอะไรได้', 'help', 'คำสั่ง', 'ใช้ยังไง'] },
 ];
+
+/* ภาษาไทยไม่เว้นวรรคระหว่างคำ จะเทียบแบบ "มีคำนี้อยู่ในประโยคไหม" (includes) ได้เลย
+   แต่คำอังกฤษเทียบแบบนั้นไม่ได้ ตัวอย่างที่พังจริงในตัวเดิม:
+     'hi'   ไปแมตช์กับ this / which / history / machine
+     'menu' ไปแมตช์กับ menu แต่ก็รวมถึงคำอื่นที่มี menu ต่อท้าย
+   คำที่เป็นอักษรละตินล้วนจึงต้องเทียบแบบมีขอบเขตคำ (\b...\b) */
+const ASCII_ONLY = /^[a-z0-9.\s-]+$/;
+
+const boundaryCache = new Map();
+
+function matchesKeyword(haystack, keyword) {
+  const k = keyword.toLowerCase();
+  if (!ASCII_ONLY.test(k)) return haystack.includes(k);
+
+  let re = boundaryCache.get(k);
+  if (!re) {
+    re = new RegExp(`(^|[^a-z0-9])${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`, 'i');
+    boundaryCache.set(k, re);
+  }
+  return re.test(haystack);
+}
 
 /** ข้อความผู้ใช้ -> id ความตั้งใจ (null = ไม่รู้จัก) */
 export function matchIntent(text) {
   const lower = String(text || '').toLowerCase().trim();
   if (!lower) return null;
   for (const intent of INTENTS) {
-    if (intent.keywords.some((k) => lower.includes(k.toLowerCase()))) return intent.id;
+    if (intent.keywords.some((k) => matchesKeyword(lower, k))) return intent.id;
   }
   return null;
+}
+
+/* คำที่แปลว่า "พอแล้ว ออกจากขั้นตอนนี้"
+
+   ทำไมต้องมี: ตอนบอทถามหาเลขห้องหรือรายละเอียดปัญหา ข้อความถัดไปทุกข้อความ
+   จะถูกเก็บเป็นคำตอบของคำถามนั้นทั้งหมด ไม่ว่าผู้ใช้จะพิมพ์อะไรมา
+   ใครเปลี่ยนใจกลางคันแล้วพิมพ์ "ยกเลิก" หรือ "ขอดูยอดเงินแทน"
+   จะได้ห้องชื่อ "ยกเลิก" กลับไปแทน แล้วติดอยู่ในขั้นตอนต่อไปอีก ออกไม่ได้เลย
+   นอกจากปิดกล่องแชททิ้ง */
+const CANCEL_WORDS = ['ยกเลิก', 'ไม่เอาแล้ว', 'ไม่เอา', 'พอแล้ว', 'หยุด', 'ออก', 'เลิก', 'cancel', 'stop'];
+
+export function isCancelWord(text) {
+  const lower = String(text || '').toLowerCase().trim();
+  if (!lower || lower.length > 20) return false;
+  return CANCEL_WORDS.some((w) => matchesKeyword(lower, w));
 }
 
 /* คำที่บอกว่าน่าจะเป็นอุปกรณ์อะไร ใช้เดาให้ผู้ใช้ไม่ต้องพิมพ์ซ้ำ
@@ -257,10 +319,14 @@ export function answerFor(intentId, ctx) {
         return { text: 'หน้าคิวเครื่องดื่มอยู่ที่หน้าร้านกาแฟครับ', actions: [{ label: 'ไปหน้าร้าน', path: '/barista' }] };
       }
       const n = activeOrderCount;
+      const codes = ctx.activePickupCodes || [];
       return {
         text:
           n > 0
-            ? `ตอนนี้คุณมีออเดอร์ที่ยังไม่เสร็จอยู่ ${n} รายการครับ`
+            ? `ตอนนี้คุณมีออเดอร์ที่ยังไม่เสร็จอยู่ ${n} รายการครับ` +
+              /* รหัสรับของคือสิ่งเดียวที่ต้องยื่นให้บาริสต้าตอนไปรับ
+                 ถามบอทแล้วได้แค่จำนวนใบ ยังต้องเปิดอีกหน้าเพื่อดูรหัสอยู่ดี */
+              (codes.length > 0 ? `\nรหัสรับของ **${codes.join('**, **')}**` : '')
             : 'ตอนนี้คุณไม่มีออเดอร์ที่ค้างอยู่ครับ',
         actions: [
           { label: 'สั่งเครื่องดื่ม', path: '/coffee' },
@@ -269,10 +335,15 @@ export function answerFor(intentId, ctx) {
       };
     }
 
+    /* intent พวกนี้ต้องยิงถามฐานข้อมูลก่อนถึงจะตอบได้
+       AssistantFAB จะเรียก fetch*Answer() ให้แทน ไม่ผ่านทางนี้
+       ถ้ามาถึงตรงนี้แปลว่ามีคนลืมต่อสาย จึงตอบแบบไม่มั่วข้อมูลไว้ก่อน */
+    case 'menu':
+    case 'gate':
+    case 'wallet_history':
     case 'timetable':
       return {
-        text: 'เปิดตารางเรียนได้จากเมนูตารางสอนครับ\nถ้ามีการสอนแทน คาบนั้นจะขึ้นสีต่างจากปกติให้เห็นชัด',
-        actions: [{ label: 'เปิดตารางสอน', path: '/timetable' }],
+        text: 'ตอนนี้ดึงข้อมูลส่วนนี้ไม่ได้ครับ ลองใหม่อีกครั้ง',
       };
 
     case 'password':
@@ -285,19 +356,244 @@ export function answerFor(intentId, ctx) {
       return {
         text:
           'ผมช่วยเรื่องพวกนี้ได้ครับ\n' +
-          (isStudent ? '• ยอดเงินในบัตร คะแนนความประพฤติ สถานะใบลา ออเดอร์เครื่องดื่ม\n' : '• ใบลาที่รออนุมัติ กิจกรรมในปฏิทิน\n') +
-          '• กิจกรรมที่กำลังจะถึง\n' +
-          '• แจ้งซ่อมอุปกรณ์ และตามสถานะใบแจ้งซ่อม\n\n' +
-          'ทุกคำตอบดึงจากข้อมูลจริงในระบบ ไม่ใช่ข้อความสำเร็จรูปครับ',
+          (isStudent
+            ? '• **ตารางวันนี้** เรียนคาบไหน วิชาอะไร ห้องไหน มีสอนแทนไหม\n' +
+              '• **เมนูวันนี้** ร้านมีอะไรขาย ราคาเท่าไร\n' +
+              '• **ยอดเงิน** และ **รายการเงินเข้า-ออก** ล่าสุด\n' +
+              '• **คะแนนความประพฤติ** และประวัติการหักคะแนน\n' +
+              '• **เวลาเข้าโรงเรียน** ที่สแกนบัตรไว้\n' +
+              '• **สถานะใบลา** และ **ออเดอร์เครื่องดื่ม** พร้อมรหัสรับของ\n'
+            : '• **ใบลาที่รออนุมัติ**\n• **เมนูร้านกาแฟ** และราคา\n') +
+          '• **กิจกรรมที่กำลังจะถึง** ในปฏิทินฝ่ายวิชาการ\n' +
+          '• **แจ้งซ่อมอุปกรณ์** และตามสถานะใบแจ้งซ่อม\n\n' +
+          'พิมพ์ถามเป็นภาษาปกติได้เลย หรือกดปุ่มลัดด้านล่างก็ได้ครับ\n' +
+          'ทุกคำตอบดึงจากข้อมูลจริงในระบบ ไม่ใช่ข้อความสำเร็จรูป',
       };
   }
 }
 
+/* ============================================================
+   คำตอบที่ต้องยิงถามฐานข้อมูลก่อน
+
+   แยกออกมาจาก answerFor() เพราะสามอันนี้ต้อง await
+   และไม่ควรดึงไว้ล่วงหน้าตอนเปิดกล่องแชท — คนเปิดแชทส่วนใหญ่ถามเรื่องเดียว
+   ถ้าดึงทุกอย่างไว้ก่อนจะเสียทั้งเน็ตและโควตา DB ไปกับข้อมูลที่ไม่มีใครดู
+   ============================================================ */
+
+const askError = (what) => ({
+  text: `ตอนนี้ดึง${what}ไม่ได้ครับ อาจเป็นที่การเชื่อมต่อ ลองใหม่อีกครั้งได้เลย`,
+  tone: 'error',
+});
+
+/** เมนูร้านกาแฟที่เปิดขายอยู่ตอนนี้ พร้อมราคา */
+export async function fetchMenuAnswer() {
+  const { data, error } = await supabase.rpc('menu_with_options');
+  if (error) {
+    console.error('[assistant] ดึงเมนูไม่สำเร็จ:', error);
+    return askError('เมนูร้านกาแฟ');
+  }
+
+  const products = data?.products || [];
+  if (products.length === 0) {
+    return {
+      text: 'ตอนนี้ร้านยังไม่ได้เปิดเมนูไว้ในระบบครับ',
+      actions: [{ label: 'เปิดหน้าสั่งเครื่องดื่ม', path: '/coffee' }],
+    };
+  }
+
+  // จัดกลุ่มตามหมวดเหมือนหน้าสั่งซื้อ จะได้อ่านเรียงเหมือนกันทั้งสองที่
+  const groups = new Map();
+  for (const p of products) {
+    const key = categoryLabel(p.category);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(p);
+  }
+
+  const lines = [...groups.entries()].map(([label, items]) => {
+    const list = items
+      .slice(0, 6)
+      .map((p) => `  • ${p.name} ${formatBaht(p.price_satang)} ฿`)
+      .join('\n');
+    const more = items.length > 6 ? `\n  • และอีก ${items.length - 6} รายการ` : '';
+    return `**${label}**\n${list}${more}`;
+  });
+
+  return {
+    text:
+      `ร้านมี ${products.length} เมนูที่เปิดขายอยู่ครับ\n\n${lines.join('\n\n')}\n\n` +
+      'ราคานี้เป็นราคาเริ่มต้น ยังบวกเพิ่มตามขนาดแก้วกับท็อปปิ้งที่เลือก',
+    actions: [{ label: 'สั่งเลย', path: '/coffee' }],
+  };
+}
+
+/** เวลาเข้าโรงเรียนที่สแกนบัตรไว้ */
+export async function fetchGateAnswer() {
+  const { data, error } = await supabase.rpc('my_gate_logs', { p_limit: 7 });
+  if (error) {
+    console.error('[assistant] ดึงเวลาเข้าโรงเรียนไม่สำเร็จ:', error);
+    return askError('เวลาเข้าโรงเรียน');
+  }
+
+  const logs = Array.isArray(data) ? data : [];
+  if (logs.length === 0) {
+    return { text: 'ยังไม่มีบันทึกการสแกนบัตรเข้าโรงเรียนของคุณในระบบครับ' };
+  }
+
+  const timeText = (iso) =>
+    new Intl.DateTimeFormat('th-TH', {
+      timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit',
+    }).format(new Date(iso));
+
+  const dateOf = (iso) =>
+    new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Bangkok' }).format(new Date(iso));
+
+  const today = todayISO();
+  const todayLog = logs.find((l) => dateOf(l.entered_at) === today);
+
+  const recent = logs
+    .slice(0, 5)
+    .map((l) => `• ${describeDate(dateOf(l.entered_at))} เวลา ${timeText(l.entered_at)}${l.gate ? ` (${l.gate})` : ''}`)
+    .join('\n');
+
+  return {
+    text:
+      (todayLog
+        ? `วันนี้คุณสแกนเข้าโรงเรียนเวลา **${timeText(todayLog.entered_at)}** ครับ`
+        : 'วันนี้ยังไม่มีบันทึกการสแกนเข้าโรงเรียนของคุณครับ') +
+      `\n\nล่าสุด\n${recent}`,
+  };
+}
+
+/** เงินเข้า-ออกในบัตรล่าสุด */
+export async function fetchWalletAnswer() {
+  const { data, error } = await supabase.rpc('my_wallet_history', { p_limit: 6 });
+  if (error) {
+    console.error('[assistant] ดึงประวัติเงินไม่สำเร็จ:', error);
+    return askError('รายการเงินเข้า-ออก');
+  }
+
+  const rows = Array.isArray(data) ? data : [];
+  if (rows.length === 0) {
+    return {
+      text: 'ยังไม่มีรายการเงินเข้า-ออกในบัตรของคุณครับ',
+      actions: [{ label: 'เติมเงิน', path: '/home' }],
+    };
+  }
+
+  const KIND_LABELS = {
+    topup: 'เติมเงิน',
+    order: 'สั่งเครื่องดื่ม',
+    refund: 'คืนเงิน',
+    adjust: 'เจ้าหน้าที่ปรับยอด',
+  };
+
+  const lines = rows
+    .map((r) => {
+      const sign = r.direction === 'in' ? '+' : '-';
+      const amount = formatBaht(Math.abs(r.amount_satang));
+      const when = r.occurred_at
+        ? new Intl.DateTimeFormat('th-TH', {
+            timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+          }).format(new Date(r.occurred_at))
+        : '';
+      return `• ${sign}${amount} ฿ ${KIND_LABELS[r.kind] || r.kind}${when ? ` — ${when}` : ''}`;
+    })
+    .join('\n');
+
+  return {
+    text: `รายการล่าสุดในบัตรครับ\n${lines}\n\nยอดคงเหลือหลังรายการล่าสุด ${formatBaht(rows[0].balance_after)} บาท`,
+    actions: [{ label: 'ดูทั้งหมด', path: '/home' }],
+  };
+}
+
+/** ตารางเรียนของวันนี้ พร้อมคาบที่มีครูสอนแทน */
+export async function fetchTimetableAnswer(user) {
+  const classId = user?.class_id;
+
+  /* ครู/ฝ่ายวิชาการไม่ได้ผูกกับห้องเดียว จึงไม่มี "ตารางของฉัน" ให้ตอบ
+     ส่งไปหน้าตารางที่เลือกห้องเองได้ดีกว่าเดาห้องให้ */
+  if (!classId) {
+    return {
+      text: 'บัญชีนี้ไม่ได้ผูกกับห้องเรียนห้องใดห้องหนึ่ง เลือกห้องที่อยากดูได้ในหน้าตารางสอนครับ',
+      actions: [{ label: 'เปิดตารางสอน', path: '/timetable' }],
+    };
+  }
+
+  const today = todayISO();
+  const dayKey = weekdayKeyOf(today);
+
+  if (!isSchoolDay(today)) {
+    return {
+      text: `วัน${DAY_LABELS[dayKey]}ไม่มีคาบเรียนตามตารางปกติครับ`,
+      actions: [{ label: 'ดูตารางทั้งสัปดาห์', path: '/timetable' }],
+    };
+  }
+
+  try {
+    const [{ timetable }, subs] = await Promise.all([
+      fetchBaseTimetable(classId),
+      fetchSubstitutions(classId, today),
+    ]);
+
+    const merged = applySubstitutions(timetable, subs, today);
+    const periods = merged?.[dayKey] || {};
+    const keys = Object.keys(periods)
+      .map(Number)
+      .filter((n) => periods[n]?.subject)
+      .sort((a, b) => a - b);
+
+    if (keys.length === 0) {
+      return {
+        text: `ยังไม่มีตารางของวัน${DAY_LABELS[dayKey]}สำหรับห้อง ${classLabel(classId)} ในระบบครับ`,
+        actions: [{ label: 'เปิดตารางสอน', path: '/timetable' }],
+      };
+    }
+
+    const lines = keys.map((p) => {
+      const slot = periods[p];
+      const room = slot.is_substituted && slot.substitute_room ? slot.substitute_room : slot.room;
+      const teacher = slot.is_substituted && slot.substitute_teacher ? slot.substitute_teacher : slot.teacher;
+      return (
+        `• คาบ ${p} (${PERIOD_TIMES[p] || '-'}) ${slot.subject}` +
+        (teacher ? ` — ${teacher}` : '') +
+        (room ? ` ห้อง ${room}` : '') +
+        (slot.is_substituted ? '  **[สอนแทน]**' : '')
+      );
+    });
+
+    const subCount = keys.filter((p) => periods[p].is_substituted).length;
+
+    return {
+      text:
+        `ตารางวัน${DAY_LABELS[dayKey]} ห้อง ${classLabel(classId)} ครับ\n${lines.join('\n')}` +
+        (subCount > 0 ? `\n\nวันนี้มีเปลี่ยนครูสอนแทน ${subCount} คาบ` : ''),
+      actions: [{ label: 'ดูตารางทั้งสัปดาห์', path: '/timetable' }],
+    };
+  } catch (err) {
+    console.error('[assistant] ดึงตารางเรียนไม่สำเร็จ:', err);
+    return askError('ตารางเรียน');
+  }
+}
+
+/** intent ไหนต้องใช้ตัวดึงข้อมูลแบบ async — AssistantFAB ใช้ตัดสินใจว่าจะ await หรือตอบทันที */
+export const ASYNC_ANSWERS = {
+  menu: fetchMenuAnswer,
+  gate: fetchGateAnswer,
+  wallet_history: fetchWalletAnswer,
+  timetable: fetchTimetableAnswer,
+};
+
 /** ข้อความเปิดตอนเปิดหน้าต่างครั้งแรก */
 export function greetingFor(user) {
   const name = user?.name ? `คุณ${user.name}` : '';
+  const isStudent = (user?.role || 'student') === 'student';
   return {
-    text: `สวัสดีครับ ${name}\nผมดูข้อมูลจริงในระบบให้ได้ และรับแจ้งซ่อมเข้าคิวฝ่ายวิชาการได้ด้วย\nกดปุ่มลัดด้านล่าง หรือพิมพ์ถามได้เลยครับ`,
+    text:
+      `สวัสดีครับ ${name}\n` +
+      (isStudent
+        ? 'ถามได้เลยครับ เช่น "วันนี้เรียนอะไร" "เมนูมีอะไรบ้าง" "เงินเหลือเท่าไร" หรือ "แจ้งซ่อมแอร์ห้อง 1406"'
+        : 'ถามได้เลยครับ เช่น "ใบลารออนุมัติ" "กิจกรรมที่จะถึง" หรือ "แจ้งซ่อมแอร์ห้อง 1406"') +
+      '\nหรือกดปุ่มลัดด้านล่างก็ได้',
   };
 }
 

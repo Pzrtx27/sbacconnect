@@ -11,10 +11,12 @@ import { useRepairTickets } from '../../hooks/useRepairTickets';
 import { supabase } from '../../config/supabase';
 import { ACTIVE_STATUSES } from '../../utils/orders';
 import {
+  ASYNC_ANSWERS,
   answerFor,
   detectEquipment,
   extractRoom,
   greetingFor,
+  isCancelWord,
   matchIntent,
   quickActionsFor,
   repairErrorText,
@@ -87,17 +89,25 @@ export default function AssistantFAB() {
 
       {/* mount เฉพาะตอนเปิดจริง — hook ข้างในเปิด realtime channel สามช่อง
           ถ้าปล่อยให้ mount ค้างไว้ทุกหน้า ทุกผู้ใช้จะกิน connection เพิ่มเท่าตัว
-          ทั้งที่ส่วนใหญ่ไม่เคยเปิดกล่องแชทเลย */}
-      {isOpen && (
-        <AssistantPanel
-          user={user}
-          isDark={isDark}
-          messages={messages}
-          setMessages={setMessages}
-          openerRef={openerRef}
-          onClose={() => setIsOpen(false)}
-        />
-      )}
+          ทั้งที่ส่วนใหญ่ไม่เคยเปิดกล่องแชทเลย
+
+          AnimatePresence ต้องอยู่ตรงนี้ ไม่ใช่ข้างในตัว panel
+          ของเดิมใส่ไว้ข้างใน AssistantPanel ซึ่งไม่มีผลอะไรเลย เพราะพอ isOpen
+          เป็น false ตัว panel ถูกถอดออกจาก tree ทันที AnimatePresence ที่อยู่
+          ข้างในนั้นก็หายไปพร้อมกัน ไม่มีใครเหลือรอไว้เล่นแอนิเมชันขาออก
+          ผลคือกล่องแชท "กระพริบหาย" ทั้งที่โค้ดเขียน exit ไว้ครบ */}
+      <AnimatePresence>
+        {isOpen && (
+          <AssistantPanel
+            user={user}
+            isDark={isDark}
+            messages={messages}
+            setMessages={setMessages}
+            openerRef={openerRef}
+            onClose={() => setIsOpen(false)}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 }
@@ -110,6 +120,7 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
   const [draft, setDraft] = useState({ room: '', equipment: '', problem: '' });
   const [behaviorScore, setBehaviorScore] = useState(null);
   const [activeOrderCount, setActiveOrderCount] = useState(0);
+  const [activePickupCodes, setActivePickupCodes] = useState([]);
 
   const listEndRef = useRef(null);
   const panelRef = useRef(null);
@@ -139,18 +150,30 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
       });
     }
 
-    supabase
-      .from('orders')
-      .select('id', { count: 'exact', head: true })
-      .in('status', ACTIVE_STATUSES)
-      .then(({ count, error }) => {
-        if (!alive) return;
-        if (error) {
-          console.error('[assistant] นับออเดอร์ที่ค้างไม่สำเร็จ:', error);
-          return;
-        }
-        setActiveOrderCount(count ?? 0);
-      });
+    /* ออเดอร์ที่ยังไม่เสร็จ — ดึงเฉพาะ role ที่บอทตอบเรื่องนี้จริง
+       บาริสต้ากับฝ่ายวิชาการถูกส่งไปหน้าคิวของร้านอยู่แล้ว ไม่ได้ใช้ตัวเลขนี้
+       และสองบทบาทนั้นอ่านออเดอร์ได้ทุกใบ ถ้าปล่อยให้ยิงต่อไปก็เป็นการนับ
+       ทั้งร้านทิ้งเปล่า ๆ ทุกครั้งที่มีคนเปิดกล่องแชท
+
+       เอา pickup_code มาด้วยเลย ไม่ใช่แค่ count — เพราะคำถามที่คนถามจริง
+       คือ "รหัสรับของเลขอะไร" ไม่ใช่ "มีกี่ใบ" */
+    if (role === 'student' || role === 'teacher') {
+      supabase
+        .from('orders')
+        .select('pickup_code')
+        .in('status', ACTIVE_STATUSES)
+        .order('created_at', { ascending: false })
+        .limit(20)
+        .then(({ data, error }) => {
+          if (!alive) return;
+          if (error) {
+            console.error('[assistant] ดึงออเดอร์ที่ค้างไม่สำเร็จ:', error);
+            return;
+          }
+          setActiveOrderCount(data?.length ?? 0);
+          setActivePickupCodes((data || []).map((o) => o.pickup_code).filter(Boolean).slice(0, 3));
+        });
+    }
 
     return () => {
       alive = false;
@@ -315,7 +338,7 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
   );
 
   const handleIntent = useCallback(
-    (intentId) => {
+    async (intentId) => {
       if (intentId === 'repair') {
         startRepairFlow('');
         return;
@@ -324,6 +347,20 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
         answerRepairStatus();
         return;
       }
+
+      /* intent ที่ต้องยิงถาม DB ก่อน (เมนู / ตารางวันนี้ / เวลาเข้าเรียน / รายการเงิน)
+         โชว์ตัวหมุนระหว่างรอ ไม่งั้นกดปุ่มแล้วเงียบไปสองวินาทีเหมือนกดไม่ติด */
+      const fetcher = ASYNC_ANSWERS[intentId];
+      if (fetcher) {
+        setThinking(true);
+        try {
+          pushBot(await fetcher(user));
+        } finally {
+          setThinking(false);
+        }
+        return;
+      }
+
       pushBot(
         answerFor(intentId, {
           user,
@@ -333,11 +370,13 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
           leaveLoading,
           behaviorScore,
           activeOrderCount,
+          activePickupCodes,
         })
       );
     },
     [
       activeOrderCount,
+      activePickupCodes,
       answerRepairStatus,
       behaviorScore,
       events,
@@ -356,6 +395,17 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
 
     pushUser(text);
     setInputValue('');
+
+    /* ทางออกจากขั้นตอนแจ้งซ่อม
+
+       ระหว่างที่บอทถามหาห้องหรือรายละเอียดปัญหา ข้อความทุกข้อความจะถูกเก็บเป็น
+       คำตอบของคำถามนั้น ไม่ว่าคนพิมพ์จะตั้งใจตอบหรือไม่
+       ของเดิมจึงไม่มีทางถอยออกมาเลย พิมพ์ "ยกเลิก" ก็ได้ห้องชื่อ "ยกเลิก"
+       แล้วบอทถามต่อว่าเสียยังไง — ติดอยู่ในลูปจนต้องปิดกล่องแชททิ้ง */
+    if (flow !== FLOW.IDLE && isCancelWord(text)) {
+      cancelRepair();
+      return;
+    }
 
     // อยู่ระหว่างเก็บข้อมูลแจ้งซ่อม — ข้อความถัดไปคือคำตอบของคำถามที่ค้างอยู่
     if (flow === FLOW.ASK_ROOM) {
@@ -384,10 +434,11 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
     const intentId = matchIntent(text);
 
     if (!intentId) {
-      pushBot({
-        text:
-          'ขอโทษครับ ผมยังไม่เข้าใจคำถามนี้\nลองกดปุ่มลัดด้านล่าง หรือถามเรื่องยอดเงิน คะแนนความประพฤติ กิจกรรม ใบลา หรือแจ้งซ่อมดูครับ',
-      });
+      /* ตอบว่าไม่เข้าใจแล้วต้องบอกต่อว่า "แล้วถามอะไรได้บ้าง"
+         ของเดิมบอกไว้แค่ห้าหัวข้อในประโยคเดียว ซึ่งไม่ตรงกับสิ่งที่บอททำได้จริงแล้ว
+         ดึงรายการเดียวกับ intent 'help' มาใช้ จะได้ไม่มีวันหลุดกัน */
+      const fallback = answerFor('help', { user, events, leaveRequests });
+      pushBot({ ...fallback, text: `ยังไม่เข้าใจคำถามนี้ครับ\n\n${fallback.text}` });
       return;
     }
 
@@ -417,9 +468,10 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
     : 'bg-surface-card border-border text-ink';
 
   return createPortal(
-    <AnimatePresence>
-      {/* ตัวนี้ mount ก็ต่อเมื่อกล่องเปิดอยู่แล้ว จึงไม่ต้องมีเงื่อนไข isOpen ซ้อนอีกชั้น
-          ที่ยังต้องมี AnimatePresence เพราะอยากได้แอนิเมชันตอนขึ้น */}
+    <>
+      {/* AnimatePresence อยู่ที่ AssistantFAB (ผู้เรียก) ไม่ใช่ตรงนี้
+          framer-motion ส่งสถานะ present ลงมาทาง context ผ่าน portal ได้
+          motion.div ข้างล่างจึงได้เล่น exit ก่อนถูกถอดออกจริง */}
       <>
               <motion.div
                 initial={{ opacity: 0 }}
@@ -548,7 +600,9 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
                     {thinking && (
                       <div className="flex items-center gap-2 text-xs font-semibold text-content-muted">
                         <Loader2 size={14} className="animate-spin" aria-hidden="true" />
-                        กำลังบันทึก...
+                        {/* ข้อความเดิมเขียนว่า "กำลังบันทึก..." ตายตัว ซึ่งถูกเฉพาะตอนส่งใบแจ้งซ่อม
+                            ตอนนี้ตัวหมุนตัวเดียวกันถูกใช้ระหว่างดึงเมนู/ตาราง/ยอดเงินด้วย */}
+                        {flow === FLOW.CONFIRM ? 'กำลังบันทึกใบแจ้งซ่อม...' : 'กำลังดึงข้อมูล...'}
                       </div>
                     )}
 
@@ -560,18 +614,19 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
                       กล่องแชทกว้างราว 360px แต่ปุ่มของนักเรียนมีหกอัน รวมกันยาวเกินสองเท่า
                       และไม่มีอะไรบอกว่ายังมีต่อ คนใช้เลยไม่รู้ว่ามีปุ่มที่เหลืออยู่
                       แบบ wrap เห็นครบทุกปุ่มในครั้งเดียว ไม่ต้องเลื่อนอะไรเลย */}
-                  {flow === FLOW.IDLE && (
+                  {flow === FLOW.IDLE ? (
                     <div className={`px-4 py-2.5 border-t shrink-0 ${isDark ? 'border-white/10' : 'border-border'}`}>
                       <div className="flex flex-wrap gap-1.5">
                         {quickActions.map((action) => (
                           <button
                             key={action.intent + action.label}
                             type="button"
+                            disabled={thinking}
                             onClick={() => {
                               pushUser(action.label);
                               handleIntent(action.intent);
                             }}
-                            className={`px-3 py-1.5 rounded-full text-[12px] font-bold border transition-colors ${
+                            className={`px-3 py-1.5 rounded-full text-[12px] font-bold border transition-colors disabled:opacity-50 ${
                               isDark
                                 ? 'border-white/15 text-slate-200 hover:bg-white/10'
                                 : 'border-border text-ink-secondary hover:bg-slate-50'
@@ -582,6 +637,29 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
                         ))}
                       </div>
                     </div>
+                  ) : (
+                    /* ระหว่างกรอกใบแจ้งซ่อม ปุ่มลัดหายไปทั้งแถบ (ถูกต้องแล้ว เพราะกดไปก็
+                       ตอบไม่ได้อยู่ดี) แต่ของเดิมไม่เหลืออะไรให้กดถอยออกเลยสักปุ่ม
+                       จนกว่าจะถึงหน้าจอยืนยัน — แถบนี้จึงบอกว่าตอนนี้อยู่ขั้นไหน
+                       และมีทางออกให้เห็นตลอด */
+                    flow !== FLOW.CONFIRM && (
+                      <div className={`px-4 py-2.5 border-t shrink-0 flex items-center justify-between gap-2 ${isDark ? 'border-white/10' : 'border-border'}`}>
+                        <span className="text-[12px] font-bold text-content-muted truncate">
+                          {flow === FLOW.ASK_ROOM ? 'กำลังแจ้งซ่อม · ขั้นที่ 1 จาก 2' : 'กำลังแจ้งซ่อม · ขั้นที่ 2 จาก 2'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={cancelRepair}
+                          className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] font-bold border transition-colors ${
+                            isDark
+                              ? 'border-white/15 text-slate-200 hover:bg-white/10'
+                              : 'border-border text-ink-secondary hover:bg-slate-50'
+                          }`}
+                        >
+                          ยกเลิก
+                        </button>
+                      </div>
+                    )
                   )}
 
                   <form
@@ -621,7 +699,7 @@ function AssistantPanel({ user, isDark, messages, setMessages, openerRef, onClos
                 </div>
               </motion.div>
       </>
-    </AnimatePresence>,
+    </>,
     document.body
   );
 }

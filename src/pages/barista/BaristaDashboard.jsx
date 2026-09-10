@@ -3,9 +3,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../config/supabase';
 import { showToast } from '../../components/ui/Toast';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
-import { LogOut, Clock, Check, RefreshCw, Coffee, X, Archive } from 'lucide-react';
+import { LogOut, Clock, Check, CheckCheck, RefreshCw, Coffee, X, Archive, Lock, Inbox } from 'lucide-react';
 import { formatBaht } from '../../utils/identity';
-import { ORDER_STATUS_TEXT, productEmoji, optionSummary, bulkErrorText } from '../../utils/orders';
+import { ORDER_STATUS_TEXT, drinkShapeFor, optionSummary, bulkErrorText } from '../../utils/orders';
+import DrinkIcon from '../../components/ui/DrinkIcon';
 import { useRealtimeTable, useSerialCallback } from '../../hooks/useRealtimeTable';
 import { playChime, unlockAudio } from '../../utils/sound';
 
@@ -339,7 +340,9 @@ export default function BaristaDashboard() {
 
         {forbidden ? (
           <div className="bg-rose-500/5 border border-rose-500/25 rounded-3xl p-8 text-center space-y-3">
-            <span className="text-4xl block">🔒</span>
+            {/* อีโมจิถูกวาดด้วยฟอนต์ของเครื่องผู้ใช้ จึงคุมสี ขนาด และน้ำหนักเส้น
+                ให้เข้ากับไอคอนอื่นในหน้าไม่ได้เลย — ใช้ไอคอนเส้นชุดเดียวกับทั้งแอปแทน */}
+            <Lock size={34} className="mx-auto text-accent-rose" aria-hidden="true" />
             <h3 className="text-sm font-extrabold text-accent-rose">บัญชีนี้ไม่มีสิทธิ์ดูคิวหน้าร้าน</h3>
             <p className="text-xs text-content-muted leading-relaxed">
               ต้องมี role <code className="text-accent-amber">pos</code> หรือ{' '}
@@ -355,9 +358,11 @@ export default function BaristaDashboard() {
           </div>
         ) : visibleOrders.length === 0 ? (
           <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-10 text-center space-y-3">
-            <span className="text-4xl block" aria-hidden="true">
-              {tab === 'active' ? '😴' : '📭'}
-            </span>
+            {tab === 'active' ? (
+              <CheckCheck size={34} className="mx-auto text-accent-emerald" aria-hidden="true" />
+            ) : (
+              <Inbox size={34} className="mx-auto text-content-muted" aria-hidden="true" />
+            )}
             <h3 className="text-sm font-extrabold text-slate-200">
               {tab === 'active' ? 'ชงหมดแล้ว ไม่มีคิวค้าง' : 'ยังไม่มีออเดอร์ที่เสร็จวันนี้'}
             </h3>
@@ -420,9 +425,14 @@ export default function BaristaDashboard() {
                   <div className="space-y-2.5">
                     {order.items?.map((item, idx) => (
                       <div key={idx} className="flex gap-3 items-start">
-                        <span className="text-2xl leading-none pt-0.5" aria-hidden="true">
-                          {productEmoji(item.name, item.category)}
-                        </span>
+                        {/* หน้าคิวอยู่บนจอที่บาริสต้ามองไกล ๆ ระหว่างชง
+                            ไอคอนจึงเป็นสีเดียวกับตัวอักษร ไม่แยกสีตามหมวด
+                            จะได้ไม่มีอะไรมาแย่งสายตาไปจากชื่อเมนูกับตัวเลือก */}
+                        <DrinkIcon
+                          shape={drinkShapeFor(item.name, item.category)}
+                          size={24}
+                          className="shrink-0 mt-0.5 text-white/70"
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-extrabold text-white">
                             {item.name} × {item.qty}

@@ -99,7 +99,7 @@ function ReadyDialog({ order, isDark, remaining, onClose, onPickedUp }) {
                 id="order-ready-title"
                 className={`text-xl font-black ${isDark ? 'text-white' : 'text-sbac-navy'}`}
               >
-                เครื่องดื่มพร้อมแล้ว ☕
+                เครื่องดื่มพร้อมแล้ว
               </h2>
               <p className={`text-xs font-semibold ${isDark ? 'text-content-secondary' : 'text-ink-muted'}`}>
                 ยื่นรหัสนี้ที่เคาน์เตอร์เพื่อรับเครื่องดื่ม

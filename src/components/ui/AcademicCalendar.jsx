@@ -27,6 +27,26 @@ import {
 const DAY_NAMES = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 const DAY_NAMES_FULL = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
 
+/* สีวันหยุดสุดสัปดาห์ ตามธรรมเนียมปฏิทินไทย: อาทิตย์แดง เสาร์ม่วง
+
+   ของเดิมมีปัญหาสองอย่างพร้อมกัน
+     1) หัวคอลัมน์ทาสีแดงทั้งเสาร์และอาทิตย์ ทั้งที่ปฏิทินไทยแยกสีสองวันนี้
+     2) ตัวเลขวันที่ในช่องเสาร์-อาทิตย์ใช้ text-content-muted ซึ่งเป็นโทนที่จางที่สุด
+        ในระบบ (ไว้สำหรับคำอธิบายใต้หัวข้อ) — หัวคอลัมน์จึงบอกว่า "แดง = วันหยุด"
+        แต่ตัวเลขข้างล่างกลับเทาจางกว่าวันธรรมดา อ่านแล้วขัดกันเอง
+        และตัวเลขวันที่คือของที่คนสแกนหาเร็วที่สุดในปฏิทิน ไม่ควรเป็นตัวที่จางที่สุด
+
+   ใช้ token accent-* ที่ผ่าน AA ทั้งสองธีมอยู่แล้ว หัวคอลัมน์กับตัวเลขใช้สีเดียวกัน */
+const WEEKEND_TEXT = {
+  0: 'text-accent-rose',   // อาทิตย์
+  6: 'text-accent-violet', // เสาร์
+};
+
+const WEEKEND_HOVER = {
+  0: { dark: 'hover:bg-rose-500/15', light: 'hover:bg-rose-500/10' },
+  6: { dark: 'hover:bg-violet-500/15', light: 'hover:bg-violet-500/10' },
+};
+
 /** ภาคเรียนตามเดือน: พ.ค.–ก.ย. = ภาคเรียนที่ 1, ต.ค.–เม.ย. = ภาคเรียนที่ 2 */
 function getSemesterLabel(year, month) {
   const buddhistYear = year + 543;
@@ -181,13 +201,13 @@ export default function AcademicCalendar() {
         {/* แถบภาคเรียน + จำนวนกิจกรรม */}
         <div className="flex items-center justify-between mb-3 gap-2">
           <span
-            className={`text-[11px] font-bold px-2.5 py-1 rounded-lg text-content-secondary ${
+            className={`text-xs font-bold px-2.5 py-1 rounded-lg text-content-secondary ${
               isDark ? 'bg-white/10' : 'bg-slate-100'
             }`}
           >
             ภาคเรียน {getSemesterLabel(viewYear, viewMonth)}
           </span>
-          <span className={`text-[11px] font-bold ${error ? 'text-accent-rose' : textMuted}`}>
+          <span className={`text-xs font-bold ${error ? 'text-accent-rose' : textMuted}`}>
             {summaryText}
           </span>
         </div>
@@ -198,8 +218,8 @@ export default function AcademicCalendar() {
             <abbr
               key={name}
               title={`วัน${DAY_NAMES_FULL[i]}`}
-              className={`no-underline text-center text-[11px] font-bold py-1 ${
-                i === 0 || i === 6 ? 'text-accent-rose' : textMuted
+              className={`no-underline text-center text-xs font-extrabold py-1 ${
+                WEEKEND_TEXT[i] || 'text-content-secondary'
               }`}
             >
               {name}
@@ -218,12 +238,39 @@ export default function AcademicCalendar() {
             const hasEvents = dayEvents.length > 0;
             const isToday = day === currentDay;
             const isSelected = day === selectedDate;
-            const isWeekend = idx % 7 === 0 || idx % 7 === 6;
+            const weekday = idx % 7;
+            const weekendText = WEEKEND_TEXT[weekday];
             const isHoliday = dayEvents.some((e) => e.type === 'holiday');
 
-            const label = hasEvents
-              ? `${day} ${MONTH_NAMES[viewMonth]} — ${dayEvents.length} กิจกรรม: ${dayEvents.map((e) => e.title).join(', ')}`
-              : `${day} ${MONTH_NAMES[viewMonth]} — ไม่มีกิจกรรม`;
+            const dayTypeText = isHoliday
+              ? 'วันหยุด'
+              : weekday === 0
+                ? 'วันอาทิตย์'
+                : weekday === 6
+                  ? 'วันเสาร์'
+                  : null;
+
+            const label =
+              `${day} ${MONTH_NAMES[viewMonth]}` +
+              (dayTypeText ? ` (${dayTypeText})` : '') +
+              (hasEvents
+                ? ` — ${dayEvents.length} กิจกรรม: ${dayEvents.map((e) => e.title).join(', ')}`
+                : ' — ไม่มีกิจกรรม');
+
+            /* ลำดับความสำคัญของสีในช่อง: วันนี้ > วันหยุดราชการ > เสาร์/อาทิตย์ > วันธรรมดา
+               ทุกชั้นใช้ token สีตัวอักษรที่ผ่าน AA ไม่มีชั้นไหนตกไปเป็นสีจาง */
+            const hover = weekendText
+              ? (isDark ? WEEKEND_HOVER[weekday].dark : WEEKEND_HOVER[weekday].light)
+              : (isDark ? 'hover:bg-white/5' : 'hover:bg-slate-100');
+
+            const dayTone = isToday
+              /* วันนี้ต้องหาเจอทันทีที่เปิดหน้า พื้นอ่อน 12% บนการ์ดสีครีมแทบมองไม่เห็น
+                 จึงเติมเส้นขอบในเข้าไปด้วย เห็นชัดขึ้นโดยไม่ต้องเพิ่มความเข้มของพื้น
+                 (พื้นเข้มกว่านี้จะแย่งความเด่นไปจากช่องที่ถูกเลือกซึ่งใช้ ring สีเดียวกัน) */
+              ? `text-brand ring-1 ring-inset ring-sbac-blue/35 ${isDark ? 'bg-sbac-blue/25' : 'bg-sbac-blue/12'}`
+              : isHoliday
+                ? `text-accent-rose ${isDark ? 'bg-rose-500/15' : 'bg-rose-500/10'}`
+                : `${weekendText || 'text-content'} ${hover}`;
 
             return (
               <button
@@ -235,30 +282,25 @@ export default function AcademicCalendar() {
                 aria-label={label}
                 aria-pressed={isSelected}
                 aria-current={isToday ? 'date' : undefined}
-                className={`aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all duration-200 cursor-pointer active:scale-90
+                className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 relative transition-all duration-200 cursor-pointer active:scale-90
                   ${isSelected ? 'ring-2 ring-sbac-blue ring-offset-1 ' + (isDark ? 'ring-offset-surface-dark-elev' : 'ring-offset-surface-card') : ''}
-                  ${
-                  isToday
-                    ? `text-brand font-extrabold ${isDark ? 'bg-sbac-blue/25' : 'bg-sbac-blue/10'}`
-                    : isHoliday
-                    ? `text-accent-rose ${isDark ? 'bg-red-900/20' : 'bg-red-50'}`
-                    : isWeekend
-                    ? `${textMuted} ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`
-                    : `text-content ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`
-                }`}
+                  ${dayTone}`}
               >
-                <span className="text-xs font-bold leading-none">{day}</span>
+                {/* tabular-nums: ปฏิทินคือตารางตัวเลข ถ้าเลข 1 แคบกว่าเลขอื่น
+                    คอลัมน์จะเยื้องกันทั้งแถว — เป็นค่าเริ่มต้นของเบราว์เซอร์ที่ต้องสั่งทับ */}
+                <span className="text-xs font-extrabold leading-none tabular-nums">{day}</span>
 
-                {hasEvents && (
-                  <div className="flex gap-0.5 mt-0.5" aria-hidden="true">
-                    {dayEvents.slice(0, 3).map((evt) => (
+                {/* จุดกิจกรรม — สูงเท่ากันทุกช่องแม้ไม่มีกิจกรรม ตัวเลขจะได้ไม่ขยับขึ้นลง
+                    ระหว่างช่องที่มีกับไม่มี ซึ่งทำให้แถวดูสั่น */}
+                <div className="flex gap-[3px] h-1.5 items-center" aria-hidden="true">
+                  {hasEvents &&
+                    dayEvents.slice(0, 3).map((evt) => (
                       <div
                         key={evt.id}
-                        className={`w-1 h-1 rounded-full ${DOT_COLORS[evt.color] || 'bg-blue-500'}`}
+                        className={`w-1.5 h-1.5 rounded-full ${DOT_COLORS[evt.color] || 'bg-blue-500'}`}
                       />
                     ))}
-                  </div>
-                )}
+                </div>
               </button>
             );
           })}
@@ -276,7 +318,7 @@ export default function AcademicCalendar() {
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-1.5">
               <div className={`w-2 h-2 rounded-full ${item.color}`} aria-hidden="true" />
-              <span className={`text-[11px] font-bold ${textMuted}`}>{item.label}</span>
+              <span className={`text-xs font-semibold ${textMuted}`}>{item.label}</span>
             </div>
           ))}
         </div>
@@ -333,34 +375,34 @@ export default function AcademicCalendar() {
                     <div className="flex-1 space-y-1">
                       <div className="flex items-start gap-2 flex-wrap">
                         <span className="text-xs font-bold">{evt.title}</span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-white/10' : 'bg-white/70'}`}>
+                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${isDark ? 'bg-white/10' : 'bg-white/70'}`}>
                           {EVENT_TYPE_LABELS[evt.type] || evt.type}
                         </span>
                         {evt.classRoomId !== null && labelOf(evt.classRoomId) && (
                           <span
-                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                            className={`text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${
                               isDark ? 'bg-white/10' : 'bg-white/70'
                             }`}
                           >
-                            <Users size={9} aria-hidden="true" />
+                            <Users size={11} aria-hidden="true" />
                             {labelOf(evt.classRoomId)}
                           </span>
                         )}
                       </div>
 
                       {evt.description && (
-                        <p className="text-[11px] font-semibold leading-relaxed opacity-90">
+                        <p className="text-xs font-semibold leading-relaxed opacity-90">
                           {evt.description}
                         </p>
                       )}
 
                       <div className="flex items-center gap-3 flex-wrap">
-                        <span className="flex items-center gap-1 text-[11px] font-semibold">
-                          <ClockIcon size={10} aria-hidden="true" /> {eventTimeText(evt)}
+                        <span className="flex items-center gap-1.5 text-xs font-semibold">
+                          <ClockIcon size={12} aria-hidden="true" /> {eventTimeText(evt)}
                         </span>
                         {evt.location && (
-                          <span className="flex items-center gap-1 text-[11px] font-semibold">
-                            <MapPin size={10} aria-hidden="true" /> {evt.location}
+                          <span className="flex items-center gap-1.5 text-xs font-semibold">
+                            <MapPin size={12} aria-hidden="true" /> {evt.location}
                           </span>
                         )}
                       </div>

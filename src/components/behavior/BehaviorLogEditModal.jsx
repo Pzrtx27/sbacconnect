@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useBehaviorCategories } from '../../hooks/useBehaviorCategories';
 import Modal from '../ui/Modal';
-import { Save } from 'lucide-react';
+import { Save, TrendingDown, TrendingUp } from 'lucide-react';
 
 /* โมดัลแก้ไขรายการตัด/เพิ่มคะแนน — ใช้ร่วมกันทั้ง TeacherHome และ AcademicDashboard
    log = null ปิดโมดัล, log = object เปิดพร้อม prefill ค่าจากรายการนั้น
@@ -57,24 +57,26 @@ export default function BehaviorLogEditModal({ log, onClose, onSave }) {
             <button
               type="button"
               onClick={() => { setActionType('deduct'); setCategoryId(null); }}
-              className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+              className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center gap-1.5 ${
                 actionType === 'deduct'
                   ? 'bg-rose-500 text-white border-rose-500'
                   : isDark ? 'bg-white/5 border-white/10 text-accent-rose' : 'bg-rose-50 border-rose-100 text-accent-rose'
               }`}
             >
-              ⚠️ ตัดคะแนน
+              <TrendingDown size={15} aria-hidden="true" />
+              ตัดคะแนน
             </button>
             <button
               type="button"
               onClick={() => { setActionType('add'); setCategoryId(null); }}
-              className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+              className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center gap-1.5 ${
                 actionType === 'add'
                   ? 'bg-emerald-500 text-white border-emerald-500'
                   : isDark ? 'bg-white/5 border-white/10 text-accent-emerald' : 'bg-emerald-50 border-emerald-100 text-accent-emerald'
               }`}
             >
-              ⭐ เพิ่มคะแนน
+              <TrendingUp size={15} aria-hidden="true" />
+              เพิ่มคะแนน
             </button>
           </div>
 

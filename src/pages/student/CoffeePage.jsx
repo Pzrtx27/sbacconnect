@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -10,8 +10,10 @@ import {
   ShoppingCart, History, Coffee, Minus, Plus, RefreshCw, Trash2, X, Check,
 } from 'lucide-react';
 import { formatBaht } from '../../utils/identity';
+import DrinkIcon from '../../components/ui/DrinkIcon';
 import {
-  productEmoji, newIdempotencyKey, placeOrderErrorText, optionSummary,
+  drinkShapeFor, drinkTone, categoryLabel,
+  newIdempotencyKey, placeOrderErrorText, optionSummary,
 } from '../../utils/orders';
 import { requestNotifyPermission } from '../../utils/notify';
 import { unlockAudio } from '../../utils/sound';
@@ -89,22 +91,62 @@ export default function CoffeePage() {
   const [orderResult, setOrderResult] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
+  /* แยก "โหลดครั้งแรก" ออกจาก "โหลดซ้ำ"
+
+     ครั้งแรกต้องโชว์ตัวหมุนแทนกริด เพราะยังไม่มีอะไรให้ดู
+     แต่การโหลดซ้ำ (กดปุ่มรีเฟรช หรือ realtime แจ้งว่าเมนูเปลี่ยน) ห้ามสลับไปหน้าตัวหมุน
+     เพราะการ์ดทั้งกริดจะถูก unmount แล้ว mount ใหม่ = เล่นแอนิเมชันเข้าใหม่ทั้งหน้า
+     ทุกครั้งที่ร้านแก้เมนูสักตัวเดียว ซึ่งกระตุกและน่ารำคาญกว่าไม่มี realtime เสียอีก
+     ตอนโหลดซ้ำจึงให้เห็นแค่ไอคอนหมุนที่ปุ่มรีเฟรช ส่วนกริดเปลี่ยนค่าอยู่กับที่ */
+  const loadedOnceRef = useRef(false);
+  const [refreshingMenu, setRefreshingMenu] = useState(false);
+
   const loadMenu = useCallback(async () => {
-    setLoadingMenu(true);
+    if (loadedOnceRef.current) setRefreshingMenu(true);
+    else setLoadingMenu(true);
+
     const { data, error } = await supabase.rpc('menu_with_options');
 
     if (error) {
       console.error('[coffee] โหลดเมนูไม่สำเร็จ:', error);
       showToast('โหลดรายการเครื่องดื่มไม่สำเร็จ', 'error');
-      setProducts([]);
+      // โหลดซ้ำแล้วพลาด ให้คงเมนูเดิมไว้ ดีกว่าล้างจอเป็นหน้าว่างทั้งที่ของเก่ายังใช้ได้
+      if (!loadedOnceRef.current) setProducts([]);
     } else {
       setProducts(data?.products || []);
+      loadedOnceRef.current = true;
     }
+
     setLoadingMenu(false);
+    setRefreshingMenu(false);
   }, []);
 
   useEffect(() => {
     loadMenu();
+  }, [loadMenu]);
+
+  /* เมนูเปลี่ยนแล้วต้องขึ้นเองโดยไม่ต้องรีเฟรชทั้งหน้า
+
+     อาการที่ถูกรายงานมา: ร้านเพิ่มเมนูใหม่ในตาราง products แล้ว "ไม่ขึ้น"
+     ต้นเหตุคือหน้านี้ยิง menu_with_options() แค่ครั้งเดียวตอน mount
+     แอปเป็น SPA — นักเรียนเปิดค้างทั้งวัน สลับแท็บไปมาก็ไม่ได้ mount ใหม่
+     เมนูที่เพิ่งเพิ่มจึงไม่มีทางโผล่จนกว่าจะกด F5 ซึ่งไม่มีอะไรบอกให้ทำ
+
+     แก้ด้วยการ subscribe ตาราง products กับ options ไว้ พอมีแถวเปลี่ยน
+     ก็ดึงเมนูใหม่ทั้งก้อน (เมนูทั้งร้านมีไม่กี่สิบแถว ดึงใหม่ถูกกว่าไล่ merge เอง)
+
+     ต้องเปิด publication ให้สองตารางนี้ก่อน (39_cup_oz_and_menu_realtime.sql)
+     ถ้ายังไม่ได้รัน ปุ่ม "โหลดเมนูใหม่" ที่หัวหน้ายังใช้ได้อยู่ ไม่พังเงียบ */
+  useEffect(() => {
+    const channel = supabase
+      .channel('menu-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => loadMenu())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'options' }, () => loadMenu())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [loadMenu]);
 
   /* แยกเมนูตามหมวดเพื่อให้เลื่อนหาง่าย — ร้านมีทั้งกาแฟ ชา โซดา ขนม
@@ -320,7 +362,27 @@ export default function CoffeePage() {
           </span>
           SBAC Coffee
         </h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* ปุ่มโหลดเมนูใหม่ — ทางออกเวลา realtime ไม่มา (เน็ตโรงเรียนตัด websocket บ่อย)
+              หรือร้านเพิ่งแก้เมนูแล้วอยากเห็นผลเดี๋ยวนั้นเลย */}
+          <button
+            type="button"
+            onClick={loadMenu}
+            disabled={loadingMenu || refreshingMenu}
+            aria-label="โหลดเมนูใหม่"
+            title="โหลดเมนูใหม่"
+            className={`w-9 h-9 flex items-center justify-center rounded-xl border transition-colors active:scale-95 disabled:opacity-50 ${
+              isDark
+                ? 'border-white/10 text-content-secondary hover:bg-white/10'
+                : 'border-slate-200 text-ink-secondary hover:bg-slate-100'
+            }`}
+          >
+            <RefreshCw
+              size={14}
+              className={loadingMenu || refreshingMenu ? 'animate-spin' : ''}
+              aria-hidden="true"
+            />
+          </button>
           <button
             onClick={() => navigate('/orders/history')}
             className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl border active:scale-95 transition-all ${
@@ -348,57 +410,83 @@ export default function CoffeePage() {
           <span className={`text-xs font-semibold ${textMuted}`}>กำลังโหลดเมนู...</span>
         </div>
       ) : products.length === 0 ? (
-        <div className={`rounded-3xl border shadow-sm p-8 text-center space-y-2 ${panel}`}>
-          <div className="text-4xl" aria-hidden="true">🗒️</div>
-          <h3 className={`text-sm font-extrabold ${textPrimary}`}>ยังไม่มีรายการเครื่องดื่ม</h3>
-          <p className={`text-xs ${textMuted}`}>
-            กรุณาติดต่อผู้ดูแลระบบให้เพิ่มสินค้าในตาราง products
+        /* ข้อความนี้ต้องบอก "ต้องไปทำอะไรต่อ" ให้ครบ
+           ของเดิมเขียนแค่ "ติดต่อผู้ดูแลระบบให้เพิ่มสินค้า" ซึ่งไม่ช่วยคนที่เพิ่งเพิ่มเมนู
+           ไปแล้วแต่ไม่เห็นมันขึ้น — สาเหตุที่เจอบ่อยคือ is_active ยังไม่ติด */
+        <div className={`rounded-3xl border shadow-sm p-8 text-center space-y-3 ${panel}`}>
+          <div className={`w-14 h-14 rounded-2xl mx-auto flex items-center justify-center ${drinkTone('cup').tile} ${drinkTone('cup').icon}`}>
+            <DrinkIcon shape="cup" size={30} />
+          </div>
+          <h3 className={`text-sm font-extrabold ${textPrimary}`}>ยังไม่มีเมนูเปิดขายอยู่ตอนนี้</h3>
+          <p className={`text-xs leading-relaxed ${textMuted}`}>
+            ถ้าเพิ่งเพิ่มเมนูเข้าไปแล้วยังไม่ขึ้น ให้กด &ldquo;โหลดเมนูใหม่&rdquo; ก่อน
+            <span className="block mt-1">
+              ถ้ายังไม่ขึ้นอีก แปลว่าแถวนั้นใน <code className="font-mono">products</code> ยังมี{' '}
+              <code className="font-mono">is_active = false</code> อยู่
+            </span>
           </p>
+          <button
+            type="button"
+            onClick={loadMenu}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-sbac-blue hover:bg-sbac-navy text-white text-xs font-bold transition-colors"
+          >
+            <RefreshCw size={14} aria-hidden="true" />
+            โหลดเมนูใหม่
+          </button>
         </div>
       ) : (
         byCategory.map(([category, items]) => (
           <section key={category} className="space-y-3">
-            <h3 className={`text-sm font-extrabold ${textPrimary}`}>{category}</h3>
+            <h3 className={`text-sm font-extrabold ${textPrimary}`}>{categoryLabel(category)}</h3>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
-              {items.map((item) => (
-                <GlassCard key={item.id} onClick={() => openProduct(item)}>
-                  <div className="text-center py-4 space-y-2">
-                    <div
-                      className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-sm overflow-hidden ${
-                        isDark ? 'bg-white/10' : 'bg-slate-50'
-                      }`}
-                    >
-                      {item.image_url ? (
-                        <img
-                          src={item.image_url}
-                          alt=""
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        productEmoji(item.name, item.category)
+              {items.map((item) => {
+                const shape = drinkShapeFor(item.name, item.category);
+                const tone = drinkTone(shape);
+                /* ป้ายบอกว่าเมนูนี้ปรับอะไรได้บ้าง — เขียนชื่อกลุ่มตรง ๆ คั่นด้วยจุด
+                   ของเดิมเป็น "เลือกประเภท / ขนาดได้" ซึ่งอ่านแล้วสะดุด เพราะเอาคำว่า
+                   "เลือก...ได้" ไปคร่อมชื่อกลุ่มที่ต่อกันด้วย / อีกที */
+                const optionNames = item.option_groups.map((g) => g.name);
+                return (
+                  <GlassCard key={item.id} onClick={() => openProduct(item)}>
+                    <div className="text-center py-4 space-y-2">
+                      <div
+                        className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center overflow-hidden ${
+                          item.image_url ? (isDark ? 'bg-white/10' : 'bg-slate-50') : `${tone.tile} ${tone.icon}`
+                        }`}
+                      >
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <DrinkIcon shape={shape} size={32} />
+                        )}
+                      </div>
+
+                      <h4 className={`text-sm font-extrabold ${textPrimary}`}>{item.name}</h4>
+
+                      {optionNames.length > 0 && (
+                        <p className={`text-[12px] ${textMuted}`}>
+                          {optionNames.slice(0, 2).join(' · ')}
+                          {optionNames.length > 2 ? ` · +${optionNames.length - 2}` : ''}
+                        </p>
                       )}
+
+                      <div
+                        className={`text-sm font-extrabold pt-1 ${
+                          isDark ? 'text-accent-amber font-black' : 'text-sbac-red'
+                        }`}
+                      >
+                        {formatBaht(item.price_satang)} ฿
+                      </div>
                     </div>
-
-                    <h4 className={`text-sm font-extrabold ${textPrimary}`}>{item.name}</h4>
-
-                    {item.option_groups.length > 0 && (
-                      <p className={`text-[11px] ${textMuted}`}>
-                        เลือก{item.option_groups.map((g) => g.name).slice(0, 2).join(' / ')}ได้
-                      </p>
-                    )}
-
-                    <div
-                      className={`text-sm font-extrabold pt-1 ${
-                        isDark ? 'text-accent-amber font-black' : 'text-sbac-red'
-                      }`}
-                    >
-                      {formatBaht(item.price_satang)} ฿
-                    </div>
-                  </div>
-                </GlassCard>
-              ))}
+                  </GlassCard>
+                );
+              })}
             </div>
           </section>
         ))
@@ -597,7 +685,7 @@ export default function CoffeePage() {
       <Modal
         isOpen={cartOpen}
         onClose={() => !submitting && setCartOpen(false)}
-        title="🛒 ตะกร้าของคุณ"
+        title="ตะกร้าของคุณ"
         footer={
           cart.length > 0 && (
             <button
