@@ -3,7 +3,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../config/supabase';
 import { showToast } from '../../components/ui/Toast';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
-import { LogOut, Clock, Check, RefreshCw, Coffee, X, Archive } from 'lucide-react';
+import { LogOut, Clock, Check, RefreshCw, X, Archive } from 'lucide-react';
+import CoffeeCup from '../../components/ui/icons/CoffeeCup';
 import { formatBaht } from '../../utils/identity';
 import { ORDER_STATUS_TEXT, productEmoji, optionSummary, bulkErrorText } from '../../utils/orders';
 import { useRealtimeTable, useSerialCallback } from '../../hooks/useRealtimeTable';
@@ -239,7 +240,7 @@ export default function BaristaDashboard() {
       <header className="bg-neutral-950 border-b border-neutral-800 px-6 py-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-amber-500/10 text-accent-amber rounded-2xl">
-            <Coffee size={24} />
+            <CoffeeCup size={24} />
           </div>
           <div>
             <h1 className="text-lg font-black tracking-tight leading-none">SBAC COFFEE BARISTA</h1>

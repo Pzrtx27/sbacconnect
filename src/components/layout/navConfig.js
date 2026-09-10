@@ -1,4 +1,5 @@
-import { Home, Calendar, Coffee, ShoppingCart } from 'lucide-react';
+import { Home, Calendar, ShoppingCart } from 'lucide-react';
+import CoffeeCup from '../ui/icons/CoffeeCup';
 
 /* เมนูนำทาง แยกออกมาจาก BottomNav เพราะตอนนี้มีสองที่ที่ต้องใช้ชุดเดียวกัน:
      มือถือ  -> BottomNav (แถบล่าง)
@@ -9,13 +10,13 @@ const navConfigs = {
   student: [
     { id: 'home', path: '/home', icon: Home, label: 'หน้าหลัก' },
     { id: 'timetable', path: '/timetable', icon: Calendar, label: 'ตารางสอน' },
-    { id: 'coffee', path: '/coffee', icon: Coffee, label: 'กาแฟ' },
+    { id: 'coffee', path: '/coffee', icon: CoffeeCup, label: 'กาแฟ' },
     { id: 'orders', path: '/orders', icon: ShoppingCart, label: 'คำสั่งซื้อ' },
   ],
   teacher: [
     { id: 'home', path: '/teacher', icon: Home, label: 'หน้าหลัก' },
     { id: 'timetable', path: '/timetable', icon: Calendar, label: 'ตารางสอน' },
-    { id: 'coffee', path: '/coffee', icon: Coffee, label: 'กาแฟ' },
+    { id: 'coffee', path: '/coffee', icon: CoffeeCup, label: 'กาแฟ' },
     { id: 'orders', path: '/orders', icon: ShoppingCart, label: 'คำสั่งซื้อ' },
   ],
   /* เดิมมี 'จัดการ' ที่ path '/academic' ซ้ำกับ 'หน้าหลัก' เป๊ะ ๆ
@@ -29,7 +30,7 @@ const navConfigs = {
     { id: 'timetable', path: '/timetable', icon: Calendar, label: 'ตารางสอน' },
   ],
   barista: [
-    { id: 'barista', path: '/barista', icon: Coffee, label: 'ร้านกาแฟ' },
+    { id: 'barista', path: '/barista', icon: CoffeeCup, label: 'ร้านกาแฟ' },
   ],
 };
 

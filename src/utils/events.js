@@ -27,24 +27,34 @@ export const DEFAULT_COLOR_BY_CATEGORY = {
   deadline: 'orange',
 };
 
+/* จุดและแถบสีของกิจกรรม — ลดจากขั้น 500 มาเป็น 400 ทั้งชุด
+   ข้อเสนอแนะจากการรีวิว: กรอบและแถบสีในปฏิทินเข้มเกินไป
+
+   ทำไมลดได้โดยไม่ต้องห่วงคอนทราสต์: ทั้งจุดและแถบเป็นภาพประกอบล้วน ติด aria-hidden ไว้
+   ไม่มีตัวอักษรวางทับ และไม่ได้เป็นตัวสื่อความหมายเพียงอย่างเดียว
+   (ทุกกิจกรรมมีป้ายชื่อหมวดกำกับเป็นตัวหนังสืออยู่แล้ว คนตาบอดสีจึงไม่เสียข้อมูล)
+   ส่วนสีตัวอักษรในตารางด้านล่าง ไม่แตะเลย เพราะต้องรักษา 4.5:1 ตามเดิม */
 export const DOT_COLORS = {
-  emerald: 'bg-emerald-500',
-  blue: 'bg-blue-500',
-  red: 'bg-red-500',
-  rose: 'bg-rose-500',
-  amber: 'bg-amber-500',
-  orange: 'bg-orange-500',
-  violet: 'bg-violet-500',
+  emerald: 'bg-emerald-400',
+  blue: 'bg-blue-400',
+  red: 'bg-red-400',
+  rose: 'bg-rose-400',
+  amber: 'bg-amber-400',
+  orange: 'bg-orange-400',
+  violet: 'bg-violet-400',
 };
 
+/* กล่องรายละเอียดกิจกรรม — พื้นกับตัวอักษรคงเดิม (ตัวอักษรต้องผ่าน AA)
+   ที่อ่อนลงคือ "เส้นขอบ" 200 -> 100 ในโหมดสว่าง และ 40% -> 25% ในโหมดมืด
+   เส้นขอบไม่ได้ทำหน้าที่สื่อความหมาย มีไว้แค่บอกขอบเขตของกล่อง */
 export const BADGE_COLORS = {
-  emerald: { light: 'bg-emerald-50 text-emerald-800 border-emerald-200', dark: 'bg-emerald-900/30 text-emerald-300 border-emerald-800/40' },
-  blue: { light: 'bg-blue-50 text-blue-800 border-blue-200', dark: 'bg-blue-900/30 text-blue-300 border-blue-800/40' },
-  red: { light: 'bg-red-50 text-red-800 border-red-200', dark: 'bg-red-900/30 text-red-300 border-red-800/40' },
-  rose: { light: 'bg-rose-50 text-rose-800 border-rose-200', dark: 'bg-rose-900/30 text-rose-300 border-rose-800/40' },
-  amber: { light: 'bg-amber-50 text-amber-900 border-amber-200', dark: 'bg-amber-900/30 text-amber-300 border-amber-800/40' },
-  orange: { light: 'bg-orange-50 text-orange-900 border-orange-200', dark: 'bg-orange-900/30 text-orange-300 border-orange-800/40' },
-  violet: { light: 'bg-violet-50 text-violet-800 border-violet-200', dark: 'bg-violet-900/30 text-violet-300 border-violet-800/40' },
+  emerald: { light: 'bg-emerald-50 text-emerald-800 border-emerald-100', dark: 'bg-emerald-900/30 text-emerald-300 border-emerald-800/25' },
+  blue: { light: 'bg-blue-50 text-blue-800 border-blue-100', dark: 'bg-blue-900/30 text-blue-300 border-blue-800/25' },
+  red: { light: 'bg-red-50 text-red-800 border-red-100', dark: 'bg-red-900/30 text-red-300 border-red-800/25' },
+  rose: { light: 'bg-rose-50 text-rose-800 border-rose-100', dark: 'bg-rose-900/30 text-rose-300 border-rose-800/25' },
+  amber: { light: 'bg-amber-50 text-amber-900 border-amber-100', dark: 'bg-amber-900/30 text-amber-300 border-amber-800/25' },
+  orange: { light: 'bg-orange-50 text-orange-900 border-orange-100', dark: 'bg-orange-900/30 text-orange-300 border-orange-800/25' },
+  violet: { light: 'bg-violet-50 text-violet-800 border-violet-100', dark: 'bg-violet-900/30 text-violet-300 border-violet-800/25' },
 };
 
 export const MONTH_NAMES = [

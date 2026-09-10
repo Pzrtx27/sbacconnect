@@ -1,7 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useTheme } from '../../contexts/ThemeContext';
-import { RefreshCw, History, Coffee, ChevronRight, Check } from 'lucide-react';
+import { RefreshCw, History, ChevronRight, Check } from 'lucide-react';
+import CoffeeCup from '../../components/ui/icons/CoffeeCup';
+import PageHeader from '../../components/layout/PageHeader';
+import { READING_WIDTH } from '../../utils/layout';
 import { formatBaht } from '../../utils/identity';
 import {
   ORDER_STATUS_TEXT_LONG,
@@ -41,17 +44,8 @@ export default function MyOrdersPage() {
   const textMuted = isDark ? 'text-content-secondary' : 'text-ink-muted';
 
   return (
-    <div className="space-y-6 xl:max-w-3xl">
-      <div className="flex justify-between items-center gap-3">
-        <h2
-          className={`text-xl font-extrabold flex items-center gap-2 transition-colors duration-300 ${textPrimary}`}
-        >
-          <span className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-accent-amber shrink-0">
-            <Coffee size={18} aria-hidden="true" />
-          </span>
-          สถานะการสั่งซื้อ
-        </h2>
-
+    <div className={`space-y-6 ${READING_WIDTH}`}>
+      <PageHeader icon={CoffeeCup} title="สถานะการสั่งซื้อ" tone="amber">
         {/* ป้ายนี้เคยเป็นจุดเขียวกะพริบตายตัว ทั้งที่ข้างหลังไม่ได้ต่อเรียลไทม์จริง
             ตอนนี้ผูกกับสถานะการเชื่อมต่อจริง และกดได้ด้วย
             เพราะเวลาคนสงสัยว่า "มันอัปเดตอยู่จริงไหม" สิ่งที่อยากทำคือกดเช็คเดี๋ยวนั้น
@@ -76,7 +70,7 @@ export default function MyOrdersPage() {
           />
           {live ? 'อัปเดตสด' : 'กำลังเชื่อมต่อ'}
         </button>
-      </div>
+      </PageHeader>
 
       {/* ---------- พร้อมรับแล้ว ---------- */}
       {readyOrders.map((order) => (
@@ -93,7 +87,7 @@ export default function MyOrdersPage() {
         onClick={() => navigate('/orders/history')}
         className={`w-full flex items-center justify-between p-3.5 rounded-2xl border transition-all active:scale-[0.98] ${
           isDark
-            ? 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08]'
+            ? 'bg-white/[0.06] border-white/10 hover:bg-white/10'
             : 'bg-slate-50 border-slate-100 hover:bg-slate-100'
         }`}
       >

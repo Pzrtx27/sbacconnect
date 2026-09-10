@@ -24,6 +24,19 @@ import {
    เครื่องนักเรียนที่เปิดค้างอยู่จะอัปเดตเองโดยไม่ต้องรีเฟรช
    ============================================================ */
 
+/* คำอธิบายสีใต้ปฏิทิน — อ้างชื่อสีชุดเดียวกับที่ DB เก็บ (EVENT_COLORS)
+   แล้วให้ DOT_COLORS เป็นคนแปลงเป็นคลาสจริง
+   ของเดิมเขียนคลาสสีไว้ตรงนี้เองอีกชุด พอปรับเฉดที่ utils/events.js
+   จุดในปฏิทินกับจุดในคำอธิบายก็กลายเป็นคนละสีทันทีโดยไม่มีอะไรเตือน */
+const LEGEND = [
+  { label: 'กิจกรรม', color: 'emerald' },
+  { label: 'สอบ', color: 'rose' },
+  { label: 'วันหยุด', color: 'red' },
+  { label: 'กิจกรรมพิเศษ', color: 'violet' },
+  { label: 'กำหนดส่งงาน', color: 'orange' },
+  { label: 'วิชาการ', color: 'blue' },
+];
+
 const DAY_NAMES = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 const DAY_NAMES_FULL = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
 
@@ -236,7 +249,7 @@ export default function AcademicCalendar() {
                 aria-pressed={isSelected}
                 aria-current={isToday ? 'date' : undefined}
                 className={`aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all duration-200 cursor-pointer active:scale-90
-                  ${isSelected ? 'ring-2 ring-sbac-blue ring-offset-1 ' + (isDark ? 'ring-offset-surface-dark-elev' : 'ring-offset-surface-card') : ''}
+                  ${isSelected ? 'ring-2 ring-sbac-blue/50 ring-offset-1 ' + (isDark ? 'ring-offset-surface-dark-elev' : 'ring-offset-surface-card') : ''}
                   ${
                   isToday
                     ? `text-brand font-extrabold ${isDark ? 'bg-sbac-blue/25' : 'bg-sbac-blue/10'}`
@@ -266,16 +279,9 @@ export default function AcademicCalendar() {
 
         {/* Legend */}
         <div className={`flex flex-wrap gap-x-3 gap-y-1.5 mt-3 pt-3 border-t ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
-          {[
-            { label: 'กิจกรรม', color: 'bg-emerald-500' },
-            { label: 'สอบ', color: 'bg-rose-500' },
-            { label: 'วันหยุด', color: 'bg-red-500' },
-            { label: 'กิจกรรมพิเศษ', color: 'bg-violet-500' },
-            { label: 'กำหนดส่งงาน', color: 'bg-orange-500' },
-            { label: 'วิชาการ', color: 'bg-blue-500' },
-          ].map((item) => (
+          {LEGEND.map((item) => (
             <div key={item.label} className="flex items-center gap-1.5">
-              <div className={`w-2 h-2 rounded-full ${item.color}`} aria-hidden="true" />
+              <div className={`w-2 h-2 rounded-full ${DOT_COLORS[item.color]}`} aria-hidden="true" />
               <span className={`text-[11px] font-bold ${textMuted}`}>{item.label}</span>
             </div>
           ))}
