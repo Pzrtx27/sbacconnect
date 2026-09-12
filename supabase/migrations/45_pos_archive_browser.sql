@@ -157,6 +157,7 @@ comment on function public.pos_archived_orders(text, date, date, int) is
 -- ============================================================
 grant execute on function public.pos_archived_orders(text, date, date, int) to authenticated;
 revoke all on function public.pos_archived_orders(text, date, date, int) from anon;
+revoke execute on function public.pos_archived_orders(text, date, date, int) from public;
 
 -- ============================================================
 -- ตรวจผล

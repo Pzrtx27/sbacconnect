@@ -224,6 +224,7 @@ comment on function public.app_can_grade_subject(uuid) is
 
 grant execute on function public.app_can_grade_subject(uuid) to authenticated;
 revoke all on function public.app_can_grade_subject(uuid) from anon;
+revoke execute on function public.app_can_grade_subject(uuid) from public;
 
 -- คะแนนเต็มของวิชา = ผลรวมของหัวข้อที่ไม่มีลูก (ใบ) เท่านั้น
 -- ถ้ารวมทั้งแม่และลูกจะได้สองเท่าเสมอ เพราะแม่คือผลรวมของลูกอยู่แล้ว
@@ -316,6 +317,23 @@ revoke all on public.score_items    from anon;
 revoke all on public.student_scores from anon;
 revoke all on public.score_logs     from anon;
 
+-- ต้องถอนสิทธิ์เขียนออกจาก authenticated ด้วย ไม่ใช่แค่ไม่ grant ให้
+--
+-- Supabase ตั้ง "alter default privileges in schema public grant all on tables
+-- to anon, authenticated" ไว้ตั้งแต่ตอนสร้างโปรเจกต์ ตารางใหม่ทุกตัวจึงได้ ALL
+-- ติดมาตั้งแต่บรรทัด create table แล้ว — grant select ข้างบนเพิ่มสิทธิ์ ไม่ได้ถอนอะไร
+-- (28_harden_core_tables.sql พิสูจน์เรื่องนี้มาแล้วด้วยการยิง API จริง)
+--
+-- ตอนนี้ยังเขียนไม่ได้เพราะไม่มี policy insert/update/delete ให้ RLS ผ่าน
+-- แต่นั่นเหลือกำแพงชั้นเดียว วันไหนมีคนเพิ่ม policy กว้างเกินไปสักข้อ
+-- นักเรียนจะ PATCH /rest/v1/student_scores แก้คะแนนตัวเองได้ทันที
+-- ถอนที่ชั้น grant ด้วย = ต่อให้ policy พลาด ประตูชั้นนอกก็ยังปิดอยู่
+-- (41_homeroom_attendance.sql กับ 43_student_fees.sql ทำแบบนี้กับตารางของตัวเองแล้ว)
+revoke insert, update, delete on public.subjects       from authenticated;
+revoke insert, update, delete on public.score_items    from authenticated;
+revoke insert, update, delete on public.student_scores from authenticated;
+revoke insert, update, delete on public.score_logs     from authenticated;
+
 -- ============================================================
 -- 7) RPC ฝั่งนักเรียน — สรุปคะแนนทุกวิชาของตัวเอง
 --
@@ -403,6 +421,7 @@ comment on function public.my_score_summary(text) is
 
 grant execute on function public.my_score_summary(text) to authenticated;
 revoke all on function public.my_score_summary(text) from anon;
+revoke execute on function public.my_score_summary(text) from public;
 
 -- ============================================================
 -- 8) RPC ฝั่งนักเรียน — รายละเอียดวิชาเดียว แตก T1-T5 และหัวข้อย่อย
@@ -510,6 +529,7 @@ comment on function public.my_subject_scores(uuid) is
 
 grant execute on function public.my_subject_scores(uuid) to authenticated;
 revoke all on function public.my_subject_scores(uuid) from anon;
+revoke execute on function public.my_subject_scores(uuid) from public;
 
 -- ============================================================
 -- 9) RPC ฝั่งอาจารย์ — รายวิชาที่ตัวเองกรอกคะแนนได้
@@ -566,6 +586,7 @@ comment on function public.list_gradebook_subjects(bigint, text) is
 
 grant execute on function public.list_gradebook_subjects(bigint, text) to authenticated;
 revoke all on function public.list_gradebook_subjects(bigint, text) from anon;
+revoke execute on function public.list_gradebook_subjects(bigint, text) from public;
 
 -- ============================================================
 -- 10) RPC ฝั่งอาจารย์ — ตารางคะแนนทั้งห้องของวิชาหนึ่ง
@@ -674,6 +695,7 @@ comment on function public.subject_gradebook(uuid) is
 
 grant execute on function public.subject_gradebook(uuid) to authenticated;
 revoke all on function public.subject_gradebook(uuid) from anon;
+revoke execute on function public.subject_gradebook(uuid) from public;
 
 -- ============================================================
 -- 11) แกนกลางของการเขียนคะแนน
@@ -889,6 +911,7 @@ comment on function public.save_score(uuid, uuid, numeric, text, text) is
 
 grant execute on function public.save_score(uuid, uuid, numeric, text, text) to authenticated;
 revoke all on function public.save_score(uuid, uuid, numeric, text, text) from anon;
+revoke execute on function public.save_score(uuid, uuid, numeric, text, text) from public;
 
 -- ============================================================
 -- 13) RPC: ให้/ตัดคะแนนแบบบวกลบจากของเดิม
@@ -942,6 +965,7 @@ comment on function public.adjust_score(uuid, uuid, numeric, text) is
 
 grant execute on function public.adjust_score(uuid, uuid, numeric, text) to authenticated;
 revoke all on function public.adjust_score(uuid, uuid, numeric, text) from anon;
+revoke execute on function public.adjust_score(uuid, uuid, numeric, text) from public;
 
 -- ============================================================
 -- 14) RPC: บันทึกคะแนนทั้งคอลัมน์ทีเดียว
@@ -1014,6 +1038,7 @@ comment on function public.bulk_save_scores(uuid, jsonb, boolean) is
 
 grant execute on function public.bulk_save_scores(uuid, jsonb, boolean) to authenticated;
 revoke all on function public.bulk_save_scores(uuid, jsonb, boolean) from anon;
+revoke execute on function public.bulk_save_scores(uuid, jsonb, boolean) from public;
 
 -- ============================================================
 -- 15) RPC: จัดการโครงสร้าง T1-T5 และหัวข้อย่อย
@@ -1098,6 +1123,7 @@ comment on function public.upsert_score_item(uuid, uuid, uuid, text, text, numer
 
 grant execute on function public.upsert_score_item(uuid, uuid, uuid, text, text, numeric, integer) to authenticated;
 revoke all on function public.upsert_score_item(uuid, uuid, uuid, text, text, numeric, integer) from anon;
+revoke execute on function public.upsert_score_item(uuid, uuid, uuid, text, text, numeric, integer) from public;
 
 create or replace function public.delete_score_item(p_item_id uuid)
 returns jsonb
@@ -1133,6 +1159,7 @@ comment on function public.delete_score_item(uuid) is
 
 grant execute on function public.delete_score_item(uuid) to authenticated;
 revoke all on function public.delete_score_item(uuid) from anon;
+revoke execute on function public.delete_score_item(uuid) from public;
 
 -- ============================================================
 -- 16) RPC: จัดการรายวิชา (ฝ่ายวิชาการ)
@@ -1207,6 +1234,7 @@ comment on function public.upsert_subject(uuid, bigint, text, text, text, intege
 
 grant execute on function public.upsert_subject(uuid, bigint, text, text, text, integer, uuid, text, integer) to authenticated;
 revoke all on function public.upsert_subject(uuid, bigint, text, text, text, integer, uuid, text, integer) from anon;
+revoke execute on function public.upsert_subject(uuid, bigint, text, text, text, integer, uuid, text, integer) from public;
 
 create or replace function public.archive_subject(p_subject_id uuid, p_is_active boolean default false)
 returns jsonb
@@ -1230,6 +1258,7 @@ end $fn$;
 
 grant execute on function public.archive_subject(uuid, boolean) to authenticated;
 revoke all on function public.archive_subject(uuid, boolean) from anon;
+revoke execute on function public.archive_subject(uuid, boolean) from public;
 
 -- ============================================================
 -- 17) RPC: ใส่โครงสร้าง T1-T5 มาตรฐานให้วิชาที่ยังว่าง
@@ -1292,6 +1321,7 @@ comment on function public.apply_default_score_template(uuid) is
 
 grant execute on function public.apply_default_score_template(uuid) to authenticated;
 revoke all on function public.apply_default_score_template(uuid) from anon;
+revoke execute on function public.apply_default_score_template(uuid) from public;
 
 -- ============================================================
 -- 18) RPC: ปูมคะแนน
@@ -1306,11 +1336,27 @@ language plpgsql stable security definer set search_path = public
 as $fn$
 declare
   v_me     uuid := app_current_user_id();
+  v_target uuid := p_student_user_id;
   v_result jsonb;
 begin
-  -- นักเรียนดูปูมของตัวเองได้ (ต้องตรวจสอบได้ว่าคะแนนหายไปไหน) แต่ของคนอื่นไม่ได้
-  if not app_is_teaching_staff() and p_student_user_id is distinct from v_me then
-    return jsonb_build_object('ok', false, 'error', 'FORBIDDEN');
+  -- ไม่มีตัวตน = ไม่มีสิทธิ์ ต้องตัดจบตรงนี้ก่อนอย่างอื่น
+  --
+  -- ของเดิมเขียนด่านเดียวว่า
+  --   not app_is_teaching_staff() and p_student_user_id is distinct from v_me
+  -- ซึ่งพังเมื่อคนเรียกไม่ได้ล็อกอิน: v_me เป็น null และ p_student_user_id ก็ default null
+  -- null is distinct from null = false ทั้งก้อนจึงเป็น false ด่านไม่ทำงาน
+  -- แล้วไหลลงไปที่ where ซึ่งแปล null ว่า "ไม่ต้องกรอง"
+  -- ผลคือใครถือ anon key (ซึ่งอยู่ใน bundle ที่ส่งให้เบราว์เซอร์) ยิงเข้ามาเปล่า ๆ
+  -- ก็ได้ชื่อนักเรียนจริงพร้อมคะแนนและเหตุผลที่ครูเขียน ของทั้งวิทยาลัย
+  if v_me is null then
+    return jsonb_build_object('ok', false, 'error', 'NOT_AUTHENTICATED');
+  end if;
+
+  -- คนที่ไม่ใช่เจ้าหน้าที่สอน: บังคับขอบเขตให้เป็นของตัวเองเสมอ ไม่ว่าจะส่งอะไรมา
+  -- ใช้ "บังคับขอบเขต" แทน "ตอบ FORBIDDEN" เพราะปลอดภัยเท่ากันแต่ไม่มีทางพลาด
+  -- ต่อให้หน้าเว็บไม่ส่ง p_student_user_id มา นักเรียนก็ได้ของตัวเอง ไม่ใช่ของทุกคน
+  if not app_is_teaching_staff() then
+    v_target := v_me;
   end if;
 
   select coalesce(jsonb_agg(row_to_json(l)::jsonb order by l.created_at desc), '[]'::jsonb)
@@ -1334,7 +1380,7 @@ begin
     join public.users su on su.id = sl.student_user_id
     left join public.users t on t.id = sl.teacher_user_id
     where (p_subject_id is null or sl.subject_id = p_subject_id)
-      and (p_student_user_id is null or sl.student_user_id = p_student_user_id)
+      and (v_target is null or sl.student_user_id = v_target)
     order by sl.created_at desc
     limit greatest(1, least(coalesce(p_limit, 50), 200))
   ) l;
@@ -1347,6 +1393,7 @@ comment on function public.list_score_logs(uuid, uuid, integer) is
 
 grant execute on function public.list_score_logs(uuid, uuid, integer) to authenticated;
 revoke all on function public.list_score_logs(uuid, uuid, integer) from anon;
+revoke execute on function public.list_score_logs(uuid, uuid, integer) from public;
 
 -- ============================================================
 -- 19) Realtime
@@ -1466,3 +1513,78 @@ from public.subjects s
 join public.class_rooms cr on cr.id = s.class_room_id
 where s.is_active
 order by cr.level, cr.room_no, s.sort_order, s.name;
+
+-- ============================================================
+-- ตรวจผลด้านสิทธิ์ — ต้องไม่มี anon เรียก RPC ของไฟล์นี้ได้
+-- และ authenticated ต้องเขียนสี่ตารางนี้ไม่ได้
+-- แนวเดียวกับบล็อกตรวจผลท้าย 28_harden_core_tables.sql และ 35_revoke_app_balance.sql
+-- ============================================================
+do $$
+declare
+  r record;
+  v_bad int := 0;
+begin
+  -- ก) RPC ที่ anon ยังเรียกได้
+  -- revoke ... from anon อย่างเดียวไม่พอ เพราะ anon เป็นสมาชิกของ PUBLIC
+  -- และ PostgreSQL แจก EXECUTE ให้ PUBLIC เป็นค่าเริ่มต้นกับทุกฟังก์ชันใหม่
+  for r in
+    select p.oid::regprocedure::text as f
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in (
+        'app_can_grade_subject', 'my_score_summary', 'my_subject_scores',
+        'list_gradebook_subjects', 'subject_gradebook', 'save_score', 'adjust_score',
+        'bulk_save_scores', 'upsert_score_item', 'delete_score_item', 'upsert_subject',
+        'archive_subject', 'apply_default_score_template', 'list_score_logs',
+        'subject_max_score', 'student_subject_score', 'apply_score_change'
+      )
+      and has_function_privilege('anon', p.oid, 'execute')
+  loop
+    raise warning 'anon ยังเรียกได้: %', r.f;
+    v_bad := v_bad + 1;
+  end loop;
+
+  -- ข) สิทธิ์เขียนที่ยังค้างอยู่บนตารางของสมุดคะแนน
+  for r in
+    select table_name || ' / ' || grantee || ' / ' || privilege_type as f
+    from information_schema.role_table_grants
+    where table_schema = 'public'
+      and table_name in ('subjects', 'score_items', 'student_scores', 'score_logs')
+      and grantee in ('anon', 'authenticated')
+      and privilege_type in ('INSERT', 'UPDATE', 'DELETE', 'TRUNCATE')
+  loop
+    raise warning 'ยังเหลือสิทธิ์เขียน: %', r.f;
+    v_bad := v_bad + 1;
+  end loop;
+
+  if v_bad = 0 then
+    raise notice 'ผ่าน — anon เรียก RPC ของสมุดคะแนนไม่ได้ และเขียนสี่ตารางไม่ได้ทั้ง anon/authenticated';
+  else
+    raise warning 'ยังไม่ผ่าน % รายการ — ดูบรรทัด WARNING ด้านบน', v_bad;
+  end if;
+end $$;
+
+-- ============================================================
+-- เตือน: วิชาที่ยังไม่ผูก teacher_user_id
+--
+-- app_can_grade_subject มีกิ่ง fallback "s.teacher_user_id is null" ซึ่งตั้งใจไว้
+-- ไม่ให้ฟีเจอร์ตายตั้งแต่วันแรก แต่ seed ข้างบนใส่ได้แค่ teacher_name (text)
+-- เพราะ timetables เก็บชื่อครูเป็นข้อความ จับคู่กับ users ไม่ได้
+-- ผลคือทุกแถวเข้ากิ่ง fallback = ครูทุกคนแก้และลบคะแนนได้ทุกห้องทุกวิชา
+-- ต้องผูกครูให้ครบก่อนบอกครูว่าเปิดใช้ได้ ดูวิธีในคอมเมนต์ท้ายไฟล์
+-- ============================================================
+do $$
+declare
+  v_unbound int;
+begin
+  select count(*) into v_unbound
+  from public.subjects where teacher_user_id is null and is_active;
+
+  if v_unbound > 0 then
+    raise warning 'มี % วิชาที่ยังไม่ผูก teacher_user_id — ตอนนี้ครูทุกคนแก้/ลบคะแนนวิชาเหล่านี้ได้', v_unbound;
+    raise warning 'แก้: รัน 46_bind_subject_teachers.sql แล้วผูกวิชาที่เหลือผ่านฝ่ายวิชาการ';
+  else
+    raise notice 'ผ่าน — ทุกวิชาผูกครูผู้สอนแล้ว';
+  end if;
+end $$;
