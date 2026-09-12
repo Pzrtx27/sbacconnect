@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../config/supabase';
 import { useRealtimeTable } from './useRealtimeTable';
+import { notEnabledMessage, CONTACT } from '../utils/setupNotice';
 
 /* ค่าเทอม/ค่าธรรมเนียมของตัวเอง (43_student_fees.sql)
 
@@ -23,7 +24,7 @@ export const FEE_STATUS_LABELS = {
 
 export const feeErrorMessage = (code) =>
   ({
-    SETUP: 'ยังไม่ได้ติดตั้งระบบค่าธรรมเนียมในฐานข้อมูล (รัน supabase/migrations/43_student_fees.sql)',
+    SETUP: notEnabledMessage('ค่าเทอมและค่าธรรมเนียม', CONTACT.finance),
     NOT_FOUND: 'ไม่พบรายการนี้ กรุณาปิดแล้วเปิดใหม่อีกครั้ง',
     ALREADY_PENDING: 'รายการนี้แจ้งชำระไปแล้ว กำลังรอฝ่ายการเงินตรวจสอบ',
     ALREADY_PAID: 'รายการนี้ชำระเรียบร้อยแล้ว',

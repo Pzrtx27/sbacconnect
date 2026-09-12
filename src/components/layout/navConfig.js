@@ -1,4 +1,4 @@
-import { Home, Calendar, ShoppingCart, HeartHandshake } from 'lucide-react';
+import { Home, Calendar, ShoppingCart, HeartHandshake, Receipt } from 'lucide-react';
 import CoffeeCup from '../ui/icons/CoffeeCup';
 import { timetableTitle } from '../../utils/timetable';
 
@@ -36,7 +36,21 @@ const navConfigs = {
   barista: [
     { id: 'barista', path: '/barista', icon: CoffeeCup, label: 'ร้านกาแฟ' },
   ],
+  /* sysadmin ต้องมีเมนูของตัวเอง ไม่งั้น navItemsFor ตกไปที่เมนูนักเรียน
+     แล้วแอดมินจะเห็น หน้าหลัก/ตารางเรียน/กาแฟ/คำสั่งซื้อ ซึ่งสามในสี่อัน
+     กดแล้วโดน ProtectedRoute เด้งกลับ /academic ทันที */
+  sysadmin: [
+    { id: 'home', path: '/academic', icon: Home, label: 'หน้าหลัก' },
+    { id: 'development', path: '/development', icon: HeartHandshake, label: 'ฝ่ายพัฒนา' },
+    { id: 'timetable', path: '/timetable', icon: Calendar, label: timetableTitle('academic') },
+  ],
 };
+
+/* เมนูฝ่ายการเงิน — ต่อท้ายให้คนที่ถือ role cashier เท่านั้น
+   ไม่ได้อยู่ใน navConfigs เพราะสิทธิ์นี้ไม่ได้ผูกกับ "บทบาทหลัก" ที่ AuthContext
+   เลือกมาอันเดียว แต่ผูกกับ roles ทั้งอาร์เรย์ (กติกาเดียวกับ FinanceRoute)
+   คนที่เป็นทั้งฝ่ายวิชาการและเจ้าหน้าที่การเงินจึงได้เมนูนี้เพิ่มจากของเดิม */
+const FINANCE_ITEM = { id: 'finance', path: '/finance', icon: Receipt, label: 'การเงิน' };
 
 /* เตือนตอนพัฒนาถ้ามีเมนูสอง path ซ้ำกันอีก
    บั๊ก "กดอันเดียวสว่างสองอัน" มองข้ามง่ายมากเพราะหน้าที่เปิดถูกต้อง แค่ไฟติดเกิน
@@ -51,9 +65,22 @@ if (import.meta.env?.DEV) {
   }
 }
 
-export function navItemsFor(role) {
-  const key = String(role || 'student').toLowerCase().trim();
-  return navConfigs[key] || navConfigs.student;
+/** เมนูของผู้ใช้คนนี้
+ *
+ *  รับ user ทั้งก้อน ไม่ใช่ role เดียว เพราะบางเมนู (การเงิน) ต้องดู roles ทั้งอาร์เรย์
+ *  ยังรับสตริงได้อยู่เพื่อไม่ให้ที่เรียกแบบเดิมพัง */
+export function navItemsFor(userOrRole) {
+  const user = typeof userOrRole === 'string' ? { role: userOrRole } : (userOrRole || {});
+  const key = String(user.role || 'student').toLowerCase().trim();
+  const items = navConfigs[key] || navConfigs.student;
+
+  const roles = Array.isArray(user.roles) ? user.roles : [];
+  const canManageFees = roles.some((r) => r === 'cashier' || r === 'sysadmin');
+
+  // เปลือกเต็มจอของ barista ไม่ได้ใช้เมนูชุดนี้ (มีปุ่มของตัวเองใน BaristaDashboard)
+  if (!canManageFees || key === 'barista') return items;
+  if (items.some((i) => i.path === FINANCE_ITEM.path)) return items;
+  return [...items, FINANCE_ITEM];
 }
 
 /** เมนูนี้คือหน้าที่กำลังเปิดอยู่ไหม

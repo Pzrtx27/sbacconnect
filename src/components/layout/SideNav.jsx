@@ -26,7 +26,7 @@ export default function SideNav() {
 
   if (!user) return null;
 
-  const items = navItemsFor(user.role);
+  const items = navItemsFor(user);
 
   /* ต้อง await — เหตุผลเดียวกับใน BottomNav.jsx */
   const handleLogout = async () => {

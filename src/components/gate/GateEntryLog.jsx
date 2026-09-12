@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { LogIn, RefreshCw } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { fetchGateLogs, formatTime, formatDayLabel } from '../../utils/wallet';
+import { notEnabledMessage, CONTACT } from '../../utils/setupNotice';
 
 /* เวลาเข้าโรงเรียน — ขาเข้าอย่างเดียว
 
@@ -29,7 +30,7 @@ export default function GateEntryLog({ limit = 14 }) {
       console.error('[gate] โหลดเวลาเข้าโรงเรียนไม่สำเร็จ:', err);
       setError(
         err?.code === 'PGRST202' || /my_gate_logs/i.test(err?.message || '')
-          ? 'ยังไม่ได้ติดตั้งระบบบันทึกเวลาเข้า (รัน 27_gate_logs.sql บน Supabase ก่อน)'
+          ? notEnabledMessage('บันทึกเวลาเข้าโรงเรียน', CONTACT.registrar)
           : 'โหลดข้อมูลไม่สำเร็จ'
       );
     } finally {

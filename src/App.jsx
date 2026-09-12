@@ -21,37 +21,10 @@ import LoadingSpinner from './components/ui/LoadingSpinner';
 import OrderAlerts from './components/ui/OrderAlerts';
 import AssistantFAB from './components/assistant/AssistantFAB';
 import { shellWidthClass } from './utils/layout';
+import { homeFor, normalizeRole } from './utils/homeRoute';
 
-/** หน้าเริ่มต้นของแต่ละ role — ใช้ที่เดียวกันทั้งแอปเพื่อไม่ให้ redirect วนลูป
- *  sysadmin ต้องมีในนี้ด้วย: AuthContext เลือก role นี้เป็นอันดับแรกถ้ามี
- *  ถ้าไม่ระบุไว้ จะตกไปที่ '/home' ซึ่ง ProtectedRoute อนุญาตแค่ student
- *  แล้วเด้งกลับมา homeFor() = '/home' อีก กลายเป็นวนไม่จบ */
-const HOME_BY_ROLE = {
-  student: '/home',
-  teacher: '/teacher',
-  academic: '/academic',
-  barista: '/barista',
-  sysadmin: '/academic',
-};
-
-const normalizeRole = (user) => (user?.role || 'student').toLowerCase().trim();
-
-/** หน้าแรกหลังล็อกอิน
- *
- *  เคสพิเศษ: บัญชีที่มี role 'cashier' แต่ไม่มี 'pos' คือเจ้าหน้าที่การเงิน ไม่ใช่คนชงกาแฟ
- *  AuthContext ยุบทั้ง cashier และ pos เป็น role เดียวชื่อ 'barista' (ดูคอมเมนต์ใน
- *  loadProfile) ซึ่งตอนนั้นถูกแล้วเพราะยังไม่มีหน้าการเงินให้ไป — พอมี /finance แล้ว
- *  การส่งเจ้าหน้าที่การเงินไปลงคิวร้านกาแฟทุกครั้งที่ล็อกอินกลายเป็นเรื่องแปลก
- *
- *  คนที่ถือทั้งสอง role (บัญชีเคาน์เตอร์ของที่นี่) ยังลงที่คิวกาแฟเหมือนเดิม
- *  เพราะนั่นคืองานหลักที่เปิดแอปมาทำ แล้วค่อยกดปุ่มไปหน้าการเงินเมื่อต้องใช้ */
-const homeFor = (user) => {
-  const roles = Array.isArray(user?.roles) ? user.roles : [];
-  if (roles.includes('cashier') && !roles.includes('pos') && !roles.includes('sysadmin')) {
-    return '/finance';
-  }
-  return HOME_BY_ROLE[normalizeRole(user)] || '/home';
-};
+/* HOME_BY_ROLE / normalizeRole / homeFor ย้ายไป src/utils/homeRoute.js แล้ว
+   เพราะ LoginPage เคยถือสำเนาของตัวเองที่เพี้ยนจากตัวนี้ ดูเหตุผลเต็มในไฟล์นั้น */
 
 /** พื้นหลังเต็มจอที่ใช้ร่วมกัน (โทนเดียวกับ .dark body ใน index.css) */
 function FullScreen({ children }) {

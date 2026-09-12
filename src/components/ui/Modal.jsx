@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { toneClass } from './iconTones';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
 
 /**
@@ -18,7 +19,7 @@ import { useIsDesktop } from '../../hooks/useMediaQuery';
  * (ตอน sheet เด้งขึ้น) ทำให้ Chrome/Safari บางเวอร์ชัน render เพี้ยนเป็นเส้นขาวหยักๆ
  * ระหว่างแอนิเมชัน — gradient ธรรมดาให้ความนุ่มนวลใกล้เคียงกันแต่ปลอดภัยกว่า
  */
-export default function Modal({ isOpen, onClose, title, children, footer = null }) {
+export default function Modal({ isOpen, onClose, title, icon: Icon, tone = 'brand', children, footer = null }) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const panelRef = useRef(null);
@@ -191,14 +192,27 @@ export default function Modal({ isOpen, onClose, title, children, footer = null 
               </div>
 
               {/* Header */}
-              <div className="relative flex items-center justify-between px-6 py-3 shrink-0 xl:pt-5 xl:px-7">
+              <div className="relative flex items-center justify-between gap-3 px-6 py-3 shrink-0 xl:pt-5 xl:px-7">
                 <h2
                   id={titleId}
-                  className={`text-lg xl:text-xl font-extrabold transition-colors duration-300 ${
+                  className={`text-lg xl:text-xl font-extrabold flex items-center gap-2 min-w-0 transition-colors duration-300 ${
                     isDark ? 'text-white' : 'text-sbac-navy'
                   }`}
                 >
-                  {title}
+                  {/* ไอคอนวาดจริงในกรอบมน — ชุดเดียวกับ PageHeader
+                      ของเดิมทุกโมดัลใส่ emoji นำหน้าข้อความในตัว title เอง
+                      ซึ่งเป็นคนละภาษาไอคอนกับการ์ดที่กดเข้ามา (การ์ดใช้ lucide)
+                      และมันไม่ได้สื่อความต่างจริง — 📝 ถูกใช้ทั้งกับ "ยื่นใบลา"
+                      และ "กำหนดการสอบ" ส่วน emoji ยังเปลี่ยนหน้าตาตามเครื่องผู้ใช้
+                      จึงคุมน้ำหนักเส้นให้เท่าไอคอนตัวอื่นในจอเดียวกันไม่ได้เลย */}
+                  {Icon && (
+                    <span
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${toneClass(tone)}`}
+                    >
+                      <Icon size={18} aria-hidden="true" />
+                    </span>
+                  )}
+                  <span className="truncate">{title}</span>
                 </h2>
                 <button
                   type="button"

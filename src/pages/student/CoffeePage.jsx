@@ -170,6 +170,40 @@ export default function CoffeePage() {
   );
   const cartCount = useMemo(() => cart.reduce((n, line) => n + line.qty, 0), [cart]);
 
+  /* ยกปุ่มผู้ช่วยขึ้นให้พ้นแถบตะกร้า
+     AssistantFAB เป็น fixed bottom-24 (96px) ส่วนแถบตะกร้าเป็น fixed bottom-20 (80px)
+     และกินความกว้างเต็มบรรทัด วัดจริงบนจอ 375: ปุ่มทับตัวเลขยอดรวมอยู่ 36x23px
+     แล้วปุ่มอยู่ด้านบน = กดยอดรวมเพื่อเปิดตะกร้าไม่ได้ ซึ่งเป็นทางเดียวที่จะสั่งของ
+
+     วัดความสูงจริงแทนการเดาตัวเลข เพราะแถบสูงไม่เท่ากันตามฟอนต์ที่โหลดได้
+     และขนาดตัวอักษรที่ผู้ใช้ตั้งไว้ในเครื่อง — แพตเทิร์นเดียวกับ --app-header-h
+     ที่ Header.jsx ใช้อยู่แล้ว */
+  const cartBarRef = useRef(null);
+  useEffect(() => {
+    const el = cartBarRef.current;
+    const root = document.documentElement;
+
+    if (!el) {
+      root.style.removeProperty('--fab-bottom');
+      return undefined;
+    }
+
+    const publish = () => {
+      // ขอบบนของแถบตะกร้า + ช่องไฟ 12px
+      root.style.setProperty('--fab-bottom', `${el.offsetHeight + 80 + 12}px`);
+    };
+    publish();
+
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+
+    return () => {
+      ro.disconnect();
+      // ออกจากหน้านี้แล้วปุ่มต้องกลับไปที่เดิม ไม่ค้างลอยสูงอยู่หน้าอื่น
+      root.style.removeProperty('--fab-bottom');
+    };
+  }, [cart.length]);
+
   // ---------- โมดัลตั้งค่าตัวเลือก ----------
   const openProduct = (product) => {
     setEditing({
@@ -475,7 +509,7 @@ export default function CoffeePage() {
 
       {/* ---------- แถบตะกร้าลอยด้านล่าง ---------- */}
       {cart.length > 0 && (
-        <div className="fixed bottom-20 left-0 right-0 px-4 z-40 pointer-events-none xl:bottom-6 xl:left-64">
+        <div ref={cartBarRef} className="fixed bottom-20 left-0 right-0 px-4 z-40 pointer-events-none xl:bottom-6 xl:left-64">
           <div className="max-w-md xl:max-w-[1200px] mx-auto pointer-events-auto">
             <button
               onClick={() => setCartOpen(true)}

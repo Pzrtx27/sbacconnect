@@ -123,6 +123,16 @@ const CATEGORY_SHAPES = {
  * เลือกทรงภาชนะให้เมนูหนึ่งรายการ
  * คืนคีย์ที่ <DrinkIcon shape="..."> รู้จัก (ดู components/ui/DrinkIcon.jsx)
  */
+/** ทรงภาชนะทั้งหมดที่ drinkShapeFor() คืนได้
+ *
+ *  มีไว้ให้ menuPhotos.js ตรวจตอน dev ว่ามีรูปครบทุกทรงหรือยัง
+ *  ถ้าวันหลังมีคนเพิ่มทรงใหม่ใน NAME_SHAPES แล้วลืมใส่รูป เมนูนั้นจะตกไปเป็น
+ *  ไอคอนเส้นเงียบ ๆ ซึ่งเป็นหน้าตาที่ทีมตัดสินใจเลิกใช้ไปแล้ว
+ *  รายการนี้จึงต้องอัปเดตคู่กับ NAME_SHAPES/CATEGORY_SHAPES เสมอ */
+export const ALL_DRINK_SHAPES = Object.freeze([
+  ...new Set([...NAME_SHAPES.map(([, s]) => s), ...Object.values(CATEGORY_SHAPES)]),
+]);
+
 export function drinkShapeFor(name = '', category = '') {
   const cat = normalizeCategory(category);
   const n = String(name).toLowerCase();

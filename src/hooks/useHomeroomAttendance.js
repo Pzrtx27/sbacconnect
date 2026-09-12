@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../config/supabase';
+import { notEnabledMessage, CONTACT } from '../utils/setupNotice';
 
 /* เช็คชื่อเข้าแถวโฮมรูม (41_homeroom_attendance.sql)
 
@@ -23,7 +24,7 @@ export const ATTENDANCE_OPTIONS = [
 
 export const attendanceErrorMessage = (code) =>
   ({
-    SETUP: 'ยังไม่ได้ติดตั้งระบบเช็คชื่อในฐานข้อมูล (รัน supabase/migrations/41_homeroom_attendance.sql)',
+    SETUP: notEnabledMessage('เช็คชื่อเข้าแถว', CONTACT.admin),
     NO_CLASS: 'บัญชีนี้ยังไม่ได้ถูกกำหนดให้เป็นครูประจำชั้นของห้องใด — ให้ฝ่ายวิชาการกำหนดให้ก่อน',
     FORBIDDEN: 'บัญชีนี้ไม่มีสิทธิ์เช็คชื่อห้องนี้',
     CLASS_NOT_FOUND: 'ไม่พบห้องเรียนนี้ในระบบ',

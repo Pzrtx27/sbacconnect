@@ -5,6 +5,7 @@ import { useRepairTickets } from '../../hooks/useRepairTickets';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { showToast } from '../ui/Toast';
 import { repairStatusLabel } from '../../utils/assistant';
+import { notEnabledMessage, CONTACT } from '../../utils/setupNotice';
 
 /* คิวใบแจ้งซ่อมของฝ่ายวิชาการ — ปลายทางของเรื่องที่นักเรียนแจ้งผ่านผู้ช่วย
    ถ้าไม่มีหน้านี้ ใบแจ้งซ่อมก็เป็นแค่แถวใน DB ที่ไม่มีใครเห็น ซึ่งไม่ต่างจาก
@@ -123,7 +124,7 @@ export default function RepairTicketQueue() {
         >
           <p className="text-xs font-bold text-accent-rose">โหลดคิวแจ้งซ่อมไม่สำเร็จ</p>
           <p className="text-[12px] font-semibold text-content-secondary">
-            ถ้าเพิ่งติดตั้งระบบ ตรวจว่ารัน 23_repair_tickets.sql บน Supabase แล้วหรือยัง
+            {notEnabledMessage('แจ้งซ่อม', CONTACT.admin)}
           </p>
           <button
             type="button"

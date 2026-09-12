@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { notEnabledMessage, CONTACT } from '../../utils/setupNotice';
 import { ArrowDownLeft, ArrowUpRight, RefreshCw } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
@@ -32,7 +33,7 @@ export default function WalletHistory({ limit = 50 }) {
       // ยังไม่ได้รัน migration = ฟังก์ชันไม่มีจริง บอกให้ตรงจุดจะได้ไม่ไล่หาผิดที่
       setError(
         err?.code === 'PGRST202' || /my_wallet_history/i.test(err?.message || '')
-          ? 'ยังไม่ได้ติดตั้งระบบประวัติ (รัน 26_wallet_history.sql บน Supabase ก่อน)'
+          ? notEnabledMessage('ประวัติเงินเข้า-ออก', CONTACT.finance)
           : 'โหลดประวัติไม่สำเร็จ'
       );
     } finally {

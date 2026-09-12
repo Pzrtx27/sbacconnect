@@ -45,11 +45,26 @@ export function toGrade(score, maxScore) {
   return { ...row, pct, color: tier.text, chip: tier.chip };
 }
 
+/** วิชานี้ "ประกาศคะแนนแล้ว" หรือยัง
+ *
+ *  ต้องดูสองอย่าง ไม่ใช่แค่คะแนนเต็ม:
+ *    max_score > 0     -> อาจารย์ตั้งหัวข้อคะแนนไว้แล้ว
+ *    graded_count > 0  -> และกรอกคะแนนของนักเรียนคนนี้แล้วอย่างน้อยหนึ่งหัวข้อ
+ *
+ *  ข้อหลังขาดไม่ได้ เพราะ seed ของ 40_gradebook.sql ใส่โครง T1-T5 (เต็ม 100)
+ *  ให้ทุกวิชาตั้งแต่วินาทีที่รัน migration ทั้งที่ยังไม่มีใครกรอกคะแนนสักช่อง
+ *  ถ้าดูแค่คะแนนเต็ม วิชาที่ยังไม่เริ่มกรอกจะนับเป็น 0/100 = F ทุกวิชาทั้งวิทยาลัย
+ *  แล้วนักเรียนเปิดหน้าแรกมาเจอ "GPA 0.00" ในวันที่ครูยังไม่ได้เริ่มตรวจงานด้วยซ้ำ */
+export function isAnnounced(subject) {
+  return Number(subject?.max_score) > 0 && Number(subject?.graded_count || 0) > 0;
+}
+
 /** เกรดเฉลี่ยถ่วงน้ำหนักด้วยหน่วยกิต
- *  นับเฉพาะวิชาที่มีคะแนนเต็มตั้งไว้แล้ว — วิชาที่ยังไม่ตั้งหัวข้อคะแนน (เต็ม 0)
- *  ถ้านับด้วยจะกลายเป็น F ทุกตัวแล้วลาก GPA ลงทั้งเทอมโดยไม่มีความผิดของใคร */
+ *  นับเฉพาะวิชาที่ประกาศคะแนนแล้วจริง ๆ (ดู isAnnounced)
+ *  วิชาที่ยังไม่ประกาศถ้านับด้วยจะกลายเป็น F ทุกตัว
+ *  แล้วลาก GPA ลงทั้งเทอมโดยไม่มีความผิดของใคร */
 export function calcGpa(subjects) {
-  const graded = (subjects || []).filter((s) => Number(s.max_score) > 0);
+  const graded = (subjects || []).filter(isAnnounced);
   if (graded.length === 0) return null;
 
   const totals = graded.reduce(

@@ -26,7 +26,7 @@ import { useIsDesktop } from '../../hooks/useMediaQuery';
 import { useMyClassInfo } from '../../hooks/useMyClassInfo';
 import { useMyScoreSummary } from '../../hooks/useGradebook';
 import StudentScorePanel from '../../components/score/StudentScorePanel';
-import { calcGpa, fmtScore, getScoreTier, scorePercent, sumScores, toGrade } from '../../utils/score';
+import { calcGpa, fmtScore, getScoreTier, isAnnounced, scorePercent, sumScores, toGrade } from '../../utils/score';
 import {
   Clock,
   Award,
@@ -36,14 +36,57 @@ import {
   FileText,
   UserX,
   ArrowRight,
-  Download,
   CheckCircle2,
   History,
   Receipt,
   QrCode,
   CalendarDays,
-  ChevronDown
+  ChevronDown,
+  Wallet
 } from 'lucide-react';
+
+/* สถานะ "ฟีเจอร์นี้ยังไม่เปิดใช้งาน"
+ *
+ * ของเดิมสองโมดัลนี้ (กำหนดการสอบ / เอกสารอิเล็กทรอนิกส์) เป็นข้อมูลสมมติที่เขียนตายไว้ใน JSX
+ * นักเรียนทุกคนทั้งวิทยาลัยเห็นตารางสอบชุดเดียวกัน ห้อง 1503 เหมือนกันหมด
+ * และปุ่ม "ดาวน์โหลด" ขึ้น toast สีเขียวว่ากำลังดาวน์โหลดโดยไม่มีไฟล์ออกมาเลย
+ *
+ * ตัวเลขทุกตัวที่เหลือในแอปนี้มาจากของจริง จุดที่ยังปลอมจึงไม่ได้แค่ "ยังไม่เสร็จ"
+ * แต่มันสอนผู้ใช้ว่าหน้าจอนี้โกหกได้ ซึ่งทำให้เขาไม่เชื่อยอดเงินกับคะแนนที่จริงไปด้วย
+ *
+ * สถานะว่างที่ใช้ได้จริงต้องตอบสามข้อ: ตอนนี้เป็นยังไง / ทำไม / แล้วต้องทำยังไงต่อ
+ * ข้อสามสำคัญที่สุด — บอกทางที่ได้ของจริงวันนี้ ไม่ใช่ปล่อยให้เจอทางตัน
+ */
+function NotOpenYet({ icon: Icon, what, detail, meanwhile, isDark }) {
+  return (
+    <div className="py-6 text-center max-w-sm mx-auto">
+      <span
+        className={`w-14 h-14 rounded-2xl inline-flex items-center justify-center mb-4 ${
+          isDark ? 'bg-white/[0.06] text-content-secondary' : 'bg-slate-100 text-ink-muted'
+        }`}
+      >
+        <Icon size={26} aria-hidden="true" />
+      </span>
+
+      <p className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+        ยังไม่เปิดให้ใช้{what}ในแอป
+      </p>
+
+      <p className={`text-[12px] leading-relaxed mt-2 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+        {detail}
+      </p>
+
+      {/* ทางที่ได้ของจริงวันนี้ — แยกออกมาให้เห็นชัด ไม่ปนกับคำอธิบายว่าทำไมยังไม่มี */}
+      <div
+        className={`mt-5 pt-4 border-t text-[12px] font-semibold leading-relaxed ${
+          isDark ? 'border-white/10 text-content-secondary' : 'border-slate-100 text-ink-secondary'
+        }`}
+      >
+        {meanwhile}
+      </div>
+    </div>
+  );
+}
 
 export default function StudentHome() {
   const { user, updateBalance } = useAuth();
@@ -507,7 +550,9 @@ export default function StudentHome() {
       <Modal 
         isOpen={activeModal === 'balance'} 
         onClose={() => setActiveModal(null)} 
-        title="💳 ยอดเงินบัตร"
+        title="ยอดเงินบัตร"
+        icon={Wallet}
+        tone="emerald"
       >
         <div className="space-y-6">
           <div className={`text-center py-4 rounded-2xl border transition-colors ${
@@ -554,7 +599,9 @@ export default function StudentHome() {
       <Modal
         isOpen={activeModal === 'topup'}
         onClose={() => setActiveModal(null)}
-        title="📷 เติมเงินด้วย QR + สลิป"
+        title="เติมเงินด้วย QR + สลิป"
+        icon={QrCode}
+        tone="brand"
       >
         <TopUpSlipForm />
       </Modal>
@@ -563,7 +610,9 @@ export default function StudentHome() {
       <Modal
         isOpen={activeModal === 'leave'}
         onClose={() => setActiveModal(null)}
-        title="📝 ยื่นใบลา"
+        title="ยื่นใบลา"
+        icon={UserX}
+        tone="amber"
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
@@ -683,12 +732,12 @@ export default function StudentHome() {
       {/* MODAL: เวลาเข้าโรงเรียน — ขาเข้าอย่างเดียว
           ของเดิมเป็นเลขเขียนตายไว้ (เข้า 07:42 / ออก 16:30) ทุกคนเห็นเหมือนกันหมด
           และมีบรรทัด "ออกนอกสถานศึกษา" ทั้งที่ของจริงไม่มีใครแตะบัตรตอนกลับ */}
-      <Modal isOpen={activeModal === 'entry'} onClose={() => setActiveModal(null)} title="🕐 เวลาเข้าโรงเรียน">
+      <Modal isOpen={activeModal === 'entry'} onClose={() => setActiveModal(null)} title="เวลาเข้าโรงเรียน" icon={Clock} tone="cyan">
         <GateEntryLog />
       </Modal>
 
       {/* MODAL: Debts */}
-      <Modal isOpen={activeModal === 'debt'} onClose={() => setActiveModal(null)} title="💰 รายการค้างชำระ">
+      <Modal isOpen={activeModal === 'debt'} onClose={() => setActiveModal(null)} title="รายการค้างชำระ" icon={Receipt} tone="rose">
         <FeePaymentPanel
           fees={fees.fees}
           loading={fees.loading}
@@ -700,7 +749,7 @@ export default function StudentHome() {
       </Modal>
 
       {/* MODAL: Behavior */}
-      <Modal isOpen={activeModal === 'behavior'} onClose={() => setActiveModal(null)} title="📊 คะแนนความประพฤติ">
+      <Modal isOpen={activeModal === 'behavior'} onClose={() => setActiveModal(null)} title="คะแนนความประพฤติ" icon={Award} tone="amber">
         <div className="space-y-6">
           <div className={`text-center py-5 border rounded-2xl ${
             isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
@@ -771,7 +820,7 @@ export default function StudentHome() {
       {/* MODAL: Score — เนื้อหาทั้งหมดอยู่ใน StudentScorePanel
           เพราะตอนนี้เป็นสองชั้น (ทุกรายวิชา -> รายละเอียด T1-T5 ของวิชาที่กด)
           ซึ่งมีสถานะภายในของตัวเอง ไม่ควรปนกับสถานะของหน้าแรกทั้งหน้า */}
-      <Modal isOpen={activeModal === 'score'} onClose={() => setActiveModal(null)} title="📈 คะแนนระหว่างภาค">
+      <Modal isOpen={activeModal === 'score'} onClose={() => setActiveModal(null)} title="คะแนนระหว่างภาค" icon={BookOpen} tone="brand">
         <StudentScorePanel
           subjects={scoreSubjects}
           term={scoreTerm}
@@ -781,7 +830,7 @@ export default function StudentHome() {
       </Modal>
 
       {/* MODAL: Grade */}
-      <Modal isOpen={activeModal === 'grade'} onClose={() => setActiveModal(null)} title="🎓 ผลการเรียน">
+      <Modal isOpen={activeModal === 'grade'} onClose={() => setActiveModal(null)} title="ผลการเรียน" icon={GraduationCap} tone="violet">
         <div className="space-y-4">
           <div className={`flex justify-between items-center p-3 rounded-xl border ${
             isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
@@ -800,7 +849,18 @@ export default function StudentHome() {
             </div>
           )}
 
-          {!scoreLoading && scoreSubjects.length === 0 && (
+          {/* ต้องแยก "โหลดไม่ได้" ออกจาก "ไม่มีข้อมูล" ก่อนเสมอ
+              ของเดิมเช็คแค่ scoreSubjects.length === 0 ตอน RPC ล้ม (เช่นยังไม่ได้รัน
+              40_gradebook.sql) นักเรียนจึงถูกบอกว่า "ห้องคุณไม่มีวิชา" ซึ่งชี้ผิดทางสนิท
+              แล้วจะเดินไปถามฝ่ายทะเบียนเรื่องที่ไม่ใช่ปัญหา */}
+          {!scoreLoading && scoreError && (
+            <div className={`text-xs text-center py-8 space-y-1 ${textMuted}`}>
+              <p className={`font-bold ${textPrimary}`}>ยังดูผลการเรียนไม่ได้ในตอนนี้</p>
+              <p>ระบบคะแนนยังไม่ถูกเปิดใช้งาน กรุณาแจ้งฝ่ายวิชาการ</p>
+            </div>
+          )}
+
+          {!scoreLoading && !scoreError && scoreSubjects.length === 0 && (
             <p className={`text-xs text-center py-8 ${textMuted}`}>
               ยังไม่มีรายวิชาของห้องคุณในภาคเรียนนี้
             </p>
@@ -810,6 +870,12 @@ export default function StudentHome() {
             {scoreSubjects.map((item, idx) => {
               const grade = toGrade(item.score, item.max_score);
               const pending = Number(item.item_count || 0) - Number(item.graded_count || 0);
+              /* วิชาที่ครูยังไม่กรอกคะแนนสักช่อง ต้องไม่ขึ้นชิป "F"
+                 คะแนนเต็มถูกตั้งไว้ตั้งแต่ตอนรัน migration แล้ว (โครง T1-T5 = เต็ม 100)
+                 แต่คะแนนที่ได้ยังเป็น 0 เพราะไม่มีใครกรอก ไม่ใช่เพราะนักเรียนทำไม่ได้
+                 บรรทัด "รอประกาศอีก N หัวข้อ" ข้างล่างบอกความจริงนี้อยู่แล้ว
+                 แต่มันเป็นตัวเล็กสีจาง ส่วน F เป็นชิปตัวหนา คนอ่านเห็น F ก่อนเสมอ */
+              const announced = isAnnounced(item);
 
               return (
                 <motion.div
@@ -824,13 +890,24 @@ export default function StudentHome() {
                   <div className="min-w-0 pr-3">
                     <div className={`text-sm font-semibold ${textSecondary}`}>{item.name}</div>
                     <div className={`text-[11px] ${textMuted}`}>
-                      หน่วยกิต: {item.credits} • {fmtScore(item.score)}/{fmtScore(item.max_score)} คะแนน
-                      {pending > 0 && ` • รอประกาศอีก ${pending} หัวข้อ`}
+                      หน่วยกิต: {item.credits}
+                      {announced
+                        ? ` • ${fmtScore(item.score)}/${fmtScore(item.max_score)} คะแนน`
+                        : ' • อาจารย์ยังไม่ประกาศคะแนน'}
+                      {announced && pending > 0 && ` • รอประกาศอีก ${pending} หัวข้อ`}
                     </div>
                   </div>
-                  <span className={`text-sm font-extrabold px-2.5 py-1 rounded-full shrink-0 ${grade.chip} ${grade.color}`}>
-                    {grade.label}
-                  </span>
+                  {announced ? (
+                    <span className={`text-sm font-extrabold px-2.5 py-1 rounded-full shrink-0 ${grade.chip} ${grade.color}`}>
+                      {grade.label}
+                    </span>
+                  ) : (
+                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
+                      isDark ? 'bg-white/[0.06] text-white/50' : 'bg-slate-100 text-slate-400'
+                    }`}>
+                      ยังไม่ประกาศ
+                    </span>
+                  )}
                 </motion.div>
               );
             })}
@@ -839,76 +916,25 @@ export default function StudentHome() {
       </Modal>
 
       {/* MODAL: Exam Schedule */}
-      <Modal isOpen={activeModal === 'exam'} onClose={() => setActiveModal(null)} title="📝 กำหนดการสอบ">
-        <div className="space-y-4">
-          <p className={`text-xs ${textMuted}`}>ภาคเรียน 1/2569 • ห้อง 1503</p>
-          <div className="space-y-3">
-            {[
-              { day: '18', month: 'ก.ค.', subject: 'การสร้างเกมคอมพิวเตอร์', time: '08:30 – 10:30 น.', room: 'ห้อง 1409' },
-              { day: '19', month: 'ก.ค.', subject: 'English for Project Work', time: '08:30 – 10:30 น.', room: 'ห้อง 1503' },
-              { day: '21', month: 'ก.ค.', subject: 'ทักษะดิจิทัล', time: '08:30 – 10:30 น.', room: 'ห้อง 1509' },
-              { day: '22', month: 'ก.ค.', subject: 'การซ่อมบำรุงคอมพิวเตอร์', time: '08:30 – 10:30 น.', room: 'ห้อง 1401' },
-              { day: '24', month: 'ก.ค.', subject: 'การออกแบบกราฟิกพื้นฐาน', time: '08:30 – 10:30 น.', room: 'ห้อง 1406' },
-            ].map((item, idx) => (
-              <div key={idx} className={`flex gap-4 items-center border-b pb-2 ${
-                isDark ? 'border-white/10' : 'border-slate-50'
-              }`}>
-                <div className={`rounded-xl px-3 py-1.5 text-center min-w-[55px] border ${
-                  isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
-                }`}>
-                  <span className={`text-base font-extrabold block leading-none ${textPrimary}`}>{item.day}</span>
-                  <span className={`text-[11px] font-bold mt-1 block leading-none ${textMuted}`}>{item.month}</span>
-                </div>
-                <div className="flex-1">
-                  <div className={`text-sm font-bold ${textSecondary}`}>{item.subject}</div>
-                  <div className={`text-[11px] mt-0.5 ${textMuted}`}>{item.time}</div>
-                </div>
-                <span className={`text-[11px] font-bold px-2 py-1 rounded-md ${
-                  isDark ? 'bg-white/5 text-content-secondary' : 'bg-slate-100 text-ink-secondary'
-                }`}>
-                  {item.room}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+      <Modal isOpen={activeModal === 'exam'} onClose={() => setActiveModal(null)} title="กำหนดการสอบ" icon={CalendarDays} tone="rose">
+        <NotOpenYet
+          icon={CalendarDays}
+          what="ตารางสอบ"
+          detail="ฝ่ายวิชาการยังไม่ได้ประกาศกำหนดการสอบผ่านแอป เมื่อประกาศแล้วจะขึ้นที่นี่พร้อมวัน เวลา และห้องสอบของห้องคุณเอง"
+          meanwhile="ระหว่างนี้ดูประกาศจากบอร์ดหน้าห้องวิชาการ หรือถามครูที่ปรึกษา"
+          isDark={isDark}
+        />
       </Modal>
 
       {/* MODAL: E-Document */}
-      <Modal isOpen={activeModal === 'edoc'} onClose={() => setActiveModal(null)} title="📄 เอกสารอิเล็กทรอนิกส์">
-        <div className="space-y-3">
-          {[
-            { title: '📋 ใบรับรองการเป็นนักเรียน', sub: 'Student Certificate', status: 'ready' },
-            { title: '📊 ทรานสคริปต์', sub: 'Academic Transcript', status: 'ready' },
-            { title: '🎓 วุฒิการศึกษา', sub: 'Education Certificate', status: 'pending' },
-          ].map((doc, idx) => (
-            <div key={idx} className={`flex justify-between items-center p-3 border rounded-xl transition-all ${
-              isDark 
-                ? 'border-white/10 hover:bg-white/5' 
-                : 'border-slate-100 hover:bg-slate-50'
-            }`}>
-              <div>
-                <div className={`text-sm font-bold ${textSecondary}`}>{doc.title}</div>
-                <div className={`text-[11px] ${textMuted}`}>{doc.sub}</div>
-              </div>
-              {doc.status === 'ready' ? (
-                <button 
-                  onClick={() => showToast('กำลังดาวน์โหลด...', 'success')}
-                  className="bg-sbac-blue text-white text-xs font-bold py-1.5 px-3 rounded-lg flex items-center gap-1 active:scale-95 transition-all"
-                >
-                  <Download size={12} />
-                  ดาวน์โหลด
-                </button>
-              ) : (
-                <span className={`text-xs font-bold py-1.5 px-3 rounded-lg ${
-                  isDark ? 'bg-white/5 text-content-muted' : 'bg-slate-100 text-ink-muted'
-                }`}>
-                  รอดำเนินการ
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
+      <Modal isOpen={activeModal === 'edoc'} onClose={() => setActiveModal(null)} title="เอกสารอิเล็กทรอนิกส์" icon={FileText} tone="cyan">
+        <NotOpenYet
+          icon={FileText}
+          what="การขอเอกสารออนไลน์"
+          detail="ใบรับรองการเป็นนักเรียน ทรานสคริปต์ และวุฒิการศึกษา ยังขอผ่านแอปไม่ได้ ต้องให้ฝ่ายทะเบียนออกให้และลงนามก่อน"
+          meanwhile="ขอได้ที่ฝ่ายทะเบียน อาคาร 1 ชั้น 1 ในวันและเวลาราชการ"
+          isDark={isDark}
+        />
       </Modal>
     </div>
   );

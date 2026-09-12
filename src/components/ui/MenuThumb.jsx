@@ -26,14 +26,33 @@ export default function MenuThumb({
   alt = '',
 }) {
   const shape = shapeProp || drinkShapeFor(name, category);
-  const photo = src ? { src, alt } : menuPhoto(shape);
-  const [broken, setBroken] = useState(false);
+
+  /* ต้องแยกเป็นสองชั้นจริง ๆ ไม่ใช่เลือกมาชั้นเดียวแล้วจบ
+     ของเดิมเขียนว่า  const photo = src ? { src, alt } : menuPhoto(shape)
+     ซึ่งแปลว่าถ้าสินค้ามี image_url อยู่ รูปประจำทรงจะไม่ถูกพิจารณาอีกเลย
+     พอ image_url นั้นโหลดไม่ขึ้น (ลิงก์เสีย โดนลบ โดนบล็อก hotlink)
+     ช่องนั้นกระโดดข้ามชั้นที่ 2 ไปที่ไอคอนเส้นทันที
+
+     ขัดกับลำดับที่คอมเมนต์ข้างบนประกาศไว้เอง (image_url -> รูปประจำทรง -> ไอคอน)
+     และเป็นทางเดียวที่โค้ดชุดนี้จะกลับไปหน้าตาแบบไอคอนเส้นทั้งหน้าได้
+     ทั้งที่ไฟล์ใน public/menu/ ครบและเสิร์ฟได้ปกติ */
+  const remote = src ? { src, alt } : null;
+  const local = menuPhoto(shape);
+
+  const [remoteBroken, setRemoteBroken] = useState(false);
+  const [localBroken, setLocalBroken] = useState(false);
+
+  const photo = (!remoteBroken && remote) || (!localBroken && local) || null;
+  const usingRemote = photo === remote;
 
   /* รีเซ็ตเมื่อสลับไปสินค้าตัวอื่น ไม่งั้นช่องที่เคยโหลดรูปพังไว้
      จะติดสถานะพังต่อไปแม้ React เอา DOM ช่องเดิมไปใช้กับสินค้าใหม่ */
-  useEffect(() => setBroken(false), [photo?.src]);
+  useEffect(() => {
+    setRemoteBroken(false);
+    setLocalBroken(false);
+  }, [remote?.src, local?.src]);
 
-  if (!photo || broken) {
+  if (!photo) {
     const tone = drinkTone(shape);
     return (
       <div className={`${className} shrink-0 flex items-center justify-center ${tone.tile} ${tone.icon}`}>
@@ -45,13 +64,16 @@ export default function MenuThumb({
   return (
     <div className={`${className} shrink-0 overflow-hidden bg-slate-200 dark:bg-white/10`}>
       <img
+        /* key บังคับให้ React สร้าง <img> ใหม่เมื่อสลับจากรูปของร้านไปรูปประจำทรง
+           ถ้าใช้ element เดิม เบราว์เซอร์บางตัวไม่ยิง onload/onError รอบใหม่ให้ */
+        key={photo.src}
         src={photo.src}
         alt={alt || photo.alt || ''}
         className="w-full h-full object-cover"
         loading="lazy"
         decoding="async"
         draggable="false"
-        onError={() => setBroken(true)}
+        onError={() => (usingRemote ? setRemoteBroken(true) : setLocalBroken(true))}
       />
     </div>
   );

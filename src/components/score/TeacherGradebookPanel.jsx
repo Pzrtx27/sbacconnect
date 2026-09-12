@@ -8,6 +8,7 @@ import BulkScoreEntry from './BulkScoreEntry';
 import ScoreItemManager from './ScoreItemManager';
 import { useGradebookSubjects, useSubjectGradebook } from '../../hooks/useGradebook';
 import { fmtScore, getScoreTier, scorePercent } from '../../utils/score';
+import { notEnabledMessage, CONTACT } from '../../utils/setupNotice';
 
 /* สมุดคะแนนฝั่งอาจารย์ — เนื้อหาของโมดัล "คะแนนระหว่างภาค" ในหน้าครูและหน้าฝ่ายวิชาการ
 
@@ -87,7 +88,7 @@ export default function TeacherGradebookPanel({ classRoomId = null }) {
             <p className={`text-xs font-bold ${textPrimary}`}>ยังใช้สมุดคะแนนไม่ได้</p>
             <p className={`text-[11px] leading-relaxed ${textMuted}`}>
               {subjectsError === 'SETUP'
-                ? 'ยังไม่ได้รัน supabase/migrations/40_gradebook.sql ในฐานข้อมูล'
+                ? notEnabledMessage('สมุดคะแนน', CONTACT.admin)
                 : 'ไม่มีสิทธิ์เข้าถึงสมุดคะแนน'}
             </p>
           </div>
@@ -115,8 +116,12 @@ export default function TeacherGradebookPanel({ classRoomId = null }) {
 
         {filteredSubjects.length === 0 && (
           <p className={`text-xs text-center py-10 leading-relaxed ${textMuted}`}>
+            {/* ของเดิมเขียนว่า "ฝ่ายวิชาการเพิ่มได้ที่แท็บนักเรียน" ซึ่งไม่จริง
+                แท็บนักเรียนมีแต่เรื่องความประพฤติ ไม่มีที่ไหนในแอปเพิ่มรายวิชาได้เลย
+                (upsert_subject มีใน DB แต่ยังไม่มีหน้าจอเรียก) สถานะว่างที่ชี้ไปหา
+                หน้าจอที่ไม่มีอยู่ แย่กว่าไม่บอกอะไร เพราะคนอ่านจะไปหาจนเจอว่าไม่มี */}
             {subjects.length === 0
-              ? 'ยังไม่มีรายวิชาในระบบ — ฝ่ายวิชาการเพิ่มได้ที่แท็บนักเรียน'
+              ? 'ยังไม่มีรายวิชาในระบบ — แจ้งผู้ดูแลระบบให้เพิ่มรายวิชาของภาคเรียนนี้ก่อน'
               : 'ไม่พบรายวิชาที่ตรงกับคำค้น'}
           </p>
         )}

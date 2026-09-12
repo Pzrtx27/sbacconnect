@@ -5,6 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { motion } from 'framer-motion';
 import { showToast } from '../components/ui/Toast';
 import sbacLogo from '../assets/sbac_logo_mark.png';
+import { homeFor } from '../utils/homeRoute';
 import { 
   LogIn, 
   Sun, 
@@ -18,14 +19,6 @@ import {
   AlertTriangle,
   Info
 } from 'lucide-react';
-
-/** หน้าเริ่มต้นของแต่ละ role (ต้องตรงกับ HOME_BY_ROLE ใน App.jsx) */
-const HOME_BY_ROLE = {
-  student: '/home',
-  teacher: '/teacher',
-  academic: '/academic',
-  barista: '/barista',
-};
 
 /* จำเฉพาะ "ชื่อผู้ใช้" เท่านั้น ไม่เก็บรหัสประจำตัวลงเครื่องเด็ดขาด
    เครื่องในห้องคอมเป็นเครื่องใช้ร่วม ถ้าเก็บรหัสไว้ด้วยคนถัดไปล็อกอินเป็นคนก่อนหน้าได้เลย */
@@ -79,14 +72,16 @@ export default function LoginPage() {
       } catch {
         /* ignore */
       }
-      const role = (result.user.role || 'student').toLowerCase().trim();
       const welcomeMsg = lang === 'TH'
         ? `ยินดีต้อนรับคุณ ${result.user.name}`
         : `Welcome, ${result.user.name}`;
       showToast(welcomeMsg, 'success');
       // replace: true — กันไม่ให้กดปุ่ม back แล้วเด้งกลับหน้าล็อกอิน
       // ถ้า navigate พลาดด้วยเหตุผลใดก็ตาม LoginRoute ใน App.jsx จะเด้งให้เองอยู่ดี
-      navigate(HOME_BY_ROLE[role] || '/home', { replace: true });
+      //
+      // ต้องส่งทั้ง result.user ไม่ใช่แค่ role เดียว เพราะ homeFor ต้องดู user.roles
+      // ทั้งอาร์เรย์เพื่อแยกเจ้าหน้าที่การเงินออกจากคนชงกาแฟ (ทั้งคู่ role = 'barista')
+      navigate(homeFor(result.user), { replace: true });
     } else {
       setError(result.error);
       showToast(result.error, 'error');

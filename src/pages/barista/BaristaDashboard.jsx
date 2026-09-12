@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { notEnabledMessage, logSetupHint, CONTACT } from '../../utils/setupNotice';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../config/supabase';
 import { showToast } from '../../components/ui/Toast';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import {
-  LogOut, Clock, Check, CheckCheck, RefreshCw, X, Archive, Lock, Inbox, Search, Undo2,
+  LogOut, Clock, Check, CheckCheck, RefreshCw, X, Archive, Lock, Inbox, Search, Undo2, Receipt,
 } from 'lucide-react';
 import CoffeeCup from '../../components/ui/icons/CoffeeCup';
 import { formatBaht } from '../../utils/identity';
@@ -19,6 +21,14 @@ import { playChime, unlockAudio } from '../../utils/sound';
 
 export default function BaristaDashboard() {
   const { logout, user } = useAuth();
+  const navigate = useNavigate();
+
+  /* ต้องเทียบกับ roles ทั้งอาร์เรย์ ไม่ใช่ user.role เดียวที่ AuthContext เลือกมา
+     ใช้กติกาเดียวกับ FinanceRoute ใน App.jsx และ app_can_manage_fees() ฝั่ง DB */
+  const canManageFees = (Array.isArray(user?.roles) ? user.roles : []).some(
+    (r) => r === 'cashier' || r === 'sysadmin'
+  );
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
@@ -121,12 +131,14 @@ export default function BaristaDashboard() {
 
       if (error) {
         /* ยังไม่ได้รันไฟล์ 45 = ฟังก์ชันยังไม่มีในฐานข้อมูล ซึ่งเป็นสาเหตุที่เจอบ่อยที่สุด
-           บอกชื่อไฟล์ไปเลย ดีกว่าขึ้น "โหลดไม่สำเร็จ" ลอย ๆ ให้ไปไล่หาเอง */
+           การแยกสาเหตุนี้ออกมาถูกแล้ว แต่ชื่อไฟล์ .sql เป็นของคนที่แก้ได้ ไม่ใช่ของบาริสต้า
+           ที่ยืนอยู่หน้าเคาน์เตอร์ตอนมีคิว — บนจอบอกว่าต้องบอกใคร ชื่อไฟล์ลง console */
         const missing =
           error.code === 'PGRST202' || /could not find the function|does not exist/i.test(error.message || '');
+        if (missing) logSetupHint('คลังบิล', '45_pos_archive_browser.sql');
         setArchiveError(
           missing
-            ? 'ยังไม่ได้ติดตั้งคลังบิลในฐานข้อมูล — ต้องรันไฟล์ supabase/migrations/45_pos_archive_browser.sql ก่อน'
+            ? notEnabledMessage('คลังบิล', CONTACT.admin)
             : `โหลดคลังไม่สำเร็จ: ${error.message}`
         );
         setArchiveOrders([]);
@@ -396,13 +408,30 @@ export default function BaristaDashboard() {
           </div>
         </div>
 
-        <button
-          onClick={logout}
-          className="p-2 bg-neutral-800 hover:bg-neutral-700 text-accent-rose rounded-xl transition-all"
-          title="ออกจากระบบ"
-        >
-          <LogOut size={20} />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* ทางเข้าหน้าการเงิน — เปลือกเต็มจอนี้ไม่มี BottomNav/SideNav เลย
+              App.jsx ผูก route /finance ไว้ในเปลือกนี้แล้วพร้อมคอมเมนต์ว่า
+              "จึงต้องมีทางเข้าหน้าการเงินจากในเปลือกเต็มจอนี้" แต่ปุ่มไม่เคยถูกใส่
+              ลิงก์เดียวที่มีอยู่ไปกองที่ /development ซึ่ง role barista เข้าไม่ได้
+              ผลคือคอนโซลการเงินทั้งหน้าเข้าถึงได้ด้วยการพิมพ์ URL อย่างเดียว */}
+          {canManageFees && (
+            <button
+              onClick={() => navigate('/finance')}
+              className="flex items-center gap-1.5 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-accent-emerald rounded-xl text-xs font-bold transition-all"
+              title="ค่าเทอมและค่าธรรมเนียม"
+            >
+              <Receipt size={16} aria-hidden="true" />
+              ฝ่ายการเงิน
+            </button>
+          )}
+          <button
+            onClick={logout}
+            className="p-2 bg-neutral-800 hover:bg-neutral-700 text-accent-rose rounded-xl transition-all"
+            title="ออกจากระบบ"
+          >
+            <LogOut size={20} />
+          </button>
+        </div>
       </header>
 
       {/* กว้างเต็มจอบนคอมที่เคาน์เตอร์ แต่หยุดที่ 1600px กันไม่ให้การ์ดยืดจนอ่านยากบนจอ 4K */}

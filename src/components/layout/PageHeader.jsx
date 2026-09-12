@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
+import { toneClass } from '../ui/iconTones';
 
 /* หัวข้อหน้า — ใช้ให้เหมือนกันทุกหน้าในเปลือกแอป
 
@@ -15,14 +16,6 @@ import { useTheme } from '../../contexts/ThemeContext';
 
    tone = สีของกรอบไอคอน ผูกกับ semantic token ที่ผ่าน contrast มาแล้ว
    ห้ามใส่คลาสสีดิบ ๆ เข้ามาเอง ไม่งั้นจะกลับไปเพี้ยนกันอีก */
-const TONES = {
-  brand: 'bg-sbac-blue/10 text-brand',
-  amber: 'bg-amber-500/10 text-accent-amber',
-  emerald: 'bg-emerald-500/10 text-accent-emerald',
-  rose: 'bg-rose-500/10 text-accent-rose',
-  violet: 'bg-violet-500/10 text-accent-violet',
-  cyan: 'bg-cyan-500/10 text-accent-cyan',
-};
 
 export default function PageHeader({
   icon: Icon,
@@ -59,7 +52,7 @@ export default function PageHeader({
         >
           {Icon && (
             <span
-              className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${TONES[tone] || TONES.brand}`}
+              className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${toneClass(tone)}`}
             >
               <Icon size={18} aria-hidden="true" />
             </span>

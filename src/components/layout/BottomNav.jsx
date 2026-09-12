@@ -20,7 +20,7 @@ export default function BottomNav() {
 
   if (!user) return null;
 
-  const items = navItemsFor(user.role);
+  const items = navItemsFor(user);
 
   /* ต้อง await: logout() เคลียร์ user หลัง signOut() คืนค่าแล้วเท่านั้น
      ถ้า navigate ก่อน LoginRoute จะยังเห็น user ค้างอยู่แล้วเด้งกลับหน้าเดิมให้เห็นแวบหนึ่ง */

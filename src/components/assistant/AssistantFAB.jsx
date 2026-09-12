@@ -78,11 +78,17 @@ export default function AssistantFAB() {
         onClick={() => setIsOpen(true)}
         aria-label="เปิดผู้ช่วย SBAC Connect"
         aria-expanded={isOpen}
-        /* bottom-24 หลบ BottomNav บนมือถือ บนคอมไม่มีแถบล่างแล้วจึงลงมาชิดขอบได้ */
-        className="fixed bottom-24 right-4 xl:bottom-6 xl:right-6 z-40 flex items-center justify-center
+        /* ค่าเริ่มต้น 6rem (bottom-24) หลบ BottomNav บนมือถือ
+           บนคอมไม่มีแถบล่างแล้วจึงลงมาชิดขอบได้
+
+           --fab-bottom เป็นทางให้หน้าที่มีแถบลอยของตัวเองยกปุ่มนี้ขึ้นหลบ
+           ตอนนี้มีหน้าสั่งกาแฟที่ตั้งค่าให้ (แถบตะกร้าอยู่ที่ bottom-20 เต็มบรรทัด
+           ปุ่มนี้จึงทับตัวเลขยอดรวมพอดีจนกดเปิดตะกร้าไม่ได้บนมือถือ)
+           หน้าที่ไม่ได้ตั้งค่าไว้ก็ใช้ 6rem เหมือนเดิม ไม่ต้องแก้อะไร */
+        className="fixed bottom-[var(--fab-bottom,6rem)] right-4 xl:bottom-6 xl:right-6 z-40 flex items-center justify-center
                    w-14 h-14 rounded-full bg-sbac-blue hover:bg-sbac-navy text-white
                    shadow-button hover:shadow-button-hover
-                   transition-[background-color,box-shadow,transform] duration-200 active:scale-95"
+                   transition-[background-color,box-shadow,transform,bottom] duration-200 active:scale-95"
       >
         <MessageSquare size={22} aria-hidden="true" />
       </button>

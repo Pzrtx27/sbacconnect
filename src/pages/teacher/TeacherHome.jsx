@@ -41,6 +41,7 @@ import {
   XCircle,
   QrCode,
   History,
+  Wallet,
   Check,
   X
 } from 'lucide-react';
@@ -750,7 +751,11 @@ export default function TeacherHome() {
                             onChange={() => attendance.setStatus(student.user_id, opt.id)}
                             className="hidden peer"
                           />
-                          <div className={`py-1.5 rounded-xl text-center text-xs font-bold border border-transparent transition-all active:scale-95 ${ATTENDANCE_STYLES[opt.id]} peer-checked:shadow-sm`}>
+                          {/* min-h-11 = 44px ตามเกณฑ์เป้าแตะ ของเดิม py-1.5 ได้สูงจริง 34px
+                              ครูประจำชั้นกดปุ่มชุดนี้วันละราว 40 ครั้ง (คนละปุ่มต่อนักเรียนหนึ่งคน)
+                              บนมือถือขณะยืนหน้าแถว การพลาดแต่ละครั้งแปลว่าต้องกดแก้อีกรอบ
+                              และ PRODUCT.md ระบุ "เป้าแตะเล็ก" ไว้เป็นสิ่งที่ต้องเลี่ยงโดยตรง */}
+                          <div className={`min-h-11 px-1 rounded-xl flex items-center justify-center text-center text-xs font-bold border border-transparent transition-all active:scale-95 ${ATTENDANCE_STYLES[opt.id]} peer-checked:shadow-sm`}>
                             {opt.label}
                           </div>
                         </label>
@@ -778,6 +783,8 @@ export default function TeacherHome() {
         isOpen={activeModal === 'leaves'} 
         onClose={() => setActiveModal(null)} 
         title="อนุมัติการลาเรียนของนักเรียน"
+        icon={ClipboardCheck}
+        tone="amber"
       >
         <div className="space-y-4">
           <p className={`text-xs ${textMuted}`}>
@@ -797,6 +804,8 @@ export default function TeacherHome() {
         isOpen={activeModal === 'behavior'} 
         onClose={() => setActiveModal(null)} 
         title="จัดการพฤติกรรมและความประพฤติ"
+        icon={Award}
+        tone="rose"
       >
         <div className="space-y-4">
           {/* Select Student — ค้นหานักเรียนจริงจากฐานข้อมูล (ชื่อ หรือ รหัสประจำตัว) */}
@@ -1038,7 +1047,9 @@ export default function TeacherHome() {
       <Modal
         isOpen={activeModal === 'balance'}
         onClose={() => setActiveModal(null)}
-        title="💳 ยอดเงินบัตร"
+        title="ยอดเงินบัตร"
+        icon={Wallet}
+        tone="emerald"
       >
         <div className="space-y-6">
           <div className={`text-center py-4 rounded-2xl border transition-colors ${
@@ -1075,7 +1086,9 @@ export default function TeacherHome() {
       <Modal
         isOpen={activeModal === 'topup'}
         onClose={() => setActiveModal(null)}
-        title="📷 เติมเงินด้วย QR + สลิป"
+        title="เติมเงินด้วย QR + สลิป"
+        icon={QrCode}
+        tone="brand"
       >
         <TopUpSlipForm />
       </Modal>
@@ -1085,6 +1098,8 @@ export default function TeacherHome() {
         isOpen={activeModal === 'myLogs'}
         onClose={() => setActiveModal(null)}
         title="ประวัติที่ฉันบันทึก"
+        icon={History}
+        tone="cyan"
       >
         <BehaviorLogList
           logs={myLogs}
@@ -1099,7 +1114,9 @@ export default function TeacherHome() {
       <Modal
         isOpen={activeModal === 'gradebook'}
         onClose={() => setActiveModal(null)}
-        title="📈 คะแนนระหว่างภาค"
+        title="คะแนนระหว่างภาค"
+        icon={BookOpen}
+        tone="brand"
       >
         <TeacherGradebookPanel />
       </Modal>

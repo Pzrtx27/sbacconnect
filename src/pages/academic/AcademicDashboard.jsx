@@ -53,6 +53,7 @@ import {
   formatThaiDate,
   classLabel,
 } from '../../utils/timetable';
+import { notEnabledMessage, CONTACT } from '../../utils/setupNotice';
 
 /** กล่องอธิบายขั้นตอนการทำงานที่ต้องรู้ก่อนกดปุ่ม
  *  ไม่ใช่คำเตือนว่าพัง — ของที่พังถูกแก้หรือถอดออกไปหมดแล้ว */
@@ -457,7 +458,7 @@ export default function AcademicDashboard() {
         err?.code === '42501'
           ? 'บัญชีนี้ไม่มีสิทธิ์สั่งสอนแทน (เฉพาะฝ่ายวิชาการ)'
           : err?.code === '42P01'
-            ? 'ยังไม่ได้สร้างตาราง substitutions — รัน 31_substitutions.sql ก่อน'
+            ? notEnabledMessage('สั่งสอนแทน', CONTACT.admin)
             : `บันทึกไม่สำเร็จ (${err?.code || 'ไม่ทราบรหัส'}) ${err?.message || ''}`.trim(),
         'error'
       );
@@ -676,7 +677,11 @@ export default function AcademicDashboard() {
               และคาบไหนถูกสั่งสอนแทนอยู่ — เดิมเป็นช่อง number ที่ไม่บอกอะไรเลย */}
           <div>
             <span className={`text-xs font-bold block mb-1.5 ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>คาบที่</span>
-            <div className="grid grid-cols-8 gap-1.5">
+            {/* สี่คอลัมน์บนมือถือ แปดคอลัมน์เมื่อมีที่พอ
+                ความสูงถูกตั้งไว้ที่ 44px แล้ว แต่ความกว้างไม่ได้ถูกคุม พอเป็น grid-cols-8
+                ตายตัวบนจอ 375 ปุ่มกว้างจริงแค่ 37.6px ซึ่งต่ำกว่าเกณฑ์เป้าแตะเหมือนกัน
+                เป้าแตะต้องผ่านทั้งสองด้าน ไม่ใช่ด้านเดียว */}
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
               {PERIODS.map((p) => {
                 const slot = timetableData[dayKey]?.[p];
                 const substituted = daySubs.some((s) => Number(s.period) === p);
