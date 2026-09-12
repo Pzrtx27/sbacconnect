@@ -9,11 +9,11 @@ import { formatBaht } from '../../utils/identity';
 import {
   ORDER_STATUS_TEXT_LONG,
   ORDER_STATUS_COLOR,
-  drinkShapeFor,
   drinkTone,
   optionSummary,
 } from '../../utils/orders';
 import DrinkIcon from '../../components/ui/DrinkIcon';
+import MenuThumb from '../../components/ui/MenuThumb';
 import { useMyOrders } from '../../contexts/OrdersContext';
 
 /* หน้านี้แสดงออเดอร์ที่ยัง "ไม่จบเรื่อง" ในสายตาของนักเรียน:
@@ -181,15 +181,13 @@ export default function MyOrdersPage() {
               <div className="space-y-3">
                 {order.order_items?.map((item, idx) => (
                   <div key={idx} className="flex gap-3 items-center">
-                    {(() => {
-                      const shape = drinkShapeFor(item.products?.name, item.products?.category);
-                      const tone = drinkTone(shape);
-                      return (
-                        <div className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center ${tone.tile} ${tone.icon}`}>
-                          <DrinkIcon shape={shape} size={24} />
-                        </div>
-                      );
-                    })()}
+                    <MenuThumb
+                      name={item.products?.name}
+                      category={item.products?.category}
+                      src={item.products?.image_url}
+                      className="w-11 h-11 rounded-xl"
+                      iconSize={24}
+                    />
                     <div className="flex-1 min-w-0">
                       <div className={`text-sm font-extrabold ${textPrimary}`}>
                         {item.products?.name || 'สินค้า'}

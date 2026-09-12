@@ -6,8 +6,8 @@ import { READING_WIDTH } from '../../utils/layout';
 import { supabase } from '../../config/supabase';
 import { RefreshCw, Receipt } from 'lucide-react';
 import { formatBaht } from '../../utils/identity';
-import { ORDER_STATUS_TEXT, ORDER_STATUS_COLOR, drinkShapeFor, drinkTone, optionSummary } from '../../utils/orders';
-import DrinkIcon from '../../components/ui/DrinkIcon';
+import { ORDER_STATUS_TEXT, ORDER_STATUS_COLOR, optionSummary } from '../../utils/orders';
+import MenuThumb from '../../components/ui/MenuThumb';
 
 /* ประวัติการสั่งซื้อทั้งหมด แยกจากหน้าสถานะปัจจุบัน (/orders)
    จัดเป็นลิสต์แถวเดียวต่อออเดอร์ แบบแอปช้อปปิ้ง (Shopee / LINE MAN)
@@ -18,7 +18,7 @@ import DrinkIcon from '../../components/ui/DrinkIcon';
 // (หน้า /orders ดึงครบอยู่แล้ว หน้านี้ตกไปตอนย้ายมาใช้ตัวเลือกใน 11_menu_options.sql)
 const ORDER_SELECT =
   'id, total_satang, status, pickup_code, created_at, ' +
-  'order_items(qty, unit_price_satang, products(name, category), order_item_options(option_name, group_name))';
+  'order_items(qty, unit_price_satang, products(name, category, image_url), order_item_options(option_name, group_name))';
 
 export default function OrderHistoryPage() {
   const { user } = useAuth();
@@ -119,15 +119,13 @@ export default function OrderHistoryPage() {
             const extraCount = items.length - 1;
             return (
               <div key={order.id} className="flex items-center gap-3 p-4">
-                {(() => {
-                  const shape = drinkShapeFor(first?.products?.name, first?.products?.category);
-                  const tone = drinkTone(shape);
-                  return (
-                    <div className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center ${tone.tile} ${tone.icon}`}>
-                      <DrinkIcon shape={shape} size={24} />
-                    </div>
-                  );
-                })()}
+                <MenuThumb
+                  name={first?.products?.name}
+                  category={first?.products?.category}
+                  src={first?.products?.image_url}
+                  className="w-11 h-11 rounded-xl"
+                  iconSize={24}
+                />
 
                 <div className="flex-1 min-w-0">
                   <div className={`text-sm font-extrabold truncate transition-colors duration-300 ${textPrimary}`}>

@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { motion } from 'framer-motion';
 import { showToast } from '../components/ui/Toast';
-import sbacLogo from '../assets/sbac_logo.png';
+import sbacLogo from '../assets/sbac_logo_mark.png';
 import { 
   LogIn, 
   Sun, 
@@ -153,11 +153,21 @@ export default function LoginPage() {
     secTitle: lang === 'TH' ? 'ระบบเชื่อมต่อปลอดภัย' : 'Secured Connection',
     secDesc: lang === 'TH' ? 'ข้อมูลถูกเข้ารหัสเพื่อความปลอดภัย' : 'Your data is encrypted for security',
     helpTitle: lang === 'TH' ? 'เข้าสู่ระบบไม่ได้ใช่ไหม' : 'Trouble signing in?',
-    /* ห้ามใส่เวลาทำการหรือเบอร์ติดต่อลงในข้อความนี้ถ้ายังไม่ได้ยืนยันกับฝ่ายทะเบียน
+    /* ข้อความเดียวใช้กับทุกบทบาท — ฝ่ายทะเบียนเป็นจุดรับเรื่องจุดเดียวของทั้งวิทยาลัย
+       (ตามที่ผู้ดูแลระบบกำหนด) ไม่ว่าคนกดจะเป็นนักเรียน ครู ฝ่ายวิชาการ หรือร้านค้า
+
+       ห้ามเขียนเป็นขั้นตอนของนักเรียนโดยเฉพาะอีก — ของเดิมสั่งให้ "นำบัตรประจำตัวนักเรียน"
+       มาด้วย ครู/ฝ่ายวิชาการที่กดปุ่มนี้จึงถูกสั่งให้หยิบบัตรที่ตัวเองไม่มี
+       ข้อความนี้จึงพูดถึงแค่ "ไปที่ไหน" ซึ่งเป็นข้อมูลที่ใช้ได้กับทุกคนเหมือนกัน
+
+       หน้านี้ใช้ร่วมกันทุกบทบาท และ ณ จังหวะที่กดปุ่มนี้ยังไม่มีทางรู้ว่าคนกดเป็นใคร
+       — ยังไม่ได้ล็อกอิน หรือล็อกอินไม่ผ่าน จึงไม่มี role ให้เลือกข้อความอยู่ดี
+
+       ห้ามใส่เวลาทำการหรือเบอร์ติดต่อลงในข้อความนี้ถ้ายังไม่ได้ยืนยันกับฝ่ายทะเบียน
        ข้อความบนหน้าล็อกอินคือสิ่งที่คนเชื่อแล้วเดินไปตามนั้นจริง */
     helpBody: lang === 'TH'
-      ? 'กรุณานำบัตรประจำตัวนักเรียนหรือบัตรประชาชน ติดต่อฝ่ายทะเบียน อาคาร 1 ชั้น 1 เพื่อขอรหัสผ่านใหม่'
-      : 'Bring your student ID or national ID card to the Registrar Office, Building 1, 1st Floor, to request a new password.',
+      ? 'กรุณาติดต่อที่ฝ่ายทะเบียน ที่อาคาร 1 ชั้น 1 เพื่อขอรหัสผ่านใหม่'
+      : 'Please contact the Registrar Office, Building 1, 1st Floor, to request a new password.',
     helpClose: lang === 'TH' ? 'ปิดข้อความนี้' : 'Dismiss',
   };
 

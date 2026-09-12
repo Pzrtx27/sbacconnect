@@ -4,7 +4,13 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '../../config/supabase';
 import { showToast } from '../ui/Toast';
-import { PROMPTPAY_ID, PROMPTPAY_ACCOUNT_NAME, isPromptPayConfigured } from '../../config/promptpay';
+import {
+  PROMPTPAY_ID,
+  PROMPTPAY_ACCOUNT_NAME,
+  PROMPTPAY_ID_DIGITS,
+  isPromptPayConfigured,
+  isPromptPayIdValid,
+} from '../../config/promptpay';
 import { buildPromptPayPayload } from '../../utils/promptpay';
 import { validateSlipFile, anonymousFileName, slipErrorText, sha256File, MAX_SLIP_BYTES } from '../../utils/slipFile';
 import { TOPUP_STATUS_TEXT, TOPUP_STATUS_COLOR, topupErrorText, instantTopupErrorText } from '../../utils/topup';
@@ -288,12 +294,28 @@ export default function TopUpSlipForm() {
             )}
           </>
         ) : (
+          /* สองกรณีนี้ต้องแยกข้อความกัน ไม่งั้นชี้ผิดที่:
+             กรอกไว้แล้วแต่เลขไม่ครบ กับยังไม่ได้กรอกเลย แก้คนละแบบ */
           <div className="flex flex-col items-center gap-2 py-2">
             <AlertTriangle className="text-accent-amber" size={28} aria-hidden="true" />
-            <p className={`text-xs font-bold ${textPrimary}`}>ยังไม่ได้ตั้งค่าบัญชีพร้อมเพย์</p>
-            <p className={`text-[12px] leading-relaxed ${textMuted}`}>
-              ผู้ดูแลระบบต้องตั้งค่า VITE_PROMPTPAY_ID ใน .env ก่อน (ดู .env.example)
-            </p>
+            {isPromptPayConfigured && !isPromptPayIdValid ? (
+              <>
+                <p className={`text-xs font-bold ${textPrimary}`}>เลขพร้อมเพย์ที่ตั้งไว้ไม่ถูกรูปแบบ</p>
+                <p className={`text-[12px] leading-relaxed ${textMuted}`}>
+                  ตอนนี้ VITE_PROMPTPAY_ID มี {PROMPTPAY_ID_DIGITS} หลัก — ต้องเป็น
+                  เบอร์มือถือ 10 หลัก (ขึ้นต้นด้วย 0) หรือเลขบัตรประชาชน 13 หลัก
+                  <br />
+                  แก้ใน .env แล้วรีสตาร์ทเซิร์ฟเวอร์ (ค่า .env อ่านตอนเริ่มโปรเซสเท่านั้น)
+                </p>
+              </>
+            ) : (
+              <>
+                <p className={`text-xs font-bold ${textPrimary}`}>ยังไม่ได้ตั้งค่าบัญชีพร้อมเพย์</p>
+                <p className={`text-[12px] leading-relaxed ${textMuted}`}>
+                  ผู้ดูแลระบบต้องตั้งค่า VITE_PROMPTPAY_ID ใน .env ก่อน (ดู .env.example)
+                </p>
+              </>
+            )}
           </div>
         )}
       </div>

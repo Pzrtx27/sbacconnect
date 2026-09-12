@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เตรียมรูปเมนู — SBAC Coffee</title>
+<!--
+  เครื่องมือเตรียมรูปเมนู (ใช้ตอนพัฒนาเท่านั้น)
+
+  อยู่นอกโฟลเดอร์ public/ จึงไม่ถูกรวมไปกับ production build
+  เปิดผ่าน http://localhost:5173/tools/menu-photo-prep.html ตอน npm run dev
+
+  ทำไมต้องมี:
+    รูปจากมือถือเป็นแนวตั้ง ขนาด 3000px กว่า ๆ ไฟล์ 3-6MB
+    แต่ช่องรูปในแอปเป็นสี่เหลี่ยมจัตุรัสกว้าง 64px
+    ถ้าโยนไฟล์ดิบลงไปตรง ๆ จะเกิดสองปัญหา:
+      1. หน้าเมนูโหลดช้ามากบนเน็ตมือถือ (10 รูป = 40MB)
+      2. object-cover ครอปจากกึ่งกลางภาพเสมอ ซึ่งมักตัดหัวแก้วหรือตัดโลโก้ทิ้ง
+
+    ตัวนี้ให้เลื่อนเลือกเองว่าจะเอาส่วนไหนของรูปไว้กลางกรอบ แล้วย่อเป็น 600x600
+    (พอสำหรับจอความละเอียด 3x ของช่อง 64px และเผื่อไว้ถ้าอยากโชว์รูปใหญ่ขึ้นทีหลัง)
+
+  ทำงานในเบราว์เซอร์ล้วน ๆ รูปไม่ถูกส่งออกไปไหนทั้งนั้น และไม่ต้องลงโปรแกรมเพิ่ม
+-->
+<style>
+:root{
+  --bg:#0b0f19; --card:rgba(255,255,255,.06); --line:rgba(255,255,255,.12);
+  --text:#f1f5f9; --text2:#cbd5e1; --muted:#a8b3c4; --amber:#fbbf24;
+  --blue:#1a3cc8; --red:#c8102e; --ok:#34d399; --bad:#fb7185;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 "Segoe UI",system-ui,-apple-system,sans-serif;padding:22px}
+h1{font-size:20px;margin:0;font-weight:800}
+h2{font-size:15px;margin:0 0 10px;font-weight:800;color:var(--amber)}
+.sub{font-size:12.5px;color:var(--muted);margin-top:3px}
+header{display:flex;align-items:center;gap:13px;border-bottom:1px solid var(--line);
+  padding-bottom:15px;margin-bottom:18px}
+.mark{width:42px;height:42px;border-radius:12px;flex:0 0 auto;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--blue),var(--red));font-weight:900;font-size:13px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:16px}
+ol,ul{margin:0;padding-left:20px}
+li{margin-bottom:6px;font-size:13.5px;color:var(--text2)}
+code{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--amber)}
+.drop{border:2px dashed var(--line);border-radius:18px;padding:32px;text-align:center;
+  cursor:pointer;transition:.15s;background:rgba(255,255,255,.02)}
+.drop:hover,.drop.over{border-color:var(--amber);background:rgba(251,191,36,.07)}
+.drop b{display:block;font-size:15px;margin-bottom:4px}
+.drop span{font-size:12.5px;color:var(--muted)}
+.items{display:grid;gap:14px}
+.item{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px;
+  display:grid;grid-template-columns:260px 1fr;gap:18px}
+@media(max-width:760px){.item{grid-template-columns:1fr}}
+.stage{position:relative;width:260px;height:260px;border-radius:14px;overflow:hidden;
+  background:#000;cursor:grab;touch-action:none;justify-self:center}
+.stage.drag{cursor:grabbing}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%}
+.guide{position:absolute;inset:0;pointer-events:none;
+  background:
+    linear-gradient(rgba(255,255,255,.16) 1px,transparent 1px) 0 33.33%/100% 33.33%,
+    linear-gradient(90deg,rgba(255,255,255,.16) 1px,transparent 1px) 33.33% 0/33.33% 100%;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+.ctl{display:grid;gap:11px;align-content:start}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+label{font-size:12px;font-weight:700;color:var(--muted);min-width:66px}
+select,input[type=range]{accent-color:var(--amber)}
+select{background:#151c2b;color:var(--text);border:1px solid var(--line);
+  border-radius:10px;padding:8px 11px;font:inherit;font-size:13.5px;flex:1;min-width:180px}
+input[type=range]{flex:1;min-width:130px}
+.previews{display:flex;align-items:flex-end;gap:14px;padding:11px;border-radius:12px;
+  background:rgba(0,0,0,.3)}
+.pv{text-align:center}
+.pv canvas{display:block;border-radius:20%;background:#222}
+.pv em{font-style:normal;font-size:10.5px;color:var(--muted);display:block;margin-top:4px}
+.fname{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--ok)}
+.note{font-size:12px;color:var(--muted)}
+button{background:var(--amber);color:#1a1205;border:0;border-radius:11px;
+  padding:11px 18px;font:inherit;font-weight:800;cursor:pointer;transition:.15s}
+button:hover{filter:brightness(1.08)}
+button.ghost{background:transparent;color:var(--text2);border:1px solid var(--line)}
+button.sm{padding:7px 13px;font-size:12.5px}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.status{font-size:13px;color:var(--muted);min-height:20px;margin-top:9px}
+.status.good{color:var(--ok)}
+.status.bad{color:var(--bad)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="mark">SBAC</div>
+  <div>
+    <h1>เตรียมรูปเมนู</h1>
+    <div class="sub">ครอปเป็นสี่เหลี่ยมจัตุรัส ย่อเหลือ 600×600 แล้วเซฟลง public/menu/ — ทำงานในเครื่องคุณ รูปไม่ถูกส่งขึ้นเน็ต</div>
+  </div>
+</header>
+
+<div class="panel">
+  <h2>ถ่ายยังไงให้ทั้งชุดดูเป็นเมนูเดียวกัน</h2>
+  <ol>
+    <li><b>พื้นหลังเดียวกันทุกแก้ว</b> — เลือกมุมเดียวในร้านแล้วถ่ายรวดเดียวจบทุกเมนู พื้นหลังที่เปลี่ยนไปมาคือสาเหตุหลักที่ทำให้กริดเมนูดูกระจัดกระจาย</li>
+    <li><b>แสงธรรมชาติ ห้ามเปิดแฟลช</b> — วางแก้วใกล้หน้าต่างให้แสงเข้าด้านข้าง แฟลชจะทำให้แก้วใสสะท้อนเป็นจุดขาวและเกิดเงาแข็งด้านหลัง</li>
+    <li><b>กล้องอยู่ระดับเดียวกับแก้ว</b> — ย่อตัวลงให้เลนส์อยู่กลางแก้ว ถ้าถ่ายมุมก้มจากด้านบน โลโก้บนแก้วจะบิดและอ่านไม่ออก</li>
+    <li><b>เว้นขอบรอบแก้วไว้เยอะ ๆ</b> — อย่าถ่ายชิดจนเต็มเฟรม เพราะต้องครอปเป็นสี่เหลี่ยมจัตุรัสทีหลัง ถ่ายชิดไปจะไม่เหลือที่ให้ขยับ</li>
+    <li><b>หมุนโลโก้เข้ากล้องให้ตรง</b> — จุดขายของชุดนี้คือโลโก้ร้านบนแก้ว ให้โลโก้อยู่กลางแก้วและอ่านออก</li>
+    <li><b>ของว่างวางในจานสีเรียบ</b> — ขนมปังปิ้ง/คุกกี้ ใช้จานขาวหรือครีม บนพื้นหลังเดียวกับที่ถ่ายแก้ว</li>
+  </ol>
+</div>
+
+<div class="panel">
+  <h2>1. ใส่รูป</h2>
+  <div class="drop" id="drop">
+    <b>ลากรูปมาวางตรงนี้ หรือคลิกเพื่อเลือกไฟล์</b>
+    <span>ใส่ทีเดียวหลายรูปได้ · รองรับไฟล์ภาพที่เบราว์เซอร์เปิดได้ (JPG / PNG / WEBP)</span>
+  </div>
+  <input type="file" id="file" accept="image/*" multiple hidden>
+</div>
+
+<div class="items" id="items"></div>
+
+<div class="panel" id="savePanel" style="display:none">
+  <h2>2. เซฟลงโปรเจกต์</h2>
+  <ul>
+    <li><b>เซฟลงโฟลเดอร์โดยตรง</b> — กดแล้วเลือกโฟลเดอร์ <code>public/menu</code> ในโปรเจกต์ ไฟล์จะถูกเขียนให้เลย ไม่ต้องย้ายเอง (Edge / Chrome)</li>
+    <li><b>ดาวน์โหลดแทน</b> — ถ้าเบราว์เซอร์ไม่รองรับ ไฟล์จะลงโฟลเดอร์ Downloads แล้วค่อยย้ายไปที่ <code>public/menu</code> เอง</li>
+  </ul>
+  <div class="bar">
+    <button id="saveDir">เซฟลงโฟลเดอร์ public/menu</button>
+    <button id="saveDl" class="ghost">ดาวน์โหลดแทน</button>
+  </div>
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+/* ช่องเมนูที่แอปรู้จัก — คีย์ต้องตรงกับ src/utils/menuPhotos.js
+   เพิ่มช่องใหม่ที่นี่แล้วต้องไปเพิ่มใน menuPhotos.js ด้วย ไม่งั้นแอปจะไม่หยิบไปใช้ */
+const SLOTS = [
+  ['espresso', 'อเมริกาโน่ · เอสเปรสโซ · กาแฟดำ'],
+  ['latte',    'ลาเต้ · คาปูชิโน · นมสด'],
+  ['cup',      'เมนูกาแฟอื่น ๆ (ค่าเริ่มต้น)'],
+  ['cocoa',    'โกโก้ · มิโล · ช็อกโกแลต · มอคค่า'],
+  ['matcha',   'ชาเขียว · มัทฉะ'],
+  ['tea',      'ชาร้อนทั่วไป'],
+  ['bubble',   'ชานม · ชาไทย · ชาเย็น · ไข่มุก'],
+  ['soda',     'น้ำอัดลม · โซดา'],
+  ['bread',    'ขนมปังปิ้ง · โทสต์ · ครัวซองต์'],
+  ['cookie',   'คุกกี้ · เค้ก · บราวนี่ · วาฟเฟิล'],
+];
+
+const OUT = 600;        // ด้านของไฟล์ที่ส่งออก
+const QUALITY = 0.86;   // คุณภาพ JPEG — จุดที่ยังไม่เห็นรอยบีบอัดบนไล่สีของนม
+const items = [];
+const $ = (s) => document.querySelector(s);
+
+/* ---------- รับไฟล์ ---------- */
+const drop = $('#drop');
+const fileInput = $('#file');
+drop.onclick = () => fileInput.click();
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = (e) => {
+  e.preventDefault();
+  drop.classList.remove('over');
+  addFiles([...e.dataTransfer.files].filter((f) => f.type.startsWith('image/')));
+};
+fileInput.onchange = () => { addFiles([...fileInput.files]); fileInput.value = ''; };
+
+async function addFiles(files) {
+  for (const f of files) {
+    try {
+      makeItem(await loadImage(f), f.name);
+    } catch {
+      setStatus('เปิดไฟล์ไม่ได้: ' + f.name + ' (ถ้าเป็น HEIC จากไอโฟน ให้แปลงเป็น JPG ก่อน)', 'bad');
+    }
+  }
+  $('#savePanel').style.display = items.length ? '' : 'none';
+}
+
+function loadImage(file) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = rej;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+/* ---------- หนึ่งรูป = หนึ่งการ์ด ---------- */
+function makeItem(img, filename) {
+  const used = new Set(items.map((i) => i.slot));
+  const firstFree = SLOTS.find(([k]) => !used.has(k)) || SLOTS[0];
+
+  const el = document.createElement('div');
+  el.className = 'item';
+  el.innerHTML =
+    '<div class="stage"><canvas width="260" height="260"></canvas><div class="guide"></div></div>' +
+    '<div class="ctl">' +
+      '<div class="row"><label>ใช้กับเมนู</label><select>' +
+        SLOTS.map((s) => '<option value="' + s[0] + '">' + s[1] + '</option>').join('') +
+      '</select></div>' +
+      '<div class="row"><label>ซูม</label><input type="range" min="100" max="320" value="100"></div>' +
+      '<div class="previews">' +
+        '<div class="pv"><canvas width="64" height="64"></canvas><em>การ์ดเมนู 64px</em></div>' +
+        '<div class="pv"><canvas width="44" height="44"></canvas><em>แถวรายการ 44px</em></div>' +
+        '<div class="pv"><canvas width="36" height="36"></canvas><em>คิวบาริสต้า 36px</em></div>' +
+      '</div>' +
+      '<div class="row"><span class="fname"></span>' +
+        '<button class="ghost sm remove" type="button">เอาออก</button></div>' +
+      '<div class="row"><span class="note src"></span></div>' +
+    '</div>';
+  $('#items').appendChild(el);
+
+  const it = {
+    img: img,
+    filename: filename,
+    slot: firstFree[0],
+    el: el,
+    zoom: 1,
+    ox: 0.5,   /* ox/oy = จุดที่จะให้อยู่กลางกรอบ คิดเป็นสัดส่วนของภาพต้นฉบับ */
+    oy: 0.5,
+    stage: el.querySelector('.stage'),
+    canvas: el.querySelector('.stage canvas'),
+    select: el.querySelector('select'),
+    range: el.querySelector('input[type=range]'),
+    previews: [].slice.call(el.querySelectorAll('.pv canvas')),
+  };
+  it.select.value = it.slot;
+  items.push(it);
+
+  it.select.onchange = () => { it.slot = it.select.value; items.forEach(refresh); };
+  it.range.oninput = () => { it.zoom = it.range.value / 100; clamp(it); refresh(it); };
+  el.querySelector('.remove').onclick = () => {
+    items.splice(items.indexOf(it), 1);
+    el.remove();
+    items.forEach(refresh);
+    $('#savePanel').style.display = items.length ? '' : 'none';
+  };
+
+  /* ลากเพื่อเลื่อนจุดที่จะให้อยู่กลางกรอบ */
+  let dragging = false, lastX = 0, lastY = 0;
+  it.stage.onpointerdown = (e) => {
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+    it.stage.setPointerCapture(e.pointerId);
+    it.stage.classList.add('drag');
+  };
+  it.stage.onpointermove = (e) => {
+    if (!dragging) return;
+    const side = Math.min(it.img.width, it.img.height) / it.zoom;
+    it.ox -= (e.clientX - lastX) / 260 * side / it.img.width;
+    it.oy -= (e.clientY - lastY) / 260 * side / it.img.height;
+    lastX = e.clientX; lastY = e.clientY;
+    clamp(it); draw(it);
+  };
+  it.stage.onpointerup = it.stage.onpointercancel = (e) => {
+    dragging = false;
+    it.stage.classList.remove('drag');
+    try { it.stage.releasePointerCapture(e.pointerId); } catch (err) { /* ไม่เป็นไร */ }
+  };
+
+  items.forEach(refresh);
+}
+
+/* กันไม่ให้ลากจนกรอบเลยขอบภาพ ซึ่งจะทำให้มีแถบดำติดไปในไฟล์ที่ส่งออก */
+function clamp(it) {
+  const side = Math.min(it.img.width, it.img.height) / it.zoom;
+  const hx = side / 2 / it.img.width;
+  const hy = side / 2 / it.img.height;
+  it.ox = Math.min(1 - hx, Math.max(hx, it.ox));
+  it.oy = Math.min(1 - hy, Math.max(hy, it.oy));
+}
+
+/* สี่เหลี่ยมจัตุรัสบนภาพต้นฉบับที่จะถูกครอปออกมา */
+function cropRect(it) {
+  const side = Math.min(it.img.width, it.img.height) / it.zoom;
+  return {
+    sx: it.ox * it.img.width - side / 2,
+    sy: it.oy * it.img.height - side / 2,
+    side: side,
+  };
+}
+
+function draw(it) {
+  const r = cropRect(it);
+  const targets = [it.canvas].concat(it.previews);
+  for (const c of targets) {
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.drawImage(it.img, r.sx, r.sy, r.side, r.side, 0, 0, c.width, c.height);
+  }
+}
+
+function refresh(it) {
+  const clash = items.some((o) => o !== it && o.slot === it.slot);
+  const fname = it.el.querySelector('.fname');
+  fname.textContent = it.slot + '.jpg' + (clash ? '   ← ช่องนี้ซ้ำกับรูปอื่น' : '');
+  fname.style.color = clash ? 'var(--bad)' : '';
+
+  const tooSmall = Math.min(it.img.width, it.img.height) < OUT;
+  const src = it.el.querySelector('.src');
+  src.textContent =
+    'ต้นฉบับ ' + it.img.width + '×' + it.img.height + ' · ' + it.filename +
+    (tooSmall ? ' — ด้านสั้นเล็กกว่า ' + OUT + 'px ภาพจะเบลอ ควรถ่ายใหม่' : '') +
+    (it.zoom > 1 ? ' · ซูม ' + Math.round(it.zoom * 100) + '%' : '');
+  src.style.color = tooSmall ? 'var(--amber)' : 'var(--muted)';
+
+  draw(it);
+}
+
+/* ---------- ส่งออก ---------- */
+function render(it) {
+  const c = document.createElement('canvas');
+  c.width = OUT;
+  c.height = OUT;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#ffffff';           // กันพื้นโปร่งใสของ PNG กลายเป็นดำตอนแปลงเป็น JPEG
+  ctx.fillRect(0, 0, OUT, OUT);
+  const r = cropRect(it);
+  ctx.drawImage(it.img, r.sx, r.sy, r.side, r.side, 0, 0, OUT, OUT);
+  return new Promise((res) => c.toBlob(res, 'image/jpeg', QUALITY));
+}
+
+function setStatus(msg, cls) {
+  const s = $('#status');
+  s.textContent = msg;
+  s.className = 'status ' + (cls || '');
+}
+
+function duplicateSlots() {
+  const seen = new Set(), dup = new Set();
+  for (const it of items) {
+    if (seen.has(it.slot)) dup.add(it.slot);
+    seen.add(it.slot);
+  }
+  return [...dup];
+}
+
+$('#saveDir').onclick = async () => {
+  const dup = duplicateSlots();
+  if (dup.length) return setStatus('มีช่องเมนูที่เลือกซ้ำกัน: ' + dup.join(', ') + ' — หนึ่งช่องใส่ได้รูปเดียว', 'bad');
+  if (!window.showDirectoryPicker) return setStatus('เบราว์เซอร์นี้เซฟลงโฟลเดอร์ไม่ได้ ใช้ปุ่ม "ดาวน์โหลดแทน" ครับ', 'bad');
+  try {
+    const dir = await window.showDirectoryPicker({ mode: 'readwrite' });
+    let n = 0;
+    for (const it of items) {
+      const blob = await render(it);
+      const fh = await dir.getFileHandle(it.slot + '.jpg', { create: true });
+      const w = await fh.createWritable();
+      await w.write(blob);
+      await w.close();
+      n++;
+    }
+    setStatus('เซฟแล้ว ' + n + ' ไฟล์ — เปิดหน้าเมนูในแอปได้เลย ไม่ต้องแก้โค้ดอะไรทั้งนั้น (ถ้ารูปยังเป็นอันเก่า กด Ctrl+Shift+R เพื่อล้าง cache)', 'good');
+  } catch (e) {
+    if (e.name !== 'AbortError') setStatus('เซฟไม่สำเร็จ: ' + e.message, 'bad');
+  }
+};
+
+$('#saveDl').onclick = async () => {
+  const dup = duplicateSlots();
+  if (dup.length) return setStatus('มีช่องเมนูที่เลือกซ้ำกัน: ' + dup.join(', ') + ' — หนึ่งช่องใส่ได้รูปเดียว', 'bad');
+  for (const it of items) {
+    const blob = await render(it);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = it.slot + '.jpg';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    await new Promise((r) => setTimeout(r, 220));  // เว้นจังหวะ ไม่งั้นเบราว์เซอร์บล็อกดาวน์โหลดรัว ๆ
+  }
+  setStatus('ดาวน์โหลด ' + items.length + ' ไฟล์แล้ว — ย้ายไปไว้ใน public/menu/ ได้เลย', 'good');
+};
+</script>
+</body>
+</html>

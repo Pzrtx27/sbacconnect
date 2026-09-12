@@ -11,6 +11,8 @@ import OrderHistoryPage from './pages/student/OrderHistoryPage';
 import TeacherHome from './pages/teacher/TeacherHome';
 import AcademicDashboard from './pages/academic/AcademicDashboard';
 import BaristaDashboard from './pages/barista/BaristaDashboard';
+import FinanceDashboard from './pages/finance/FinanceDashboard';
+import DevelopmentDashboard from './pages/development/DevelopmentDashboard';
 import BottomNav from './components/layout/BottomNav';
 import SideNav from './components/layout/SideNav';
 import Header from './components/layout/Header';
@@ -33,7 +35,23 @@ const HOME_BY_ROLE = {
 };
 
 const normalizeRole = (user) => (user?.role || 'student').toLowerCase().trim();
-const homeFor = (user) => HOME_BY_ROLE[normalizeRole(user)] || '/home';
+
+/** หน้าแรกหลังล็อกอิน
+ *
+ *  เคสพิเศษ: บัญชีที่มี role 'cashier' แต่ไม่มี 'pos' คือเจ้าหน้าที่การเงิน ไม่ใช่คนชงกาแฟ
+ *  AuthContext ยุบทั้ง cashier และ pos เป็น role เดียวชื่อ 'barista' (ดูคอมเมนต์ใน
+ *  loadProfile) ซึ่งตอนนั้นถูกแล้วเพราะยังไม่มีหน้าการเงินให้ไป — พอมี /finance แล้ว
+ *  การส่งเจ้าหน้าที่การเงินไปลงคิวร้านกาแฟทุกครั้งที่ล็อกอินกลายเป็นเรื่องแปลก
+ *
+ *  คนที่ถือทั้งสอง role (บัญชีเคาน์เตอร์ของที่นี่) ยังลงที่คิวกาแฟเหมือนเดิม
+ *  เพราะนั่นคืองานหลักที่เปิดแอปมาทำ แล้วค่อยกดปุ่มไปหน้าการเงินเมื่อต้องใช้ */
+const homeFor = (user) => {
+  const roles = Array.isArray(user?.roles) ? user.roles : [];
+  if (roles.includes('cashier') && !roles.includes('pos') && !roles.includes('sysadmin')) {
+    return '/finance';
+  }
+  return HOME_BY_ROLE[normalizeRole(user)] || '/home';
+};
 
 /** พื้นหลังเต็มจอที่ใช้ร่วมกัน (โทนเดียวกับ .dark body ใน index.css) */
 function FullScreen({ children }) {
@@ -127,6 +145,36 @@ function ProtectedRoute({ children, allowedRoles }) {
   return children;
 }
 
+/** หน้า /finance — ใช้ "ทุก role ที่มี" ไม่ใช่ role เดียวที่ถูกเลือกมาเป็นหน้าหลัก
+ *
+ *  ProtectedRoute ปกติเทียบกับ user.role ซึ่ง AuthContext เลือกมาอันเดียวตามลำดับสิทธิ์
+ *  คนที่เป็นทั้ง academic และ cashier จะได้ role = 'academic' แล้วถูกกันออกจากหน้านี้
+ *  ทั้งที่ฝั่ง DB (app_is_finance_staff ใน 18_topup_requests.sql) ดูจาก user_roles
+ *  ซึ่งมี cashier อยู่จริง = มีสิทธิ์เต็มทุกปุ่มในหน้านี้ แต่เข้าหน้าไม่ได้
+ *
+ *  ตรงนี้จึงเทียบกับ user.roles (ทั้งอาร์เรย์) ให้ตรงกับกติกาเดียวกับฝั่ง DB เป๊ะ ๆ
+ *  เป็นแค่การซ่อนทางเข้าเท่านั้น ด่านจริงยังเป็น app_can_manage_fees() ใน RPC */
+function FinanceRoute({ children }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <FullScreen>
+        <LoadingSpinner size="lg" text="กำลังตรวจสอบสิทธิ์..." />
+      </FullScreen>
+    );
+  }
+
+  if (!user) return <Navigate to="/login" replace />;
+
+  const roles = Array.isArray(user.roles) ? user.roles : [];
+  if (!roles.includes('cashier') && !roles.includes('sysadmin')) {
+    return <Navigate to={homeFor(user)} replace />;
+  }
+
+  return children;
+}
+
 /** หน้า /login — ถ้าล็อกอินอยู่แล้วให้เด้งเข้าหน้าหลักทันที
  *  ทำให้การเข้าสู่ระบบทำงานถูกต้องแม้ navigate() ใน LoginPage จะพลาด */
 function LoginRoute() {
@@ -167,7 +215,19 @@ function MainLayout() {
         <div className="relative z-10 min-h-screen flex flex-col">
           <Routes>
             <Route path="/barista" element={<PageWrapper><BaristaDashboard /></PageWrapper>} />
-            <Route path="*" element={<Navigate to="/barista" replace />} />
+            {/* บัญชีบาริสต้าของโรงเรียนนี้ถือ role cashier ด้วย (ดู 08_seed_staff)
+                จึงต้องมีทางเข้าหน้าการเงินจากในเปลือกเต็มจอนี้ ไม่ใช่มีแต่ในเปลือกหลัก */}
+            <Route
+              path="/finance"
+              element={
+                <FinanceRoute>
+                  <PageWrapper><div className="container mx-auto px-4 py-6 max-w-3xl"><FinanceDashboard /></div></PageWrapper>
+                </FinanceRoute>
+              }
+            />
+            {/* ไม่ส่งกลับ /barista ตายตัว — เจ้าหน้าที่การเงิน (cashier ล้วน) ต้องลงที่ /finance
+                ไม่งั้นพิมพ์ url อะไรมาก็ถูกลากกลับคิวกาแฟหมด รวมถึงตอนเข้า '/' ครั้งแรก */}
+            <Route path="*" element={<Navigate to={homeFor(user)} replace />} />
           </Routes>
         </div>
         <AssistantFAB />
@@ -262,6 +322,28 @@ function MainLayout() {
                 <ProtectedRoute allowedRoles={['academic', 'sysadmin']}>
                   <PageWrapper><AcademicDashboard /></PageWrapper>
                 </ProtectedRoute>
+              }
+            />
+
+            {/* ฝ่ายพัฒนา (กิจการนักเรียน) — งานความประพฤตินักเรียน
+                สิทธิ์เท่าหน้าฝ่ายวิชาการ เพราะ RPC ชุดเดียวกันกันด้วย app_is_academic_staff() */}
+            <Route
+              path="/development"
+              element={
+                <ProtectedRoute allowedRoles={['academic', 'sysadmin']}>
+                  <PageWrapper><DevelopmentDashboard /></PageWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ค่าเทอม/ค่าธรรมเนียม — สิทธิ์ดูจาก user.roles ไม่ใช่ role เดียวที่เลือกมา
+                (ดูเหตุผลที่ FinanceRoute) */}
+            <Route
+              path="/finance"
+              element={
+                <FinanceRoute>
+                  <PageWrapper><FinanceDashboard /></PageWrapper>
+                </FinanceRoute>
               }
             />
 

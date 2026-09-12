@@ -23,6 +23,7 @@ import {
   Eye,
   EyeOff,
   Award,
+  BookOpen,
   ListChecks,
   ClipboardCheck,
   CalendarDays,
@@ -33,6 +34,7 @@ import { sha256, encryptAES } from '../../utils/crypto';
 import EventManager from './EventManager';
 import BehaviorDeductionWizard from './BehaviorDeductionWizard';
 import HomeroomAssignmentPanel from './HomeroomAssignmentPanel';
+import TeacherGradebookPanel from '../../components/score/TeacherGradebookPanel';
 import TabNav from '../../components/layout/TabNav';
 import {
   DAY_LABELS,
@@ -410,6 +412,7 @@ export default function AcademicDashboard() {
   const TABS = [
     { id: 'inbox', label: 'รอดำเนินการ', icon: ClipboardCheck, badge: pendingAcademicLeaves.length },
     { id: 'timetable', label: 'ตารางสอน', icon: Calendar },
+    { id: 'scores', label: 'คะแนน', icon: BookOpen },
     { id: 'students', label: 'นักเรียน', icon: Users },
     { id: 'events', label: 'กิจกรรม', icon: CalendarDays },
     { id: 'import', label: 'นำเข้าข้อมูล', icon: FileSpreadsheet },
@@ -498,6 +501,8 @@ export default function AcademicDashboard() {
           ถ้าค้างอยู่บนหัวตลอดจะอ่านเหมือนว่าทั้งหน้าถูกกรองด้วยห้องนี้
           ทั้งที่แท็บนักเรียน/กิจกรรม/นำเข้าข้อมูลไม่ได้กรองอะไรเลย */}
       <PageHeader icon={Settings} title="ฝ่ายวิชาการ">
+        {/* ทางเข้าหน้าการเงินย้ายไปอยู่หน้าฝ่ายพัฒนาแล้ว (/development)
+            หน้านี้เป็นงานวิชาการล้วน ไม่ควรมีปุ่มของอีกฝ่ายมาปน */}
         {activeTab === 'timetable' && (
           <span className={`text-xs font-bold px-3 py-1 rounded-lg transition-colors duration-300 ${isDark ? 'bg-white/10 text-content-secondary' : 'bg-slate-100 text-ink-secondary'
             }`}>
@@ -903,6 +908,37 @@ export default function AcademicDashboard() {
             )}
           </div>
         </div>
+        </div>
+      )}
+
+      {activeTab === 'scores' && (
+        <div
+          role="tabpanel"
+          id="panel-scores"
+          aria-labelledby="tab-scores"
+          tabIndex={-1}
+          className="space-y-4"
+        >
+          {/* ============================================================
+              สมุดคะแนนระหว่างภาค T1-T5 (40_gradebook.sql)
+              ฝ่ายวิชาการแก้ได้ทุกวิชาทุกห้อง (app_can_grade_subject คืน true ให้ role นี้เสมอ)
+              ครูประจำวิชาใช้ตัวเดียวกันนี้ผ่านโมดัลในหน้า /teacher
+              ============================================================ */}
+          <section aria-labelledby="head-scores" className="space-y-3">
+            <h3
+              id="head-scores"
+              className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'}`}
+            >
+              <BookOpen size={18} className="text-accent-emerald" aria-hidden="true" />
+              คะแนนระหว่างภาค (T1-T5)
+            </h3>
+            <p className={`text-[11px] leading-relaxed ${isDark ? 'text-content-secondary' : 'text-ink-muted'}`}>
+              เลือกรายวิชาเพื่อกรอกคะแนนรายคน กรอกทั้งห้องทีเดียว หรือแก้โครงสร้างหัวข้อ T1-T5
+              — ทุกการเปลี่ยนแปลงจะแจ้งเตือนนักเรียนทันทีและถูกบันทึกไว้ในปูมคะแนน
+            </p>
+
+            <TeacherGradebookPanel />
+          </section>
         </div>
       )}
 

@@ -13,8 +13,9 @@ import CoffeeCup from '../../components/ui/icons/CoffeeCup';
 import PageHeader from '../../components/layout/PageHeader';
 import { formatBaht } from '../../utils/identity';
 import DrinkIcon from '../../components/ui/DrinkIcon';
+import MenuThumb from '../../components/ui/MenuThumb';
 import {
-  drinkShapeFor, drinkTone, categoryLabel,
+  drinkTone, categoryLabel,
   newIdempotencyKey, placeOrderErrorText, optionSummary,
 } from '../../utils/orders';
 import { requestNotifyPermission } from '../../utils/notify';
@@ -430,38 +431,29 @@ export default function CoffeePage() {
 
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
               {items.map((item) => {
-                const shape = drinkShapeFor(item.name, item.category);
-                const tone = drinkTone(shape);
                 /* ป้ายบอกว่าเมนูนี้ปรับอะไรได้บ้าง — เขียนชื่อกลุ่มตรง ๆ คั่นด้วยจุด
                    ของเดิมเป็น "เลือกประเภท / ขนาดได้" ซึ่งอ่านแล้วสะดุด เพราะเอาคำว่า
-                   "เลือก...ได้" ไปคร่อมชื่อกลุ่มที่ต่อกันด้วย / อีกที */
+                   "เลือก...ได้" ไปคร่อมชื่อกลุ่มที่ต่อกันด้วย / อีกที
+
+                   เอาแค่สองกลุ่มแรกพอ ไม่ต่อท้ายว่าเหลืออีกกี่กลุ่ม (เดิมขึ้นว่า "+2")
+                   ตัวเลขนั้นไม่ได้ช่วยตัดสินใจอะไรตอนเลือกเมนู ตัวเลือกทั้งหมดอยู่ในหน้าสั่งอยู่แล้ว */
                 const optionNames = item.option_groups.map((g) => g.name);
                 return (
                   <GlassCard key={item.id} onClick={() => openProduct(item)}>
                     <div className="text-center py-4 space-y-2">
-                      <div
-                        className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center overflow-hidden ${
-                          item.image_url ? (isDark ? 'bg-white/10' : 'bg-slate-50') : `${tone.tile} ${tone.icon}`
-                        }`}
-                      >
-                        {item.image_url ? (
-                          <img
-                            src={item.image_url}
-                            alt=""
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <DrinkIcon shape={shape} size={32} />
-                        )}
-                      </div>
+                      <MenuThumb
+                        name={item.name}
+                        category={item.category}
+                        src={item.image_url}
+                        className="w-16 h-16 rounded-2xl mx-auto"
+                        iconSize={32}
+                      />
 
                       <h4 className={`text-sm font-extrabold ${textPrimary}`}>{item.name}</h4>
 
                       {optionNames.length > 0 && (
                         <p className={`text-[12px] ${textMuted}`}>
                           {optionNames.slice(0, 2).join(' · ')}
-                          {optionNames.length > 2 ? ` · +${optionNames.length - 2}` : ''}
                         </p>
                       )}
 

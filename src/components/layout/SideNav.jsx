@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { navItemsFor, isNavItemActive } from './navConfig';
 import { useMyOrders } from '../../contexts/OrdersContext';
-import logo from '../../assets/sbac_logo.png';
+import logo from '../../assets/sbac_logo_mark.png';
 
 /* แถบนำทางด้านซ้าย ใช้เฉพาะบนจอคอม (>=1280px)
    ต่ำกว่านั้นซ่อนไว้แล้วใช้ BottomNav แทน
@@ -43,7 +43,7 @@ export default function SideNav() {
     >
       {/* แบรนด์ */}
       <div className={`flex items-center gap-3 px-5 py-5 border-b ${isDark ? 'border-white/10' : 'border-border'}`}>
-        <img src={logo} alt="" className="w-9 h-9 rounded-xl object-contain" />
+        <img src={logo} alt="" className="w-9 h-9 object-contain shrink-0" draggable="false" />
         <div className="min-w-0">
           <div className={`text-sm font-extrabold tracking-wide ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
             SBAC CONNECT

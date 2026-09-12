@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Sun, Moon } from 'lucide-react';
+import sbacLogo from '../../assets/sbac_logo_mark.png';
 import { shellWidthClass } from '../../utils/layout';
 import NotificationBell from './NotificationBell';
 
@@ -50,15 +51,27 @@ export default function Header({ title = 'SBAC CONNECT', subtitle = 'Smart Campu
           : 'bg-surface-card/90 border-border/50 text-sbac-navy'
       }`}>
         <div className={`${shellWidthClass(user?.role)} mx-auto px-4 py-3 flex items-center justify-between`}>
-          <div>
-            <h1 className={`text-lg font-extrabold tracking-wide transition-colors duration-300 ${
-              isDark ? 'text-white' : 'text-sbac-navy'
-            }`}>{title}</h1>
-            {subtitle && (
-              <p className={`text-[11px] font-semibold transition-colors duration-300 ${
-                isDark ? 'text-content-secondary' : 'text-content-muted'
-              }`}>{subtitle}</p>
-            )}
+          {/* โลโก้จริงของวิทยาลัย ไม่ใช่รูปสามเหลี่ยมที่วาดเลียนแบบไว้ใน public/assets/sbac-logo.svg
+              ไฟล์ sbac_logo_mark.png คือโลโก้ตัวเดียวกับหน้าล็อกอิน แต่ลบพื้นขาวออกแล้ว
+              ของเดิมเป็นสี่เหลี่ยมขาวทึบ วางบนแถบธีมมืดจะเห็นเป็นกล่องขาวลอยอยู่ */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <img
+              src={sbacLogo}
+              alt=""
+              aria-hidden="true"
+              className="w-9 h-9 object-contain shrink-0 select-none"
+              draggable="false"
+            />
+            <div className="min-w-0">
+              <h1 className={`text-lg font-extrabold tracking-wide transition-colors duration-300 ${
+                isDark ? 'text-white' : 'text-sbac-navy'
+              }`}>{title}</h1>
+              {subtitle && (
+                <p className={`text-[11px] font-semibold transition-colors duration-300 ${
+                  isDark ? 'text-content-secondary' : 'text-content-muted'
+                }`}>{subtitle}</p>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-1.5">
             {/* แจ้งเตือนในระบบ — เห็นทันทีที่มีรายการใหม่ผ่าน Supabase Realtime */}

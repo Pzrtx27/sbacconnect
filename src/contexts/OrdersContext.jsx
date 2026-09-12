@@ -23,7 +23,7 @@ import { isActiveOrder } from '../utils/orders';
 
 const ORDER_SELECT =
   'id, total_satang, status, pickup_code, note, created_at, ' +
-  'order_items(qty, unit_price_satang, note, products(name, category), order_item_options(option_name, group_name))';
+  'order_items(qty, unit_price_satang, note, products(name, category, image_url), order_item_options(option_name, group_name))';
 
 /** ดึงมาเผื่อพอสำหรับใบที่ยังค้าง + ใบที่เพิ่งเสร็จ ไม่ต้องยิงสองรอบ */
 const FETCH_LIMIT = 15;

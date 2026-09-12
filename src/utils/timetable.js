@@ -1,6 +1,8 @@
 import { supabase } from '../config/supabase';
 import {
   fetchTimetableForClass,
+  fetchTimetableForTeacher,
+  resolveTeacherSheet,
   isSheetConfigured,
   TIMETABLE_TAB_GID_BY_CLASS,
   TIMETABLE_POLL_INTERVAL_MS,
@@ -35,6 +37,18 @@ import {
 export function classLabel(classId) {
   const m = String(classId || '').match(/^m(\d+)_(\d+)$/);
   return m ? `ปวช.${m[1]}/${m[2]}` : String(classId || '');
+}
+
+/** ชื่อหน้าตารางตามบทบาทของคนที่เปิดดู
+ *
+ *  นักเรียน "เรียน" ครูกับฝ่ายวิชาการ "สอน" — เป็นคนละคำในภาษาที่โรงเรียนใช้จริง
+ *  ของเดิมเขียน "ตารางสอน" ไว้ทุกที่ รวมถึงเมนูล่างกับหน้าแรกของนักเรียน
+ *  ซึ่งอ่านแล้วเหมือนตารางของครู ไม่ใช่ของตัวเอง
+ *
+ *  รวมไว้ที่เดียวเพราะคำนี้โผล่อยู่สี่ที่ (เมนู หัวข้อหน้า การ์ดหน้าแรก ปุ่มในแชทบอท)
+ *  แก้กระจายแล้วจะเหลือที่ตกหล่นแน่นอน */
+export function timetableTitle(role) {
+  return String(role || '').toLowerCase().trim() === 'student' ? 'ตารางเรียน' : 'ตารางสอน';
 }
 
 /** ลำดับวันที่ใช้แสดงผล — เรียงตามวันเรียนจริง ไม่ใช่เรียงตามตัวอักษร */
@@ -185,6 +199,29 @@ export const SEED_TIMETABLE_BY_CLASS = {
  *  ของเดิมอ่านรายชื่อห้องจากตาราง timetables ใน DB ซึ่งตอนนี้เลิกใช้แล้ว
  *  แหล่งความจริงใหม่คือ TIMETABLE_TAB_GID_BY_CLASS — เพิ่มห้องใหม่ = เพิ่ม gid ที่นั่น
  *  เรียงตามระดับชั้นแล้วเลขห้อง ไม่ใช่เรียงตามตัวอักษร (ไม่งั้น m3_10 มาก่อน m3_4) */
+/** true เมื่อครูคนนี้มีแท็บตารางส่วนตัวตั้งค่าไว้แล้ว
+ *  ลองรหัสครูก่อน แล้วค่อยอีเมล — แล้วแต่ว่าตั้ง key ไว้แบบไหนใน sheets.js */
+export function hasTeacherTimetable(user) {
+  return Boolean(resolveTeacherSheet(user?.teacher_code, user?.email));
+}
+
+/** ตารางสอนส่วนตัวของครู — คู่ขนานกับ fetchBaseTimetable() ของฝั่งห้องเรียน
+ *
+ *  ไม่มีข้อมูลตัวอย่างสำรองเหมือนฝั่งห้อง เพราะตารางของครูแต่ละคนไม่เหมือนกันเลย
+ *  เดาแทนให้ไม่ได้ ถ้าอ่านชีตไม่ได้ก็ต้องบอกว่าอ่านไม่ได้ ไม่ใช่โชว์ตารางของคนอื่น */
+export async function fetchTeacherTimetable(user) {
+  if (!hasTeacherTimetable(user)) return { timetable: {}, source: 'unset' };
+
+  try {
+    const data = await fetchTimetableForTeacher(user?.teacher_code, user?.email);
+    if (data && Object.keys(data).length > 0) return { timetable: data, source: 'sheet' };
+    return { timetable: {}, source: 'empty' };
+  } catch (err) {
+    console.warn('[timetable] อ่านตารางสอนของครูจาก Google Sheet ไม่สำเร็จ:', err);
+    return { timetable: {}, source: 'error' };
+  }
+}
+
 export function listClassIds() {
   return Object.keys(TIMETABLE_TAB_GID_BY_CLASS)
     .filter((id) => isSheetConfigured(id))
@@ -255,6 +292,22 @@ export function weekdayKeyOf(dateISO) {
 export function isSchoolDay(dateISO) {
   const day = toSafeDate(dateISO).getUTCDay();
   return day >= 1 && day <= 5;
+}
+
+/** วันเรียนถัดไป/ก่อนหน้า (ข้ามเสาร์-อาทิตย์)
+ *
+ *  ปุ่มลูกศรข้างปฏิทินใช้ตัวนี้ ไม่ใช่ addDaysISO ตรง ๆ
+ *  ไม่งั้นกดถัดไปจากวันศุกร์แล้วไปโผล่วันเสาร์ซึ่งไม่มีคาบสักคาบ
+ *  ต้องกดอีกสองทีถึงจะเจอวันที่มีตาราง
+ *
+ *  จำกัดรอบวนไว้ที่ 7 วัน กัน loop ไม่รู้จบถ้าวันที่ที่ส่งมาเพี้ยนจนหา weekday ไม่เจอ */
+export function nextSchoolDay(dateISO, step = 1) {
+  let d = dateISO;
+  for (let i = 0; i < 7; i += 1) {
+    d = addDaysISO(d, step);
+    if (isSchoolDay(d)) return d;
+  }
+  return addDaysISO(dateISO, step);
 }
 
 /** บวก/ลบวัน คืนเป็น 'YYYY-MM-DD' */

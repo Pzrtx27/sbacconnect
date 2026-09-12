@@ -11,15 +11,22 @@ import CoffeeCup from '../../components/ui/icons/CoffeeCup';
 import AcademicCalendar from '../../components/ui/AcademicCalendar';
 import UpcomingEvents from '../../components/ui/UpcomingEvents';
 import TopUpSlipForm from '../../components/wallet/TopUpSlipForm';
+import FeePaymentPanel from '../../components/wallet/FeePaymentPanel';
+import { useStudentFees } from '../../hooks/useStudentFees';
 import { supabase } from '../../config/supabase';
 import { formatBaht } from '../../utils/identity';
+import { timetableTitle } from '../../utils/timetable';
 import { LEAVE_TYPE_LABELS } from '../../utils/leave';
 import { useLeaveRequests } from '../../hooks/useLeaveRequests';
 import LeaveRequestList from '../../components/leave/LeaveRequestList';
 import WalletHistory from '../../components/wallet/WalletHistory';
 import GateEntryLog from '../../components/gate/GateEntryLog';
+import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
 import { useMyClassInfo } from '../../hooks/useMyClassInfo';
+import { useMyScoreSummary } from '../../hooks/useGradebook';
+import StudentScorePanel from '../../components/score/StudentScorePanel';
+import { calcGpa, fmtScore, getScoreTier, scorePercent, sumScores, toGrade } from '../../utils/score';
 import {
   Clock,
   Award,
@@ -38,24 +45,6 @@ import {
   ChevronDown
 } from 'lucide-react';
 
-/** คะแนนเก็บภาคเรียน 1/2569 — mock data ของหน้าคะแนนระหว่างภาค */
-const SCORE_ITEMS = [
-  { subject: 'การสร้างเกมคอมพิวเตอร์', score: 42, total: 50 },
-  { subject: 'English for Project Work', score: 38, total: 50 },
-  { subject: 'ทักษะดิจิทัล', score: 45, total: 50 },
-  { subject: 'การซ่อมบำรุงคอมพิวเตอร์', score: 40, total: 50 },
-  { subject: 'การออกแบบกราฟิกพื้นฐาน', score: 47, total: 50 },
-  { subject: 'โครงงาน', score: 48, total: 50 },
-];
-
-/** จัดระดับคะแนนเป็น 4 เฉด — ใช้ทั้งกับวงกลมสรุปและแถบคะแนนรายวิชา */
-function getScoreTier(pct) {
-  if (pct >= 85) return { label: 'ดีเยี่ยม', emoji: '🌟', bar: 'bg-emerald-500', text: 'text-accent-emerald', chip: 'bg-emerald-500/10' };
-  if (pct >= 70) return { label: 'ดี', emoji: '👍', bar: 'bg-sbac-blue', text: 'text-brand', chip: 'bg-sbac-blue/10' };
-  if (pct >= 50) return { label: 'ปานกลาง', emoji: '📘', bar: 'bg-amber-500', text: 'text-accent-amber', chip: 'bg-amber-500/10' };
-  return { label: 'ควรพัฒนา', emoji: '💪', bar: 'bg-rose-500', text: 'text-accent-rose', chip: 'bg-rose-500/10' };
-}
-
 export default function StudentHome() {
   const { user, updateBalance } = useAuth();
   const { theme } = useTheme();
@@ -70,6 +59,11 @@ export default function StudentHome() {
   /* ห้องเรียนและครูที่ปรึกษาของตัวเอง — ชื่อครูอยู่ในตาราง users ที่ RLS กันไว้
      จึงต้องผ่าน RPC my_class_info() ดู src/hooks/useMyClassInfo.js */
   const { info: classInfo, loading: classInfoLoading } = useMyClassInfo();
+
+  /* ค่าเทอม/ค่าธรรมเนียมค้างชำระ (43_student_fees.sql)
+     โหลดตั้งแต่เข้าหน้า ไม่รอเปิดโมดัล เพราะแถบเตือนด้านบนกับตัวเลขบนการ์ด
+     ต้องบอกความจริงตั้งแต่แรกเห็น — ของเดิมเขียนตายตัวว่า 0 THB ทุกคน */
+  const fees = useStudentFees(true);
 
   const loadBehavior = useCallback(async () => {
     const { data, error } = await supabase.rpc('my_behavior_logs');
@@ -192,12 +186,21 @@ export default function StudentHome() {
   const textMuted = isDark ? 'text-content-secondary' : 'text-ink-muted';
   const bgInput = isDark ? 'bg-neutral-900 border-white/20 text-white placeholder:text-content-muted focus:border-sbac-blue-light' : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue';
 
-  // สรุปคะแนนเก็บ — ใช้ในโมดัล "คะแนนระหว่างภาค"
-  const scoreTotal = SCORE_ITEMS.reduce((sum, item) => sum + item.score, 0);
-  const scoreMax = SCORE_ITEMS.reduce((sum, item) => sum + item.total, 0);
-  const scoreAvgPct = Math.round((scoreTotal / scoreMax) * 100);
+  /* สรุปคะแนนเก็บ — ใช้ทั้งการ์ดหน้าแรก โมดัล "คะแนนระหว่างภาค" และโมดัล "ผลการเรียน"
+     ของเดิมเป็นตัวเลขที่เขียนตายไว้ในไฟล์นี้ (ตัวแปร SCORE_ITEMS) นักเรียนทุกคนจึงเห็น
+     42/50 วิชาเกม กับ GPA 3.45 เหมือนกันหมดทั้งวิทยาลัย ไม่ว่าจะเรียนห้องไหน
+     ตอนนี้มาจาก my_score_summary() ซึ่งคิดจากคะแนนที่อาจารย์กรอกจริง (40_gradebook.sql) */
+  const {
+    subjects: scoreSubjects,
+    term: scoreTerm,
+    loading: scoreLoading,
+    error: scoreError,
+  } = useMyScoreSummary();
+
+  const scoreTotals = sumScores(scoreSubjects);
+  const scoreAvgPct = scorePercent(scoreTotals.score, scoreTotals.max);
   const scoreTier = getScoreTier(scoreAvgPct);
-  const gaugeCircumference = 2 * Math.PI * 15.5;
+  const gpa = calcGpa(scoreSubjects);
 
   return (
     <div className="space-y-6">
@@ -226,6 +229,41 @@ export default function StudentHome() {
           },
         ]}
       />
+
+      {/* แถบเตือนค่าเทอมค้างชำระ — ขึ้นเฉพาะตอนค้างจริงเท่านั้น
+          วางใต้หัวหน้าแรกสุด เพราะเป็นเรื่องที่ต้องรู้ก่อนไปทำอย่างอื่นในแอป
+          (ของเดิมยอดค้างซ่อนอยู่ในการ์ดใบหนึ่งกลางหน้า และเป็นเลข 0 ตายตัวด้วย)
+          กดแล้วเข้าโมดัลจ่ายเงินพร้อมคิวอาร์ได้ทันที ไม่ต้องไล่หาการ์ดเอง */}
+      {fees.summary.hasOutstanding && (
+        <button
+          type="button"
+          onClick={() => setActiveModal('debt')}
+          className={`w-full text-left rounded-2xl border p-4 flex items-center gap-3 active:scale-[0.995] transition-all ${
+            isDark ? 'bg-rose-950/30 border-rose-800/40' : 'bg-rose-50 border-rose-200'
+          }`}
+        >
+          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+            isDark ? 'bg-rose-500/15 text-accent-rose' : 'bg-white text-accent-rose'
+          }`}>
+            <Receipt size={20} />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-extrabold text-accent-rose">
+              มีค่าเทอมค้างชำระ {formatBaht(fees.summary.outstandingSatang)} ฿
+            </div>
+            <div className={`text-[11px] font-semibold mt-0.5 ${isDark ? 'text-content-secondary' : 'text-ink-muted'}`}>
+              {fees.summary.overdueCount > 0
+                ? `เลยกำหนดชำระแล้ว ${fees.summary.overdueCount} รายการ — แตะเพื่อจ่ายด้วยคิวอาร์พร้อมเพย์`
+                : fees.summary.unpaidCount > 0
+                  ? `${fees.summary.unpaidCount} รายการ — แตะเพื่อจ่ายด้วยคิวอาร์พร้อมเพย์`
+                  : 'แจ้งชำระแล้ว รอฝ่ายการเงินตรวจสอบ — แตะเพื่อดูรายละเอียด'}
+            </div>
+          </div>
+
+          <ArrowRight size={16} className="text-accent-rose shrink-0" />
+        </button>
+      )}
 
       {/* ลำดับบนมือถือ: เมนู -> กิจกรรม -> ปฏิทิน (พับไว้)
           ของเดิมเรียง กิจกรรม -> ปฏิทิน -> เมนู ซึ่งแปลว่าเปิดแอปมาต้องเลื่อนผ่าน
@@ -297,12 +335,17 @@ export default function StudentHome() {
                 <Receipt size={20} />
               </div>
               <div className={`text-sm font-extrabold ${textPrimary}`}>รายการค้างชำระ</div>
-              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ยอดคงเหลือ / Outstanding</div>
+              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>
+                {fees.summary.hasOutstanding ? 'จ่ายด้วยคิวอาร์พร้อมเพย์ได้ในแอป' : 'ยอดคงเหลือ / Outstanding'}
+              </div>
             </div>
+            {/* ยอดจริงจากตาราง student_fees แล้ว — ค้างอยู่ขึ้นแดง ไม่ใช่เขียว 0 THB ตายตัว */}
             <span className={`inline-block self-start text-xs font-bold px-3 py-1 rounded-full mt-2 ${
-              isDark ? 'bg-emerald-900/30 text-accent-emerald' : 'bg-emerald-50 text-accent-emerald'
+              fees.summary.hasOutstanding
+                ? (isDark ? 'bg-rose-900/30 text-accent-rose' : 'bg-rose-50 text-accent-rose')
+                : (isDark ? 'bg-emerald-900/30 text-accent-emerald' : 'bg-emerald-50 text-accent-emerald')
             }`}>
-              0 THB
+              {fees.loading ? '—' : `${formatBaht(fees.summary.outstandingSatang)} ฿`}
             </span>
           </div>
         </GlassCard>
@@ -323,17 +366,24 @@ export default function StudentHome() {
           </div>
         </GlassCard>
 
-        {/* Score */}
+        {/* Score — ตัวเลขบนการ์ดเป็นของจริงจาก my_score_summary()
+            ของเดิมเขียนแค่ "ดูข้อมูล" ซึ่งไม่ได้ตอบอะไรเลยทั้งที่มีที่ว่างพอจะตอบ */}
         <GlassCard onClick={() => setActiveModal('score')}>
           <div className="flex flex-col h-full justify-between min-h-[110px]">
             <div>
               <BookOpen className="text-accent-emerald mb-2" size={24} />
               <div className={`text-sm font-extrabold ${textPrimary}`}>คะแนนระหว่างภาค</div>
-              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>คะแนนเก็บและโครงงาน</div>
+              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>คะแนนเก็บรายหัวข้อ T1-T5</div>
             </div>
-            <div className="flex items-center text-xs font-bold text-brand mt-2">
-              ดูข้อมูล <ArrowRight size={14} className="ml-1" />
-            </div>
+            {scoreLoading || scoreError || scoreSubjects.length === 0 ? (
+              <div className="flex items-center text-xs font-bold text-brand mt-2">
+                ดูข้อมูล <ArrowRight size={14} className="ml-1" />
+              </div>
+            ) : (
+              <span className={`inline-block self-start text-xs font-bold px-3 py-1 rounded-full mt-2 ${scoreTier.chip} ${scoreTier.text}`}>
+                {fmtScore(scoreTotals.score)} / {fmtScore(scoreTotals.max)}
+              </span>
+            )}
           </div>
         </GlassCard>
 
@@ -345,9 +395,15 @@ export default function StudentHome() {
               <div className={`text-sm font-extrabold ${textPrimary}`}>ผลการเรียน</div>
               <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ดูเกรดเฉลี่ยเทอมนี้</div>
             </div>
-            <div className="flex items-center text-xs font-bold text-brand mt-2">
-              ดูข้อมูล <ArrowRight size={14} className="ml-1" />
-            </div>
+            {gpa === null ? (
+              <div className="flex items-center text-xs font-bold text-brand mt-2">
+                ดูข้อมูล <ArrowRight size={14} className="ml-1" />
+              </div>
+            ) : (
+              <span className="inline-block self-start text-xs font-bold px-3 py-1 rounded-full mt-2 bg-violet-500/10 text-accent-violet">
+                GPA {gpa.toFixed(2)}
+              </span>
+            )}
           </div>
         </GlassCard>
 
@@ -356,8 +412,9 @@ export default function StudentHome() {
           <div className="flex flex-col h-full justify-between min-h-[110px]">
             <div>
               <Calendar className="text-brand mb-2" size={24} />
-              <div className={`text-sm font-extrabold ${textPrimary}`}>ตารางสอน</div>
-              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ดูตารางเรียนรายคาบ</div>
+              {/* หน้านี้เป็นของนักเรียนอย่างเดียว จึงเป็น "ตารางเรียน" เสมอ */}
+              <div className={`text-sm font-extrabold ${textPrimary}`}>{timetableTitle('student')}</div>
+              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ดูรายคาบ เลือกดูวันอื่นได้</div>
             </div>
             <div className="flex items-center text-xs font-bold text-brand mt-2">
               ดูข้อมูล <ArrowRight size={14} className="ml-1" />
@@ -632,37 +689,14 @@ export default function StudentHome() {
 
       {/* MODAL: Debts */}
       <Modal isOpen={activeModal === 'debt'} onClose={() => setActiveModal(null)} title="💰 รายการค้างชำระ">
-        <div className="space-y-6 text-center py-4">
-          <div className={`inline-flex p-4 border rounded-full mb-2 ${
-            isDark ? 'bg-emerald-900/30 border-emerald-800/30 text-accent-emerald' : 'bg-emerald-50 border-emerald-100 text-accent-emerald'
-          }`}>
-            <Receipt size={32} />
-          </div>
-          <div>
-            <h3 className="text-3xl font-extrabold text-accent-emerald">0 THB</h3>
-            <span className={`inline-block text-xs font-bold px-3 py-1 rounded-full mt-2 ${
-              isDark ? 'bg-emerald-900/30 text-accent-emerald' : 'bg-emerald-50 text-accent-emerald'
-            }`}>
-              ✓ ไม่มีรายการค้างชำระ
-            </span>
-          </div>
-          <div className={`border-t pt-4 text-left space-y-3 text-sm font-semibold ${textSecondary} ${
-            isDark ? 'border-white/10' : 'border-slate-100'
-          }`}>
-            <div className="flex justify-between">
-              <span>ค่าเทอม 1/2569</span>
-              <span className="text-accent-emerald font-extrabold">ชำระแล้ว</span>
-            </div>
-            <div className="flex justify-between">
-              <span>ค่าอุปกรณ์การเรียน</span>
-              <span className="text-accent-emerald font-extrabold">ชำระแล้ว</span>
-            </div>
-            <div className="flex justify-between">
-              <span>ค่ากิจกรรมพิเศษ</span>
-              <span className="text-accent-emerald font-extrabold">ชำระแล้ว</span>
-            </div>
-          </div>
-        </div>
+        <FeePaymentPanel
+          fees={fees.fees}
+          loading={fees.loading}
+          error={fees.error}
+          summary={fees.summary}
+          reportTransfer={fees.reportTransfer}
+          reportingId={fees.reportingId}
+        />
       </Modal>
 
       {/* MODAL: Behavior */}
@@ -734,77 +768,16 @@ export default function StudentHome() {
         </div>
       </Modal>
 
-      {/* MODAL: Score */}
+      {/* MODAL: Score — เนื้อหาทั้งหมดอยู่ใน StudentScorePanel
+          เพราะตอนนี้เป็นสองชั้น (ทุกรายวิชา -> รายละเอียด T1-T5 ของวิชาที่กด)
+          ซึ่งมีสถานะภายในของตัวเอง ไม่ควรปนกับสถานะของหน้าแรกทั้งหน้า */}
       <Modal isOpen={activeModal === 'score'} onClose={() => setActiveModal(null)} title="📈 คะแนนระหว่างภาค">
-        <div className="space-y-5">
-          <div className="flex items-center justify-between">
-            <p className={`text-xs font-bold ${textMuted}`}>ภาคเรียน 1/2569</p>
-            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${scoreTier.chip} ${scoreTier.text}`}>
-              {scoreTier.emoji} {scoreTier.label}
-            </span>
-          </div>
-
-          {/* การ์ดสรุป: วงกลมแสดงเปอร์เซ็นต์รวม */}
-          <div className={`rounded-2xl border p-4 flex items-center gap-4 ${
-            isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
-          }`}>
-            <div className="relative w-16 h-16 shrink-0">
-              <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
-                <circle
-                  cx="18" cy="18" r="15.5" fill="none" strokeWidth="3"
-                  className={isDark ? 'stroke-white/10' : 'stroke-slate-200'}
-                />
-                <motion.circle
-                  cx="18" cy="18" r="15.5" fill="none" strokeWidth="3" strokeLinecap="round"
-                  stroke="currentColor"
-                  className={scoreTier.text}
-                  strokeDasharray={gaugeCircumference}
-                  initial={{ strokeDashoffset: gaugeCircumference }}
-                  animate={{ strokeDashoffset: gaugeCircumference * (1 - scoreAvgPct / 100) }}
-                  transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className={`text-sm font-extrabold ${textPrimary}`}>{scoreAvgPct}%</span>
-              </div>
-            </div>
-            <div>
-              <div className={`text-sm font-extrabold ${textPrimary}`}>{scoreTotal} / {scoreMax} คะแนน</div>
-              <div className={`text-[12px] mt-0.5 ${textMuted}`}>คะแนนเก็บรวม {SCORE_ITEMS.length} รายวิชา</div>
-            </div>
-          </div>
-
-          {/* แถบคะแนนรายวิชา — ทยอยเลื่อนเข้าทีละแถวให้ดูมีชีวิตชีวา */}
-          <div className="space-y-3.5">
-            {SCORE_ITEMS.map((item, idx) => {
-              const pct = Math.round((item.score / item.total) * 100);
-              const rowTier = getScoreTier(pct);
-              return (
-                <motion.div
-                  key={item.subject}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.06, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                >
-                  <div className="flex justify-between items-baseline mb-1">
-                    <span className={`text-xs font-bold ${textSecondary}`}>{item.subject}</span>
-                    <span className={`text-xs font-bold ${textPrimary}`}>
-                      {item.score}<span className={`text-[11px] font-normal ${textMuted}`}>/{item.total}</span>
-                    </span>
-                  </div>
-                  <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-white/5' : 'bg-slate-100'}`}>
-                    <motion.div
-                      className={`h-full rounded-full ${rowTier.bar}`}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${pct}%` }}
-                      transition={{ delay: idx * 0.06 + 0.1, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                    />
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
+        <StudentScorePanel
+          subjects={scoreSubjects}
+          term={scoreTerm}
+          loading={scoreLoading}
+          error={scoreError}
+        />
       </Modal>
 
       {/* MODAL: Grade */}
@@ -813,37 +786,54 @@ export default function StudentHome() {
           <div className={`flex justify-between items-center p-3 rounded-xl border ${
             isDark ? 'bg-white/[0.06] border-white/10' : 'bg-slate-50 border-slate-100'
           }`}>
-            <span className={`text-sm font-bold ${textPrimary}`}>ภาคเรียน 1/2569</span>
-            <span className="text-sm font-extrabold text-brand">GPA: 3.45</span>
+            <span className={`text-sm font-bold ${textPrimary}`}>ภาคเรียน {scoreTerm || '-'}</span>
+            <span className="text-sm font-extrabold text-brand">
+              {gpa === null ? 'ยังไม่มีเกรด' : `GPA: ${gpa.toFixed(2)}`}
+            </span>
           </div>
 
+          {/* เกรดคิดจากคะแนนจริงที่อาจารย์กรอก ไม่ใช่ตัวอักษรที่เขียนตายไว้ในโค้ดแบบเดิม
+              วิชาที่ยังกรอกไม่ครบจะมีบรรทัดกำกับ ไม่ปล่อยให้เข้าใจผิดว่าเป็นเกรดสุดท้ายแล้ว */}
+          {scoreLoading && (
+            <div className="py-6">
+              <LoadingSpinner text="กำลังโหลดผลการเรียน..." />
+            </div>
+          )}
+
+          {!scoreLoading && scoreSubjects.length === 0 && (
+            <p className={`text-xs text-center py-8 ${textMuted}`}>
+              ยังไม่มีรายวิชาของห้องคุณในภาคเรียนนี้
+            </p>
+          )}
+
           <div className="space-y-2.5">
-            {[
-              { subject: 'การสร้างเกมคอมพิวเตอร์', credit: 3, grade: 'A', color: 'text-accent-emerald', chip: 'bg-emerald-500/10' },
-              { subject: 'English for Project Work', credit: 3, grade: 'B+', color: 'text-brand', chip: 'bg-sbac-blue/10' },
-              { subject: 'ทักษะดิจิทัล', credit: 2, grade: 'A', color: 'text-accent-emerald', chip: 'bg-emerald-500/10' },
-              { subject: 'การซ่อมบำรุงคอมพิวเตอร์', credit: 3, grade: 'B+', color: 'text-brand', chip: 'bg-sbac-blue/10' },
-              { subject: 'การออกแบบกราฟิกพื้นฐาน', credit: 3, grade: 'A', color: 'text-accent-emerald', chip: 'bg-emerald-500/10' },
-              { subject: 'โครงงาน', credit: 4, grade: 'A', color: 'text-accent-emerald', chip: 'bg-emerald-500/10' },
-            ].map((item, idx) => (
-              <motion.div
-                key={item.subject}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.06, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                className={`flex justify-between items-center border-b pb-2.5 ${
-                  isDark ? 'border-white/10' : 'border-slate-50'
-                }`}
-              >
-                <div>
-                  <div className={`text-sm font-semibold ${textSecondary}`}>{item.subject}</div>
-                  <div className={`text-[11px] ${textMuted}`}>หน่วยกิต: {item.credit}</div>
-                </div>
-                <span className={`text-sm font-extrabold px-2.5 py-1 rounded-full ${item.chip} ${item.color}`}>
-                  {item.grade}
-                </span>
-              </motion.div>
-            ))}
+            {scoreSubjects.map((item, idx) => {
+              const grade = toGrade(item.score, item.max_score);
+              const pending = Number(item.item_count || 0) - Number(item.graded_count || 0);
+
+              return (
+                <motion.div
+                  key={item.subject_id}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.06, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                  className={`flex justify-between items-center border-b pb-2.5 ${
+                    isDark ? 'border-white/10' : 'border-slate-50'
+                  }`}
+                >
+                  <div className="min-w-0 pr-3">
+                    <div className={`text-sm font-semibold ${textSecondary}`}>{item.name}</div>
+                    <div className={`text-[11px] ${textMuted}`}>
+                      หน่วยกิต: {item.credits} • {fmtScore(item.score)}/{fmtScore(item.max_score)} คะแนน
+                      {pending > 0 && ` • รอประกาศอีก ${pending} หัวข้อ`}
+                    </div>
+                  </div>
+                  <span className={`text-sm font-extrabold px-2.5 py-1 rounded-full shrink-0 ${grade.chip} ${grade.color}`}>
+                    {grade.label}
+                  </span>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </Modal>
