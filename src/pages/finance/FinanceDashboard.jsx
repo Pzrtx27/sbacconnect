@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Wallet, ClipboardCheck, AlertCircle, FilePlus2, CheckCircle2, XCircle, GraduationCap, Users } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -61,8 +61,18 @@ export default function FinanceDashboard() {
 
   /* ปุ่มย้อนกลับต้องพากลับ "หน้าหลักของคนที่เข้ามา" ไม่ใช่หน้าเดียวตายตัว
      บัญชีเคาน์เตอร์ (role barista) อยู่ในเปลือกเต็มจอที่ไม่มีเมนูใด ๆ เลย
-     ถ้าส่งไป /academic จะโดน redirect กลับ /barista อีกที = ปุ่มดูเหมือนพัง */
-  const backTo = String(user?.role || '').toLowerCase() === 'barista' ? '/barista' : '/academic';
+     ถ้าส่งไป /academic จะโดน redirect กลับ /barista อีกที = ปุ่มดูเหมือนพัง
+
+     ต้องดู roles ทั้งอาร์เรย์ ไม่ใช่ role เดียว เพราะ AuthContext ยุบทั้ง pos
+     และ cashier เป็นชื่อ 'barista' เหมือนกัน แต่สองคนนี้กลับคนละที่:
+       มี pos ด้วย     -> เป็นคนหน้าร้านจริง กลับไปคิวกาแฟได้
+       cashier ล้วน    -> /barista คือจอ "ไม่มีสิทธิ์ดูคิวหน้าร้าน" ซึ่งไม่มีทางออก
+                          หน้านี้คือบ้านของเขาอยู่แล้ว จึงไม่ต้องมีปุ่มย้อนกลับเลย */
+  const roles = Array.isArray(user?.roles) ? user.roles : [];
+  const isFullScreenShell = String(user?.role || '').toLowerCase() === 'barista';
+  const backTo = isFullScreenShell
+    ? (roles.includes('pos') ? '/barista' : null)
+    : '/academic';
 
   const [activeTab, setActiveTab] = useState('pending');
 
@@ -134,20 +144,37 @@ export default function FinanceDashboard() {
 
       <TabNav tabs={tabs} active={activeTab} onChange={setActiveTab} ariaLabel="หมวดงานฝ่ายการเงิน" />
 
-      {/* ตัวเลขรวมทั้งระบบ ไม่ใช่เฉพาะที่กรองอยู่ — เห็นภาพรวมโดยไม่ต้องสลับแท็บ */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className={`p-3 rounded-2xl border text-center ${cardClass}`}>
-          <span className="text-lg font-extrabold text-accent-amber">{formatBaht(queue.summary.pending_satang)}</span>
-          <span className={`text-[9px] font-bold block mt-1 ${textMuted}`}>รอตรวจสอบ ({queue.summary.pending_count})</span>
-        </div>
-        <div className={`p-3 rounded-2xl border text-center ${cardClass}`}>
-          <span className="text-lg font-extrabold text-accent-rose">{formatBaht(queue.summary.unpaid_satang)}</span>
-          <span className={`text-[9px] font-bold block mt-1 ${textMuted}`}>ค้างชำระ ({queue.summary.unpaid_count})</span>
-        </div>
-        <div className={`p-3 rounded-2xl border text-center ${cardClass}`}>
-          <span className="text-lg font-extrabold text-accent-emerald">{formatBaht(queue.summary.paid_satang)}</span>
-          <span className={`text-[9px] font-bold block mt-1 ${textMuted}`}>เก็บได้แล้วทั้งหมด</span>
-        </div>
+      {/* ตัวเลขรวมทั้งระบบ ไม่ใช่เฉพาะที่กรองอยู่ — เห็นภาพรวมโดยไม่ต้องสลับแท็บ
+
+          บนมือถือเรียงลงเป็นแถว ไม่ใช่สามคอลัมน์
+          ของเดิมเป็น grid-cols-3 ตายตัว วัดจริงบนจอ 375: ยอดหลักล้าน (3,400,500.00)
+          กว้าง 113px ในกล่องที่มีที่ว่างจริง 82px ตัวเลขจึงดันจนทั้งหน้าเลื่อนซ้ายขวาได้
+          (documentElement.scrollWidth = 379 บนจอ 375) ล้นตั้งแต่ยอดหกหลักขึ้นไป
+          ยัดสามคอลัมน์ให้พอดีต้องลดตัวอักษรเหลือราว 10px ซึ่งอ่านไม่ออกอยู่ดี
+          และขัดกับหลักของโปรเจกต์เองที่เขียนไว้ว่าเน้นอ่านง่ายบนมือถือ
+
+          เรียงลงแล้วแต่ละยอดได้เต็มความกว้าง เทียบกันได้เหมือนเดิมเพราะอยู่ติดกัน
+          พอถึง sm ค่อยกลับไปสามคอลัมน์ซึ่งมีที่พอจริง
+
+          tabular-nums บังคับให้ตัวเลขทุกตัวกว้างเท่ากัน หลักจึงตรงกันทุกแถว
+          ไม่งั้น 1 กับ 8 กว้างไม่เท่ากัน แล้วสายตาเทียบยอดผิด */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+        {[
+          { value: queue.summary.pending_satang, tone: 'text-accent-amber', label: `รอตรวจสอบ (${queue.summary.pending_count})` },
+          { value: queue.summary.unpaid_satang, tone: 'text-accent-rose', label: `ค้างชำระ (${queue.summary.unpaid_count})` },
+          { value: queue.summary.paid_satang, tone: 'text-accent-emerald', label: 'เก็บได้แล้วทั้งหมด' },
+        ].map((item) => (
+          <div
+            key={item.label}
+            className={`px-4 py-3 rounded-2xl border flex items-center justify-between gap-3 sm:block sm:text-center ${cardClass}`}
+          >
+            <span className={`text-[11px] font-bold sm:hidden ${textMuted}`}>{item.label}</span>
+            <span className={`text-lg font-extrabold tabular-nums whitespace-nowrap ${item.tone}`}>
+              {formatBaht(item.value)}
+            </span>
+            <span className={`text-[11px] font-bold mt-1 hidden sm:block ${textMuted}`}>{item.label}</span>
+          </div>
+        ))}
       </div>
 
       {queue.error && activeTab !== 'issue' && (
@@ -278,10 +305,31 @@ function IssueFeesPanel({ isDark, textPrimary, textMuted, rowClass, bgInput, con
   const [dueDate, setDueDate] = useState('');
   const [excluded, setExcluded] = useState({}); // { [user_id]: true } = ไม่ออกบิลให้คนนี้
 
+  /* บอก hook ว่ากำลังจะออกบิลชื่ออะไรของเทอมไหน เพื่อให้ DB ตอบกลับมาว่า
+     ใครมีบิลใบนี้อยู่แล้วและอยู่ในสถานะไหน (hook หน่วง 300ms ให้เอง) */
+  const { setFeeKey } = issuing;
+  useEffect(() => {
+    setFeeKey({ term, title: title.trim() });
+  }, [setFeeKey, term, title]);
+
+  /* บิลที่จบแล้ว ห้ามออกทับ — ฝั่ง DB กันไว้แล้ว (47_fee_guard_and_log.sql)
+     แต่หน้าจอต้องไม่หลอกให้กดตั้งแต่แรก ไม่งั้นกดแล้วได้ผลว่า "ข้าม 12 คน"
+     ซึ่งอ่านเหมือนระบบพัง ทั้งที่มันทำถูก */
+  const isSettled = (s) => s.existing_status === 'paid' || s.existing_status === 'waived';
+
   const selectedIds = useMemo(
-    () => issuing.students.filter((s) => !excluded[s.user_id]).map((s) => s.user_id),
+    () =>
+      issuing.students
+        .filter((s) => !isSettled(s) && !excluded[s.user_id])
+        .map((s) => s.user_id),
     [issuing.students, excluded],
   );
+
+  const settledCount = useMemo(
+    () => issuing.students.filter(isSettled).length,
+    [issuing.students],
+  );
+  const selectableCount = issuing.students.length - settledCount;
 
   const amountValue = Number(amountBaht);
   const amountSatang = Math.round(amountValue * 100);
@@ -314,11 +362,20 @@ function IssueFeesPanel({ isDark, textPrimary, textMuted, rowClass, bgInput, con
       return;
     }
 
+    /* รายงานตามจริงทุกช่อง รวม skipped กับ failed ที่ของเดิมไม่เคยเอามาแสดง
+       ของเดิมถ้าไม่มีใบใหม่เลยจะขึ้นว่า "อัปเดตยอดให้แทน" เสมอ ทั้งที่บางคน
+       อาจถูกข้ามเพราะจ่ายไปแล้ว หรือหลุดเพราะ uuid ไม่ใช่นักเรียน */
+    const parts = [];
+    if (result.created > 0) parts.push(`ออกบิลใหม่ ${result.created} ใบ`);
+    if (result.updated > 0) parts.push(`แก้ยอดบิลเดิม ${result.updated} ใบ`);
+    if (result.skipped > 0) parts.push(`ข้าม ${result.skipped} คน (ชำระแล้ว/ยกเว้น)`);
+    if (result.failed > 0) parts.push(`ไม่สำเร็จ ${result.failed} คน`);
+
     showToast(
-      result.created > 0
-        ? `ออกบิลใหม่ ${result.created} ใบ${result.updated > 0 ? ` (แก้ยอดบิลเดิม ${result.updated} ใบ)` : ''} — แจ้งเตือนนักเรียนแล้ว`
-        : `บิลเดิมมีอยู่แล้วทั้ง ${result.students} คน — อัปเดตยอดให้แทน ไม่มีแจ้งเตือนใหม่`,
-      'success',
+      parts.length > 0
+        ? parts.join(' · ') + (result.created > 0 ? ' — แจ้งเตือนนักเรียนแล้ว' : '')
+        : 'ไม่มีอะไรเปลี่ยนแปลง',
+      result.failed > 0 ? 'info' : 'success',
     );
     onIssued?.();
   };
@@ -431,7 +488,8 @@ function IssueFeesPanel({ isDark, textPrimary, textMuted, rowClass, bgInput, con
 
         <div className="flex items-center justify-between gap-2">
           <span className={`text-[11px] font-bold ${textMuted}`}>
-            เลือกแล้ว {selectedIds.length}/{issuing.students.length} คน
+            เลือกแล้ว {selectedIds.length}/{selectableCount} คน
+            {settledCount > 0 && ` · ชำระแล้ว ${settledCount} คน`}
           </span>
           <div className="flex gap-1.5">
             <button type="button" onClick={selectAll} className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-500/10 text-accent-emerald border border-emerald-500/20">
@@ -451,26 +509,41 @@ function IssueFeesPanel({ isDark, textPrimary, textMuted, rowClass, bgInput, con
         ) : (
           <div className="space-y-1.5 max-h-[40vh] overflow-y-auto pr-1">
             {issuing.students.map((student) => {
-              const picked = !excluded[student.user_id];
+              const settled = isSettled(student);
+              const picked = !settled && !excluded[student.user_id];
               return (
                 <label
                   key={student.user_id}
-                  className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all ${
-                    picked
-                      ? (isDark ? 'bg-sbac-blue/10 border-sbac-blue/30' : 'bg-sbac-blue/5 border-sbac-blue/20')
-                      : (isDark ? 'bg-white/[0.02] border-white/10' : 'bg-white border-slate-100')
+                  className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${
+                    settled
+                      ? `cursor-not-allowed opacity-60 ${isDark ? 'bg-white/[0.02] border-white/10' : 'bg-slate-50 border-slate-100'}`
+                      : picked
+                        ? `cursor-pointer ${isDark ? 'bg-sbac-blue/10 border-sbac-blue/30' : 'bg-sbac-blue/5 border-sbac-blue/20'}`
+                        : `cursor-pointer ${isDark ? 'bg-white/[0.02] border-white/10' : 'bg-white border-slate-100'}`
                   }`}
                 >
                   <input
                     type="checkbox"
                     checked={picked}
+                    disabled={settled}
                     onChange={() => toggle(student.user_id)}
-                    className="w-4 h-4 accent-sbac-blue shrink-0"
+                    className="w-4 h-4 accent-sbac-blue shrink-0 disabled:cursor-not-allowed"
                   />
                   <div className="min-w-0 flex-1">
                     <div className={`text-xs font-bold truncate ${textPrimary}`}>{student.full_name}</div>
                     <div className={`text-[10px] font-semibold ${textMuted}`}>{student.student_code}</div>
                   </div>
+                  {/* ล็อกไว้ไม่ให้ออกบิลทับ พร้อมบอกเหตุผล
+                      ของเดิมติ๊กคนกลุ่มนี้มาให้ด้วย แล้วกดออกบิลทีเดียวยอดที่จ่ายไปแล้วเปลี่ยน */}
+                  {settled && (
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-md shrink-0 ${
+                      student.existing_status === 'paid'
+                        ? 'bg-emerald-500/10 text-accent-emerald'
+                        : 'bg-violet-500/10 text-accent-violet'
+                    }`}>
+                      {student.existing_status === 'paid' ? 'ชำระแล้ว' : 'ยกเว้น'}
+                    </span>
+                  )}
                   {student.outstanding_satang > 0 && (
                     <span className="text-[10px] font-bold text-accent-rose shrink-0">
                       ค้าง {formatBaht(student.outstanding_satang)} ฿

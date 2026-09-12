@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../config/supabase';
 import { useRealtimeTable } from './useRealtimeTable';
+import { notEnabledMessage, CONTACT } from '../utils/setupNotice';
 
 /* ฝั่งฝ่ายการเงินของระบบค่าธรรมเนียม (43_student_fees.sql + 44_finance_console.sql)
 
@@ -22,7 +23,7 @@ const EMPTY_SUMMARY = {
 
 export const financeErrorMessage = (code) =>
   ({
-    SETUP: 'ยังไม่ได้ติดตั้งระบบค่าธรรมเนียมในฐานข้อมูล (รัน 43_student_fees.sql และ 44_finance_console.sql)',
+    SETUP: notEnabledMessage('ค่าเทอมและค่าธรรมเนียม', CONTACT.admin),
     FORBIDDEN: 'บัญชีนี้ไม่มีสิทธิ์จัดการค่าธรรมเนียม — ต้องเป็นฝ่ายการเงิน (cashier) หรือแอดมิน',
     NOT_FOUND: 'ไม่พบรายการนี้ — อาจถูกแก้ไปแล้วจากอีกเครื่อง ลองโหลดใหม่',
     BAD_STATUS: 'สถานะไม่ถูกต้อง',
@@ -110,6 +111,10 @@ export function useFeeIssuing() {
   const [issuing, setIssuing] = useState(false);
   const [error, setError] = useState(null);
 
+  /* ชื่อรายการ + เทอมที่กำลังจะออกบิล ใช้ถาม DB ว่าใครมีบิลใบนี้อยู่แล้ว
+     เก็บเป็น state แยกเพราะหน้าจอเป็นคนถือช่องกรอก ไม่ใช่ hook */
+  const [feeKey, setFeeKey] = useState({ term: null, title: null });
+
   useEffect(() => {
     let alive = true;
 
@@ -140,6 +145,11 @@ export function useFeeIssuing() {
     setLoadingStudents(true);
     const { data, error: rpcError } = await supabase.rpc('list_fee_class_students', {
       p_class_room_id: classRoomId,
+      /* ส่งชื่อรายการกับเทอมไปด้วย เพื่อให้ DB บอกกลับมาได้ว่าใครมีบิลใบนี้อยู่แล้ว
+         และอยู่ในสถานะไหน (existing_status) — หน้าจอจะได้ไม่ติ๊กคนที่จ่ายไปแล้ว
+         ของเดิมส่งแต่รหัสห้อง หน้าจอจึงไม่มีทางรู้ แล้วติ๊กมาให้ทุกคน */
+      p_term: feeKey.term || null,
+      p_title: feeKey.title || null,
     });
 
     if (rpcError) {
@@ -160,10 +170,14 @@ export function useFeeIssuing() {
     setError(null);
     setStudents(data.students || []);
     setLoadingStudents(false);
-  }, [classRoomId]);
+  }, [classRoomId, feeKey.term, feeKey.title]);
 
+  /* หน่วงก่อนยิง เพราะ title ผูกกับช่องที่ผู้ใช้พิมพ์ทีละตัวอักษร
+     และคืน cleanup ทุกครั้ง — สลับห้องเร็ว ๆ สองครั้ง คำตอบของห้องแรกที่มาช้ากว่า
+     จะได้ไม่เขียนทับรายชื่อของห้องที่สอง ซึ่งสังเกตไม่ได้เลยเพราะหัวห้องเปลี่ยนไปแล้ว */
   useEffect(() => {
-    loadStudents();
+    const handle = setTimeout(loadStudents, 300);
+    return () => clearTimeout(handle);
   }, [loadStudents]);
 
   const issue = useCallback(
@@ -199,6 +213,7 @@ export function useFeeIssuing() {
     issuing,
     error,
     issue,
+    setFeeKey,
     reloadStudents: loadStudents,
   };
 }
