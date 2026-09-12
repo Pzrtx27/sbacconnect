@@ -3,7 +3,13 @@ import { QRCodeSVG } from 'qrcode.react';
 import { AlertTriangle, QrCode, Receipt, CheckCircle2 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { showToast } from '../ui/Toast';
-import { PROMPTPAY_ID, PROMPTPAY_ACCOUNT_NAME, isPromptPayConfigured } from '../../config/promptpay';
+import {
+  PROMPTPAY_ID,
+  PROMPTPAY_ACCOUNT_NAME,
+  PROMPTPAY_ID_DIGITS,
+  isPromptPayConfigured,
+  isPromptPayIdValid,
+} from '../../config/promptpay';
 import { buildPromptPayPayload } from '../../utils/promptpay';
 import { formatBaht } from '../../utils/identity';
 import { FEE_STATUS_LABELS, feeErrorMessage } from '../../hooks/useStudentFees';
@@ -107,14 +113,19 @@ export default function FeePaymentPanel({ fees, loading, error, summary, reportT
         )}
       </div>
 
-      {!isPromptPayConfigured && (
+      {/* เช็ค isPromptPayIdValid ไม่ใช่แค่ isPromptPayConfigured
+          เลขที่กรอกไว้แต่ผิดรูปแบบก็สร้าง QR ไม่ได้เหมือนกัน แต่ของเดิมเงียบสนิท
+          นักเรียนจะเห็นแค่ช่อง QR ว่างเปล่าโดยไม่มีอะไรบอกว่าทำไม */}
+      {!isPromptPayIdValid && (
         <div className={`p-3 rounded-2xl border flex gap-2 ${
           isDark ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50 border-amber-200'
         }`}>
           <AlertTriangle className="text-accent-amber shrink-0" size={18} aria-hidden="true" />
           <p className={`text-[11px] font-semibold leading-relaxed ${textMuted}`}>
-            ยังไม่ได้ตั้งค่าบัญชีพร้อมเพย์ของวิทยาลัย (VITE_PROMPTPAY_ID) — ตอนนี้จ่ายผ่าน QR ในแอปไม่ได้
-            ให้ติดต่อฝ่ายการเงินโดยตรง
+            {isPromptPayConfigured
+              ? `เลขพร้อมเพย์ที่ตั้งไว้ไม่ถูกรูปแบบ (VITE_PROMPTPAY_ID ตอนนี้มี ${PROMPTPAY_ID_DIGITS} หลัก ต้องเป็นเบอร์มือถือ 10 หลัก หรือเลขบัตรประชาชน 13 หลัก)`
+              : 'ยังไม่ได้ตั้งค่าบัญชีพร้อมเพย์ของวิทยาลัย (VITE_PROMPTPAY_ID)'}
+            {' '}— ตอนนี้จ่ายผ่าน QR ในแอปไม่ได้ ให้ติดต่อฝ่ายการเงินโดยตรง
           </p>
         </div>
       )}
