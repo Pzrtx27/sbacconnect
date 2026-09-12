@@ -15,6 +15,7 @@ import FeePaymentPanel from '../../components/wallet/FeePaymentPanel';
 import { useStudentFees } from '../../hooks/useStudentFees';
 import { supabase } from '../../config/supabase';
 import { formatBaht } from '../../utils/identity';
+import { timetableTitle } from '../../utils/timetable';
 import { LEAVE_TYPE_LABELS } from '../../utils/leave';
 import { useLeaveRequests } from '../../hooks/useLeaveRequests';
 import LeaveRequestList from '../../components/leave/LeaveRequestList';
@@ -411,8 +412,9 @@ export default function StudentHome() {
           <div className="flex flex-col h-full justify-between min-h-[110px]">
             <div>
               <Calendar className="text-brand mb-2" size={24} />
-              <div className={`text-sm font-extrabold ${textPrimary}`}>ตารางสอน</div>
-              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ดูตารางเรียนรายคาบ</div>
+              {/* หน้านี้เป็นของนักเรียนอย่างเดียว จึงเป็น "ตารางเรียน" เสมอ */}
+              <div className={`text-sm font-extrabold ${textPrimary}`}>{timetableTitle('student')}</div>
+              <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>ดูรายคาบ เลือกดูวันอื่นได้</div>
             </div>
             <div className="flex items-center text-xs font-bold text-brand mt-2">
               ดูข้อมูล <ArrowRight size={14} className="ml-1" />
