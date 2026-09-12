@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>สร้างการ์ดเมนูแบรนด์ SBAC</title>
+<!--
+  ตัวสร้างรูปเมนูแบบกราฟิกแบรนด์ SBAC Coffee Studio (ใช้ตอนพัฒนาเท่านั้น)
+
+  อยู่นอกโฟลเดอร์ public/ จึงไม่ถูกรวมไปกับ production build
+  เปิดผ่าน http://localhost:5173/tools/menu-tiles.html ตอน npm run dev
+
+  ทำไมมีไฟล์นี้แทนที่จะเก็บแค่รูปที่ render เสร็จแล้ว:
+    รูปพวกนี้วาดด้วยโค้ด ไม่ใช่ภาพถ่าย ถ้าเก็บแต่ไฟล์ .jpg ไว้
+    วันหลังอยากเปลี่ยนสีชาไทยให้เข้มขึ้น หรือเปลี่ยนพื้นหลังตามโปสเตอร์ชุดใหม่
+    จะทำไม่ได้เลยนอกจากวาดใหม่ทั้งหมด เก็บตัวสร้างไว้ = แก้ตัวเลขแล้ว render ใหม่
+
+  ทำไมวาดด้วย Canvas ไม่ใช่ SVG:
+    ต้อง export เป็นไฟล์ .jpg ให้ตรงกับชื่อไฟล์ที่ menuPhotos.js อ้างอยู่
+    (เพื่อให้วันที่ได้รูปถ่ายจริงจากร้านมาแล้ว วางทับได้เลยโดยไม่ต้องแก้โค้ด)
+    ถ้าวาดเป็น SVG แล้วแปลงเป็น raster ตัวอักษรจะเพี้ยน เพราะฟอนต์ในไฟล์ SVG
+    ที่ถูกโหลดผ่าน <img> จะไม่ resolve เป็นฟอนต์เดียวกับที่หน้าเว็บใช้
+    วาดบน canvas ตรง ๆ จึงได้ตัวอักษรตรงกับที่เห็นบนจอ
+
+  หมายเหตุ: ชุดนี้เป็นของชั่วคราวระหว่างรอรูปถ่ายจริงจากร้าน
+  พอได้รูปจริงแล้วให้ใช้ tools/menu-photo-prep.html วางทับแทน
+-->
+<style>
+:root{
+  --bg:#0b0f19; --card:rgba(255,255,255,.06); --line:rgba(255,255,255,.12);
+  --text:#f1f5f9; --text2:#cbd5e1; --muted:#a8b3c4; --amber:#fbbf24;
+  --blue:#1a3cc8; --red:#c8102e; --ok:#34d399; --bad:#fb7185;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 "Segoe UI",system-ui,-apple-system,sans-serif;padding:22px}
+h1{font-size:20px;margin:0;font-weight:800}
+h2{font-size:15px;margin:0 0 10px;font-weight:800;color:var(--amber)}
+.sub{font-size:12.5px;color:var(--muted);margin-top:3px}
+header{display:flex;align-items:center;gap:13px;border-bottom:1px solid var(--line);
+  padding-bottom:15px;margin-bottom:18px}
+.mark{width:42px;height:42px;border-radius:12px;flex:0 0 auto;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--blue),var(--red));font-weight:900;font-size:13px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:16px}
+ul{margin:0;padding-left:20px}
+li{margin-bottom:5px;font-size:13.5px;color:var(--text2)}
+code{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--amber)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+.cell{text-align:center}
+.cell canvas.big{width:100%;aspect-ratio:1;border-radius:18px;display:block}
+.cell .k{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:var(--ok);margin-top:7px}
+.cell .th{font-size:11.5px;color:var(--muted)}
+.real{display:flex;gap:9px;justify-content:center;align-items:flex-end;margin-top:8px}
+.real canvas{border-radius:22%;display:block}
+button{background:var(--amber);color:#1a1205;border:0;border-radius:11px;
+  padding:11px 18px;font:inherit;font-weight:800;cursor:pointer}
+button:hover{filter:brightness(1.08)}
+button.ghost{background:transparent;color:var(--text2);border:1px solid var(--line)}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.status{font-size:13px;color:var(--muted);min-height:20px;margin-top:9px}
+.status.good{color:var(--ok)}
+.status.bad{color:var(--bad)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="mark">SBAC</div>
+  <div>
+    <h1>สร้างการ์ดเมนูแบรนด์ SBAC</h1>
+    <div class="sub">วาดด้วยโค้ด · พื้นหลังน้ำเงินโทนเดียวกับโปสเตอร์ของร้าน · ส่งออกเป็น 600×600 JPEG</div>
+  </div>
+</header>
+
+<div class="panel">
+  <h2>ของชั่วคราว</h2>
+  <ul>
+    <li>ชุดนี้เป็น <b>ภาพวาด ไม่ใช่ภาพถ่าย</b> ใช้ระหว่างรอรูปแก้วจริงจากร้าน</li>
+    <li>ได้รูปถ่ายจริงมาเมื่อไหร่ ให้ใช้ <code>tools/menu-photo-prep.html</code> วางทับ — ชื่อไฟล์เดียวกัน ไม่ต้องแก้โค้ด</li>
+    <li>อยากเปลี่ยนสีเครื่องดื่มหรือสีพื้นหลัง แก้ที่ตัวแปร <code>MENU</code> กับ <code>BG</code> ในไฟล์นี้แล้วกดสร้างใหม่</li>
+  </ul>
+  <div class="bar">
+    <button id="saveDir">เซฟลงโฟลเดอร์ public/menu</button>
+    <button id="saveDl" class="ghost">ดาวน์โหลดแทน</button>
+  </div>
+  <div class="status" id="status"></div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+const SIZE = 600;          // ด้านของไฟล์ที่ส่งออก
+const QUALITY = 0.92;      // สูงกว่ารูปถ่าย เพราะขอบคมของงานกราฟิกเห็นรอยบีบอัดง่ายกว่า
+
+/* พื้นหลัง — น้ำเงินไล่เฉดตามโปสเตอร์ Back to School ของร้าน
+   ใช้สีเดียวกันทุกหมวดโดยตั้งใจ ให้กริดเมนูอ่านเป็นชุดเดียว
+   ตัวที่แยกหมวดออกจากกันคือสีเครื่องดื่ม ไม่ใช่สีพื้น */
+const BG = { top: '#2a47a8', bottom: '#0e1740' };
+
+/* ค่าของแต่ละช่อง
+     kind  cold = แก้วพลาสติกใส / hot = แก้วกระดาษมีฝา / toast, cookie = ของว่างในจาน
+     top,bottom  สีเครื่องดื่มไล่จากปากแก้วลงก้นแก้ว
+     milk  สัดส่วนความสูงจากก้นแก้วที่เป็นชั้นนม (0 = ไม่มีนม)
+     ice   ใส่ก้อนน้ำแข็ง
+     fizz  ฟองอากาศ (น้ำอัดลม)
+     pearls  เม็ดไข่มุกก้นแก้ว */
+const MENU = [
+  { key:'espresso', th:'อเมริกาโน่ · กาแฟดำ',   kind:'cold', top:'#5a2f16', bottom:'#1c0b03', milk:0,    ice:1 },
+  { key:'latte',    th:'ลาเต้ · คาปูชิโน',      kind:'cold', top:'#a9663a', bottom:'#c98a5b', milk:.42,  ice:1 },
+  { key:'cup',      th:'กาแฟอื่น ๆ (ค่าเริ่มต้น)', kind:'cold', top:'#6f4325', bottom:'#301607', milk:.18,  ice:1 },
+  { key:'cocoa',    th:'โกโก้ · มิโล',           kind:'cold', top:'#6a4230', bottom:'#8d5c40', milk:.38,  ice:1 },
+  { key:'matcha',   th:'ชาเขียว · มัทฉะ',        kind:'cold', top:'#86c452', bottom:'#4d8a2a', milk:.34,  ice:1 },
+  { key:'bubble',   th:'ชาไทย · ชานม',           kind:'cold', top:'#f0a85c', bottom:'#dd7c30', milk:.30,  ice:1, pearls:1 },
+  { key:'soda',     th:'น้ำอัดลม · โซดา',        kind:'cold', top:'#bfe6f8', bottom:'#7ec8ee', milk:0,    ice:1, fizz:1 },
+  { key:'tea',      th:'ชาร้อน',                 kind:'hot',  top:'#d9a05a', bottom:'#b8702c' },
+  { key:'bread',    th:'ขนมปังปิ้ง',             kind:'toast' },
+  { key:'cookie',   th:'คุกกี้ · ของว่าง',       kind:'cookie' },
+];
+
+/* ---------- ตัวช่วยวาด ---------- */
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function grad(ctx, y0, y1, a, b) {
+  const g = ctx.createLinearGradient(0, y0, 0, y1);
+  g.addColorStop(0, a);
+  g.addColorStop(1, b);
+  return g;
+}
+
+function background(ctx) {
+  ctx.fillStyle = grad(ctx, 0, SIZE, BG.top, BG.bottom);
+  ctx.fillRect(0, 0, SIZE, SIZE);
+  // วงแสงหลังแก้ว ทำให้ของที่วางอยู่ลอยออกมาจากพื้น ไม่จมไปกับสีน้ำเงิน
+  const g = ctx.createRadialGradient(SIZE / 2, SIZE * .46, 10, SIZE / 2, SIZE * .46, SIZE * .46);
+  g.addColorStop(0, 'rgba(255,255,255,.26)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+}
+
+function shadow(ctx, cx, cy, rx, ry) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,.30)';
+  ctx.filter = 'blur(6px)';
+  ctx.fill();
+  ctx.restore();
+}
+
+/* โลโก้ร้านบนแก้ว — เมล็ดกาแฟในวงกลม + ชื่อร้าน
+   วาดเป็นสีขาวทึบเลียนแบบการพิมพ์สกรีนสีขาวบนแก้วใสแบบที่ร้านใช้จริง */
+function logo(ctx, cx, cy, scale) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(scale, scale);
+
+  /* เงาอ่อน ๆ ใต้โลโก้ — จำเป็นเพราะโลโก้เป็นสีขาว แต่พื้นหลังที่มันไปวางทับ
+     เปลี่ยนไปตามสีเครื่องดื่ม บนกาแฟดำอ่านชัด แต่บนชั้นนมของลาเต้/โกโก้
+     ขาวบนครีมแทบจะหายไปเลย ใส่เงาแล้วอ่านออกครบทุกหมวดโดยไม่ต้องขยับตำแหน่ง */
+  ctx.shadowColor = 'rgba(0,0,0,.38)';
+  ctx.shadowBlur = 7;
+  ctx.shadowOffsetY = 1;
+
+  ctx.strokeStyle = 'rgba(255,255,255,.95)';
+  ctx.fillStyle = 'rgba(255,255,255,.95)';
+
+  ctx.lineWidth = 2.6;
+  ctx.beginPath();
+  ctx.arc(0, 0, 15, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // เมล็ดกาแฟ — สองส่วนโค้งประกบกัน
+  ctx.beginPath();
+  ctx.moveTo(0, -9);
+  ctx.bezierCurveTo(7, -4, 7, 4, 0, 9);
+  ctx.bezierCurveTo(-7, 4, -7, -4, 0, -9);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.18)';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(0, -8);
+  ctx.lineTo(0, 8);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255,255,255,.95)';
+  ctx.textAlign = 'center';
+  ctx.font = '800 15px "Segoe UI", system-ui, sans-serif';
+  ctx.letterSpacing = '2px';
+  ctx.fillText('SBAC', 0, 34);
+  ctx.font = '600 8px "Segoe UI", system-ui, sans-serif';
+  ctx.letterSpacing = '2.6px';
+  ctx.globalAlpha = .85;
+  ctx.fillText('COFFEE STUDIO', 0, 47);
+  ctx.restore();
+}
+
+/* เส้นทางของตัวแก้วเย็น — ทรงสอบลงหาก้นแก้ว มุมล่างมน */
+function coldBody(ctx) {
+  const TX = 184, BX = 212, TY = 208, BY = 508, R = 26;
+  ctx.beginPath();
+  ctx.moveTo(TX, TY);
+  ctx.lineTo(SIZE - TX, TY);
+  ctx.lineTo(SIZE - BX + 4, BY - R);
+  ctx.quadraticCurveTo(SIZE - BX, BY, SIZE - BX - R, BY);
+  ctx.lineTo(BX + R, BY);
+  ctx.quadraticCurveTo(BX, BY, BX - 4, BY - R);
+  ctx.closePath();
+  return { TY: TY, BY: BY };
+}
+
+function coldCup(ctx, d) {
+  shadow(ctx, SIZE / 2, 524, 122, 15);
+
+  const b = coldBody(ctx);
+  ctx.save();
+  ctx.clip();
+
+  // ระดับเครื่องดื่ม เว้นช่องอากาศใต้ฝาไว้นิดหนึ่ง ไม่งั้นดูเหมือนแก้วล้น
+  const top = b.TY + 14;
+  ctx.fillStyle = grad(ctx, top, b.BY, d.top, d.bottom);
+  ctx.fillRect(0, top, SIZE, b.BY - top);
+
+  if (d.milk > 0) {
+    const mh = (b.BY - top) * d.milk;
+    ctx.fillStyle = 'rgba(253,246,236,.94)';
+    ctx.fillRect(0, b.BY - mh, SIZE, mh);
+    // รอยต่อชั้นนมกับกาแฟ ไล่จาง ๆ ไม่ให้เป็นเส้นตรงเป๊ะแบบกราฟ
+    const gg = ctx.createLinearGradient(0, b.BY - mh - 26, 0, b.BY - mh + 8);
+    gg.addColorStop(0, 'rgba(253,246,236,0)');
+    gg.addColorStop(1, 'rgba(253,246,236,.85)');
+    ctx.fillStyle = gg;
+    ctx.fillRect(0, b.BY - mh - 26, SIZE, 34);
+  }
+
+  if (d.pearls) {
+    ctx.fillStyle = 'rgba(40,22,12,.88)';
+    const P = [[248,470],[286,482],[324,468],[352,484],[268,494],[312,496]];
+    for (const p of P) { ctx.beginPath(); ctx.arc(p[0], p[1], 13, 0, Math.PI * 2); ctx.fill(); }
+  }
+
+  if (d.ice) {
+    ctx.fillStyle = 'rgba(255,255,255,.34)';
+    const I = [[212,236,62,56,-14],[296,224,66,58,11],[250,306,60,54,21],[330,300,56,52,-8],[218,352,54,48,7]];
+    for (const c of I) {
+      ctx.save();
+      ctx.translate(c[0] + c[2] / 2, c[1] + c[3] / 2);
+      ctx.rotate(c[4] * Math.PI / 180);
+      roundRect(ctx, -c[2] / 2, -c[3] / 2, c[2], c[3], 14);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  if (d.fizz) {
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    const F = [[238,300,7],[270,350,5],[300,280,6],[336,330,5],[258,410,6],[318,420,4],[286,460,5]];
+    for (const f of F) { ctx.beginPath(); ctx.arc(f[0], f[1], f[2], 0, Math.PI * 2); ctx.fill(); }
+  }
+
+  // แสงสะท้อนบนผิวพลาสติก — ขอบซ้ายสว่างกว่าขอบขวา
+  const sg = ctx.createLinearGradient(184, 0, 416, 0);
+  sg.addColorStop(0, 'rgba(255,255,255,.30)');
+  sg.addColorStop(.28, 'rgba(255,255,255,.04)');
+  sg.addColorStop(.75, 'rgba(255,255,255,0)');
+  sg.addColorStop(1, 'rgba(255,255,255,.16)');
+  ctx.fillStyle = sg;
+  ctx.fillRect(0, b.TY, SIZE, b.BY - b.TY);
+  ctx.restore();
+
+  coldBody(ctx);
+  ctx.strokeStyle = 'rgba(255,255,255,.55)';
+  ctx.lineWidth = 6;
+  ctx.stroke();
+
+  // ฝาโดม
+  ctx.beginPath();
+  ctx.moveTo(216, 176);
+  ctx.bezierCurveTo(216, 140, 384, 140, 384, 176);
+  ctx.strokeStyle = 'rgba(255,255,255,.42)';
+  ctx.lineWidth = 6;
+  ctx.stroke();
+
+  roundRect(ctx, 168, 174, 264, 30, 12);
+  ctx.fillStyle = 'rgba(255,255,255,.18)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.55)';
+  ctx.lineWidth = 6;
+  ctx.stroke();
+
+  logo(ctx, SIZE / 2, 372, 1.5);
+}
+
+function hotCup(ctx, d) {
+  shadow(ctx, SIZE / 2, 520, 112, 14);
+
+  // ไอร้อน — บอกว่าเป็นเครื่องดื่มร้อนโดยไม่ต้องมีข้อความ
+  ctx.strokeStyle = 'rgba(255,255,255,.42)';
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'round';
+  for (const x of [252, 300, 348]) {
+    ctx.beginPath();
+    ctx.moveTo(x, 150);
+    ctx.bezierCurveTo(x - 16, 126, x + 16, 110, x, 86);
+    ctx.stroke();
+  }
+
+  const TX = 196, BX = 222, TY = 208, BY = 500, R = 22;
+  ctx.beginPath();
+  ctx.moveTo(TX, TY);
+  ctx.lineTo(SIZE - TX, TY);
+  ctx.lineTo(SIZE - BX + 4, BY - R);
+  ctx.quadraticCurveTo(SIZE - BX, BY, SIZE - BX - R, BY);
+  ctx.lineTo(BX + R, BY);
+  ctx.quadraticCurveTo(BX, BY, BX - 4, BY - R);
+  ctx.closePath();
+  ctx.fillStyle = grad(ctx, TY, BY, '#fbf7f0', '#e4d9c9');
+  ctx.fill();
+
+  // ปลอกกันร้อนสีเครื่องดื่ม ใช้เป็นแถบสีประจำหมวดแทนสีน้ำในแก้วที่มองไม่เห็น
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = grad(ctx, 320, 430, d.top, d.bottom);
+  ctx.fillRect(0, 320, SIZE, 110);
+  const sg = ctx.createLinearGradient(196, 0, 404, 0);
+  sg.addColorStop(0, 'rgba(0,0,0,.14)');
+  sg.addColorStop(.3, 'rgba(255,255,255,.22)');
+  sg.addColorStop(1, 'rgba(0,0,0,.16)');
+  ctx.fillStyle = sg;
+  ctx.fillRect(0, TY, SIZE, BY - TY);
+  ctx.restore();
+
+  ctx.strokeStyle = 'rgba(255,255,255,.5)';
+  ctx.lineWidth = 5;
+  ctx.stroke();
+
+  // ฝาแก้วกระดาษ
+  roundRect(ctx, 180, 172, 240, 36, 13);
+  ctx.fillStyle = '#f3ece1';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.5)';
+  ctx.lineWidth = 5;
+  ctx.stroke();
+  roundRect(ctx, 194, 160, 212, 18, 9);
+  ctx.fillStyle = '#e8dfd1';
+  ctx.fill();
+
+  logo(ctx, SIZE / 2, 372, 1.35);
+}
+
+function plate(ctx) {
+  shadow(ctx, SIZE / 2, 452, 158, 18);
+  ctx.beginPath();
+  ctx.ellipse(SIZE / 2, 420, 168, 62, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#f6f2ea';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(SIZE / 2, 414, 132, 46, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#eee7db';
+  ctx.fill();
+}
+
+function toast(ctx) {
+  plate(ctx);
+  ctx.save();
+  ctx.translate(SIZE / 2, 366);
+  ctx.rotate(-.06);
+
+  // ขอบขนมปัง (ส่วนที่เกรียม) วาดใหญ่กว่าเนื้อในเล็กน้อย
+  roundRect(ctx, -132, -96, 264, 192, 34);
+  ctx.fillStyle = grad(ctx, -96, 96, '#d59a4e', '#b9762f');
+  ctx.fill();
+
+  roundRect(ctx, -114, -78, 228, 156, 24);
+  ctx.fillStyle = grad(ctx, -78, 78, '#f6d79a', '#e8b76a');
+  ctx.fill();
+
+  // รอยไหม้จาง ๆ ให้ไม่ดูเป็นสี่เหลี่ยมสีเดียว
+  ctx.globalAlpha = .16;
+  ctx.fillStyle = '#8a5220';
+  for (const s of [[-70,-36,38,20],[16,-18,46,22],[-34,30,52,20],[44,44,32,16]]) {
+    roundRect(ctx, s[0], s[1], s[2], s[3], 9);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // เนยละลาย
+  ctx.fillStyle = 'rgba(255,236,168,.9)';
+  roundRect(ctx, -34, -30, 66, 50, 12);
+  ctx.fill();
+  ctx.restore();
+
+  logo(ctx, SIZE / 2, 500, 1.15);
+}
+
+function cookies(ctx) {
+  plate(ctx);
+  const C = [[248, 356, 74], [352, 344, 70], [300, 408, 66]];
+  for (const c of C) {
+    ctx.beginPath();
+    ctx.arc(c[0], c[1], c[2], 0, Math.PI * 2);
+    ctx.fillStyle = grad(ctx, c[1] - c[2], c[1] + c[2], '#d9a25f', '#a9702f');
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(120,74,28,.35)';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    ctx.fillStyle = '#4a2a12';
+    const off = [[-.35,-.3],[.3,-.15],[-.1,.35],[.4,.4],[-.45,.15]];
+    for (const o of off) {
+      ctx.beginPath();
+      ctx.arc(c[0] + o[0] * c[2], c[1] + o[1] * c[2], c[2] * .13, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  logo(ctx, SIZE / 2, 500, 1.15);
+}
+
+/* ---------- วาดหนึ่งช่อง ---------- */
+function paint(canvas, d) {
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.scale(canvas.width / SIZE, canvas.height / SIZE);
+  background(ctx);
+  if (d.kind === 'cold') coldCup(ctx, d);
+  else if (d.kind === 'hot') hotCup(ctx, d);
+  else if (d.kind === 'toast') toast(ctx);
+  else if (d.kind === 'cookie') cookies(ctx);
+  ctx.restore();
+}
+
+/* ---------- แสดงผล ---------- */
+const grid = document.getElementById('grid');
+for (const d of MENU) {
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  cell.innerHTML =
+    '<canvas class="big" width="' + SIZE + '" height="' + SIZE + '"></canvas>' +
+    '<div class="real"><canvas width="64" height="64"></canvas><canvas width="44" height="44"></canvas></div>' +
+    '<div class="k">' + d.key + '.jpg</div><div class="th">' + d.th + '</div>';
+  grid.appendChild(cell);
+  cell.querySelectorAll('canvas').forEach((c) => paint(c, d));
+}
+
+/* ---------- ส่งออก ---------- */
+function render(d) {
+  const c = document.createElement('canvas');
+  c.width = c.height = SIZE;
+  paint(c, d);
+  return new Promise((res) => c.toBlob(res, 'image/jpeg', QUALITY));
+}
+
+function setStatus(msg, cls) {
+  const s = document.getElementById('status');
+  s.textContent = msg;
+  s.className = 'status ' + (cls || '');
+}
+
+document.getElementById('saveDir').onclick = async () => {
+  if (!window.showDirectoryPicker) return setStatus('เบราว์เซอร์นี้เซฟลงโฟลเดอร์ไม่ได้ ใช้ปุ่มดาวน์โหลดแทนครับ', 'bad');
+  try {
+    const dir = await window.showDirectoryPicker({ mode: 'readwrite' });
+    for (const d of MENU) {
+      const blob = await render(d);
+      const fh = await dir.getFileHandle(d.key + '.jpg', { create: true });
+      const w = await fh.createWritable();
+      await w.write(blob);
+      await w.close();
+    }
+    setStatus('เซฟแล้ว ' + MENU.length + ' ไฟล์ — เปิดหน้าเมนูในแอปได้เลย (ถ้ารูปยังเป็นอันเก่า กด Ctrl+Shift+R)', 'good');
+  } catch (e) {
+    if (e.name !== 'AbortError') setStatus('เซฟไม่สำเร็จ: ' + e.message, 'bad');
+  }
+};
+
+document.getElementById('saveDl').onclick = async () => {
+  for (const d of MENU) {
+    const blob = await render(d);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = d.key + '.jpg';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    await new Promise((r) => setTimeout(r, 220));
+  }
+  setStatus('ดาวน์โหลด ' + MENU.length + ' ไฟล์แล้ว — ย้ายไปไว้ใน public/menu/ ได้เลย', 'good');
+};
+</script>
+</body>
+</html>
