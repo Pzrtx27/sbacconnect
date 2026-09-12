@@ -1,5 +1,6 @@
 import { Home, Calendar, ShoppingCart, HeartHandshake } from 'lucide-react';
 import CoffeeCup from '../ui/icons/CoffeeCup';
+import { timetableTitle } from '../../utils/timetable';
 
 /* เมนูนำทาง แยกออกมาจาก BottomNav เพราะตอนนี้มีสองที่ที่ต้องใช้ชุดเดียวกัน:
      มือถือ  -> BottomNav (แถบล่าง)
@@ -9,13 +10,15 @@ import CoffeeCup from '../ui/icons/CoffeeCup';
 const navConfigs = {
   student: [
     { id: 'home', path: '/home', icon: Home, label: 'หน้าหลัก' },
-    { id: 'timetable', path: '/timetable', icon: Calendar, label: 'ตารางสอน' },
+    /* คำในเมนูต่างกันตามบทบาท: นักเรียนเห็น "ตารางเรียน" ครู/วิชาการเห็น "ตารางสอน"
+       หน้าปลายทางเป็นหน้าเดียวกัน ต่างแค่คำเรียกของคนที่เปิดดู (ดู timetableTitle) */
+    { id: 'timetable', path: '/timetable', icon: Calendar, label: timetableTitle('student') },
     { id: 'coffee', path: '/coffee', icon: CoffeeCup, label: 'กาแฟ' },
     { id: 'orders', path: '/orders', icon: ShoppingCart, label: 'คำสั่งซื้อ' },
   ],
   teacher: [
     { id: 'home', path: '/teacher', icon: Home, label: 'หน้าหลัก' },
-    { id: 'timetable', path: '/timetable', icon: Calendar, label: 'ตารางสอน' },
+    { id: 'timetable', path: '/timetable', icon: Calendar, label: timetableTitle('teacher') },
     { id: 'coffee', path: '/coffee', icon: CoffeeCup, label: 'กาแฟ' },
     { id: 'orders', path: '/orders', icon: ShoppingCart, label: 'คำสั่งซื้อ' },
   ],
@@ -28,7 +31,7 @@ const navConfigs = {
   academic: [
     { id: 'home', path: '/academic', icon: Home, label: 'หน้าหลัก' },
     { id: 'development', path: '/development', icon: HeartHandshake, label: 'ฝ่ายพัฒนา' },
-    { id: 'timetable', path: '/timetable', icon: Calendar, label: 'ตารางสอน' },
+    { id: 'timetable', path: '/timetable', icon: Calendar, label: timetableTitle('academic') },
   ],
   barista: [
     { id: 'barista', path: '/barista', icon: CoffeeCup, label: 'ร้านกาแฟ' },
