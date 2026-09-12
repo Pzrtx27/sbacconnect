@@ -95,7 +95,21 @@ export default function StudentTimetable() {
      กันนักเรียนไว้ที่เงื่อนไข role ด้วยอีกชั้น ถึงแม้นักเรียนจะไม่มีทางมี key ในแผนที่นั้นอยู่แล้ว
      (ไม่มี teacher_code และอีเมลก็ไม่ได้ถูกใส่ไว้) — ฝั่งนักเรียนต้องไม่เปลี่ยนอะไรเลยแม้แต่นิดเดียว */
   const isStudentRole = (user?.role || 'student').toLowerCase().trim() === 'student';
-  const teacherMode = !isStudentRole && hasTeacherTimetable(user);
+  const isTeacherRole = (user?.role || '').toLowerCase().trim() === 'teacher';
+
+  /* ครูต้องอยู่โหมด "ตารางสอนของฉัน" เสมอ ไม่ใช่เฉพาะคนที่ตั้งชีตไว้แล้ว
+   *
+   * ของเดิม teacherMode ผูกกับ hasTeacherTimetable() ครูที่ยังไม่ได้ตั้งชีต
+   * จึงตกไปเส้นทางของนักเรียน แล้ว viewClassId ใช้ค่า fallback 'm3_6'
+   * ผลคือเปิด "ตารางสอนของฉัน" มาเห็นตารางของห้อง ปวช.3/6 พร้อมบรรทัด
+   * "อาจารย์ที่ปรึกษา: อ.ปิยะนุช" ทั้งที่ไม่ได้เกี่ยวกับตัวเองเลย
+   * และไม่มีอะไรบอกว่านี่ไม่ใช่ของเขา — ผิดแบบเงียบ ๆ ซึ่งแย่กว่าไม่มีข้อมูล
+   *
+   * fetchTeacherTimetable() มีทางออก source: 'unset' รองรับไว้แล้ว
+   * แต่เดิมเข้าไม่ถึงเพราะด่านนี้กันไว้ก่อน กลายเป็นโค้ดตาย
+   *
+   * ฝ่ายวิชาการ/แอดมินไม่เข้าโหมดนี้ เพราะหน้าที่ของเขาคือไล่ดูตารางของห้องต่าง ๆ */
+  const teacherMode = isTeacherRole || (!isStudentRole && !isAcademic && hasTeacherTimetable(user));
 
   const [viewClassId, setViewClassId] = useState(initialClassId);
   const [classIds, setClassIds] = useState([]);
@@ -353,6 +367,26 @@ export default function StudentTimetable() {
           </span>
         </div>
       </div>
+
+      {/* ครูที่ยังไม่ได้ผูกตารางสอนของตัวเอง
+          ต้องบอกตรง ๆ ว่ายังไม่มี ไม่ใช่โชว์ตารางของห้องอื่นให้เข้าใจผิด
+          และต้องบอกด้วยว่าไปให้ใครทำ ไม่ใช่ปล่อยให้เจอทางตัน */}
+      {source === 'unset' && (
+        <div
+          role="status"
+          className={`rounded-2xl border p-4 space-y-1.5 transition-colors duration-300 ${
+            isDark ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50 border-amber-200'
+          }`}
+        >
+          <p className={`text-xs font-extrabold ${isDark ? 'text-accent-amber' : 'text-amber-700'}`}>
+            ยังไม่ได้ผูกตารางสอนของคุณ
+          </p>
+          <p className={`text-[12px] font-semibold leading-relaxed ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
+            บัญชีนี้ยังไม่มีตารางสอนส่วนตัวในระบบ จึงยังไม่มีอะไรให้แสดง
+            แจ้งฝ่ายวิชาการให้เพิ่มตารางสอนของคุณเข้าระบบก่อน
+          </p>
+        </div>
+      )}
 
       {/* ประกาศสอนแทนล่วงหน้า — ของวันถัดไป ไม่ใช่วันนี้
           แยกเป็นการ์ดเพราะตารางด้านล่างเป็นแม่แบบรายสัปดาห์ ไม่ผูกกับสัปดาห์ใดสัปดาห์หนึ่ง

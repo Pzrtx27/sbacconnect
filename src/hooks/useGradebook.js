@@ -151,7 +151,46 @@ export function useGradebookSubjects({ classRoomId = null, term = null, enabled 
 
   useRealtimeTable({ table: 'subjects', onChange: load, enabled });
 
-  return { subjects, loading, error, reload: load };
+  /* เพิ่ม/แก้รายวิชา — upsert_subject กับ archive_subject มีอยู่ใน DB ตั้งแต่ไฟล์ 40
+     พร้อม grant ให้ authenticated แล้ว แต่ไม่เคยมีโค้ดฝั่งเว็บเรียกเลยสักที่
+     ทางเดียวที่เพิ่มวิชาได้คือเปิด SQL Editor ซึ่งฝ่ายวิชาการไม่ได้ทำเป็น
+     แถม empty state สองจุดยังเขียนชี้ให้ไปหาหน้าจอที่ไม่มีอยู่ */
+  const saveSubject = useCallback(async (payload) => {
+    const { data, error: rpcError } = await supabase.rpc('upsert_subject', {
+      p_subject_id:      payload.subjectId ?? null,
+      p_class_room_id:   payload.classRoomId ?? null,
+      p_term:            payload.term ?? null,
+      p_code:            payload.code ?? null,
+      p_name:            payload.name ?? null,
+      p_credits:         payload.credits ?? null,
+      p_teacher_user_id: payload.teacherUserId ?? null,
+      p_teacher_name:    payload.teacherName ?? null,
+      p_sort_order:      payload.sortOrder ?? null,
+    });
+
+    if (rpcError) {
+      console.error('[score] บันทึกรายวิชาไม่สำเร็จ:', rpcError);
+      return { ok: false, error: 'SETUP' };
+    }
+    if (data?.ok) await load();
+    return data || { ok: false, error: 'UNKNOWN' };
+  }, [load]);
+
+  const archiveSubject = useCallback(async (subjectId, isActive = false) => {
+    const { data, error: rpcError } = await supabase.rpc('archive_subject', {
+      p_subject_id: subjectId,
+      p_is_active: isActive,
+    });
+
+    if (rpcError) {
+      console.error('[score] เก็บรายวิชาไม่สำเร็จ:', rpcError);
+      return { ok: false, error: 'SETUP' };
+    }
+    if (data?.ok) await load();
+    return data || { ok: false, error: 'UNKNOWN' };
+  }, [load]);
+
+  return { subjects, loading, error, reload: load, saveSubject, archiveSubject };
 }
 
 /** สมุดคะแนนของวิชาหนึ่ง — โครงสร้างหัวข้อ + รายชื่อนักเรียน + คะแนนทุกช่อง

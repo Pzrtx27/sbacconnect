@@ -486,3 +486,34 @@ export function applySubstitutions(timetable, subs, dateISO) {
 }
 
 export { isSheetConfigured, TIMETABLE_POLL_INTERVAL_MS };
+
+/* ---------------------------------------------------------------
+   จับคู่ "ชื่อครูที่เป็นข้อความ" กับบัญชีผู้ใช้
+
+   ตาราง substitutions เก็บครูเป็นข้อความอิสระ (substitute_teacher, original_teacher)
+   ที่ฝ่ายวิชาการพิมพ์เอง ไม่ได้ผูกกับ user_id จึงกรองด้วย SQL ไม่ได้เลย
+   ผลคือการ์ด "สอนแทนวันนี้" ในหน้าครู แสดงของทุกห้องทุกครูเหมือนกันหมด
+   ครูอ่านแล้วนึกว่าเป็นของตัวเอง หรือไม่ก็เลิกเชื่อกล่องนี้ไปเลย
+
+   ที่นี่จึงทำได้แค่ "เดาให้ดีที่สุด" แล้วบอกความมั่นใจตามจริงบนหน้าจอ
+   ไม่ใช่แกล้งทำเป็นว่ากรองได้แม่นยำ
+
+   เทียบด้วยชื่อต้น เพราะตารางสอนของที่นี่เขียนแบบ 'อ.ปิยะนุช' (ชื่อต้นอย่างเดียว)
+   ส่วน users.full_name เป็นชื่อเต็มพร้อมนามสกุล
+   --------------------------------------------------------------- */
+const TEACHER_NAME_PREFIX = /^\s*(อ\.|อาจารย์|ครู|นางสาว|นาง|นาย)\s*/;
+
+/** ชื่อต้นที่ตัดคำนำหน้าออกแล้ว — คืน '' เมื่อไม่มีอะไรให้เทียบ */
+export function teacherNameKey(name) {
+  const cleaned = String(name || '').replace(TEACHER_NAME_PREFIX, '').trim();
+  if (!cleaned) return '';
+  return cleaned.split(/\s+/)[0];
+}
+
+/** ข้อความชื่อครูนี้ น่าจะหมายถึงผู้ใช้คนนี้ไหม
+ *  ใช้คำว่า "น่าจะ" จริง ๆ — ชื่อต้นซ้ำกันได้ และคนที่ไม่มีบัญชีก็มี */
+export function looksLikeSameTeacher(textName, user) {
+  const a = teacherNameKey(textName);
+  const b = teacherNameKey(user?.name);
+  return Boolean(a && b && a === b);
+}

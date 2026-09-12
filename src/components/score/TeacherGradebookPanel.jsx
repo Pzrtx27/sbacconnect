@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Search, User, ListChecks, Users, SlidersHorizontal, AlertCircle, Lock } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -9,6 +9,9 @@ import ScoreItemManager from './ScoreItemManager';
 import { useGradebookSubjects, useSubjectGradebook } from '../../hooks/useGradebook';
 import { fmtScore, getScoreTier, scorePercent } from '../../utils/score';
 import { notEnabledMessage, CONTACT } from '../../utils/setupNotice';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../config/supabase';
+import SubjectManager from './SubjectManager';
 
 /* สมุดคะแนนฝั่งอาจารย์ — เนื้อหาของโมดัล "คะแนนระหว่างภาค" ในหน้าครูและหน้าฝ่ายวิชาการ
 
@@ -31,8 +34,31 @@ export default function TeacherGradebookPanel({ classRoomId = null }) {
   const [studentId, setStudentId] = useState(null);
   const [query, setQuery] = useState('');
 
-  const { subjects, loading: subjectsLoading, error: subjectsError } = useGradebookSubjects({ classRoomId });
+  const { subjects, loading: subjectsLoading, error: subjectsError, saveSubject, archiveSubject } =
+    useGradebookSubjects({ classRoomId });
   const gradebook = useSubjectGradebook(subjectId);
+
+  /* จัดการรายวิชาเปิดให้เฉพาะฝ่ายวิชาการกับแอดมิน ตรงกับ app_is_academic_staff()
+     ที่ upsert_subject ใช้เป็นด่านฝั่ง DB ครูทั่วไปเห็นแต่รายการ ไม่เห็นปุ่ม */
+  const { user } = useAuth();
+  const canManageSubjects = ['academic', 'sysadmin'].includes(
+    String(user?.role || '').toLowerCase().trim()
+  );
+
+  const [classRooms, setClassRooms] = useState([]);
+  useEffect(() => {
+    if (!canManageSubjects) return undefined;
+    let alive = true;
+    supabase.rpc('list_class_rooms').then(({ data, error }) => {
+      if (!alive) return;
+      if (error) {
+        console.error('[score] โหลดรายชื่อห้องไม่สำเร็จ:', error);
+        return;
+      }
+      setClassRooms(Array.isArray(data) ? data : []);
+    });
+    return () => { alive = false; };
+  }, [canManageSubjects]);
 
   const textPrimary = isDark ? 'text-white' : 'text-sbac-navy';
   const textSecondary = isDark ? 'text-slate-200' : 'text-ink-secondary';
@@ -121,7 +147,9 @@ export default function TeacherGradebookPanel({ classRoomId = null }) {
                 (upsert_subject มีใน DB แต่ยังไม่มีหน้าจอเรียก) สถานะว่างที่ชี้ไปหา
                 หน้าจอที่ไม่มีอยู่ แย่กว่าไม่บอกอะไร เพราะคนอ่านจะไปหาจนเจอว่าไม่มี */}
             {subjects.length === 0
-              ? 'ยังไม่มีรายวิชาในระบบ — แจ้งผู้ดูแลระบบให้เพิ่มรายวิชาของภาคเรียนนี้ก่อน'
+              ? canManageSubjects
+                ? 'ยังไม่มีรายวิชาในระบบ — กด "เพิ่มรายวิชา" ด้านล่างเพื่อเริ่ม'
+                : 'ยังไม่มีรายวิชาในระบบ — แจ้งฝ่ายวิชาการให้เพิ่มรายวิชาของภาคเรียนนี้ก่อน'
               : 'ไม่พบรายวิชาที่ตรงกับคำค้น'}
           </p>
         )}
@@ -172,6 +200,19 @@ export default function TeacherGradebookPanel({ classRoomId = null }) {
             </div>
           </div>
         ))}
+
+        {/* ฝ่ายวิชาการจัดการรายวิชาได้จากที่นี่ — ที่เดียวกับที่เขามาดูสมุดคะแนนอยู่แล้ว
+            ไม่ต้องไปเปิด SQL Editor เหมือนเดิม และไม่ต้องหาหน้าจอที่ไม่เคยมี */}
+        {canManageSubjects && (
+          <div className={`pt-4 mt-2 border-t ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+            <SubjectManager
+              subjects={subjects}
+              classRooms={classRooms}
+              onSave={saveSubject}
+              onArchive={archiveSubject}
+            />
+          </div>
+        )}
       </div>
     );
   }

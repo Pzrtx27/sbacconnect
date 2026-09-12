@@ -21,6 +21,7 @@ import { useLeaveRequests } from '../../hooks/useLeaveRequests';
 import LeaveRequestList from '../../components/leave/LeaveRequestList';
 import WalletHistory from '../../components/wallet/WalletHistory';
 import GateEntryLog from '../../components/gate/GateEntryLog';
+import MyAttendanceHistory from '../../components/attendance/MyAttendanceHistory';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
 import { useMyClassInfo } from '../../hooks/useMyClassInfo';
@@ -733,7 +734,19 @@ export default function StudentHome() {
           ของเดิมเป็นเลขเขียนตายไว้ (เข้า 07:42 / ออก 16:30) ทุกคนเห็นเหมือนกันหมด
           และมีบรรทัด "ออกนอกสถานศึกษา" ทั้งที่ของจริงไม่มีใครแตะบัตรตอนกลับ */}
       <Modal isOpen={activeModal === 'entry'} onClose={() => setActiveModal(null)} title="เวลาเข้าโรงเรียน" icon={Clock} tone="cyan">
-        <GateEntryLog />
+        <div className="space-y-6">
+          <GateEntryLog />
+
+          {/* เช็คชื่อเข้าแถว — คำถามเดียวกันกับด้านบน ("ฉันมาเรียนไหม") แค่คนละแหล่ง
+              เครื่องแตะบัตร กับ ครูขานชื่อ ของเดิมนักเรียนดูได้แค่แหล่งแรก
+              ส่วนที่ครูบันทึกไว้ทุกวันไม่มีที่ไหนให้เจ้าตัวย้อนดูเลย */}
+          <div>
+            <h3 className={`text-sm font-extrabold mb-3 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+              เช็คชื่อเข้าแถว
+            </h3>
+            <MyAttendanceHistory />
+          </div>
+        </div>
       </Modal>
 
       {/* MODAL: Debts */}

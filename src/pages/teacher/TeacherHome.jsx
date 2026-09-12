@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -22,7 +22,7 @@ import { useBehaviorLogs } from '../../hooks/useBehaviorLogs';
 import { useLeaveRequests } from '../../hooks/useLeaveRequests';
 import { useHomeroomAttendance, ATTENDANCE_OPTIONS, attendanceErrorMessage } from '../../hooks/useHomeroomAttendance';
 import { useRealtimeTable } from '../../hooks/useRealtimeTable';
-import { fetchSubstitutionsForDate, todayISO, classLabel, PERIOD_TIMES } from '../../utils/timetable';
+import { fetchSubstitutionsForDate, todayISO, classLabel, PERIOD_TIMES, looksLikeSameTeacher } from '../../utils/timetable';
 import { buildBehaviorEntries, sumBehaviorPoints } from '../../utils/behavior';
 import {
   Calendar,
@@ -88,6 +88,21 @@ export default function TeacherHome() {
 
   // ฝ่ายวิชาการสั่งสอนแทนกะทันหันตอนคาบกำลังจะเริ่ม ครูต้องเห็นโดยไม่ต้องรีเฟรช
   useRealtimeTable({ table: 'substitutions', onChange: loadSubstitutions });
+
+  /* แยกคาบสอนแทนที่ "น่าจะเป็นของครูคนนี้" ออกจากของห้องอื่น
+     เทียบด้วยชื่อต้น เพราะตาราง substitutions เก็บครูเป็นข้อความ ไม่มี user_id
+     (ดู looksLikeSameTeacher ใน utils/timetable.js) นับทั้งกรณีเป็นคนไปสอนแทน
+     และกรณีเป็นครูเจ้าของคาบที่ถูกสั่งให้คนอื่นสอนแทน — ทั้งสองอย่างเขาต้องรู้ */
+  const mySubs = useMemo(
+    () => substitutions.filter(
+      (s) => looksLikeSameTeacher(s.substitute_teacher, user) || looksLikeSameTeacher(s.original_teacher, user)
+    ),
+    [substitutions, user]
+  );
+  const otherSubs = useMemo(
+    () => substitutions.filter((s) => !mySubs.includes(s)),
+    [substitutions, mySubs]
+  );
 
   /* โหลดรอบแรกแบบไม่พึ่ง realtime — useRealtimeTable เรียก onChange ตอน SUBSCRIBED
      ซึ่งถ้า websocket ต่อไม่ติด (เน็ตโรงเรียน/ชนเพดาน connection) จะต้องรอถึงรอบ poll
@@ -387,12 +402,22 @@ export default function TeacherHome() {
           subsLoaded กันไม่ให้กล่องกะพริบขึ้นมาแวบหนึ่งตอนยังโหลดไม่เสร็จ */}
       {subsLoaded && substitutions.length > 0 && (
         <div className="space-y-3">
-          <span className="text-xs font-bold text-sbac-red flex items-center gap-1">
-            <AlertCircle size={16} />
-            รายการสอนแทนวันนี้ ({substitutions.length} คาบ)
-          </span>
+          {/* ต้องแยก "ของคุณ" ออกจาก "ของห้องอื่น"
+              ของเดิมขึ้นหัวข้อสีแดงว่า "รายการสอนแทนวันนี้" แล้วเทรายการของทุกห้อง
+              ทุกครูลงมาเหมือนกันหมด เพราะ fetchSubstitutionsForDate กรองแค่วันที่
+              ครูอ่านแล้วนึกว่าเป็นคาบของตัวเอง หรือไม่ก็เลิกเชื่อกล่องนี้ไปเลย
 
-          {substitutions.map(sub => (
+              ตาราง substitutions เก็บครูเป็นข้อความที่ฝ่ายวิชาการพิมพ์เอง ไม่มี user_id
+              กรองให้แม่นจึงทำไม่ได้จริง — ที่ทำได้คือเดาด้วยชื่อต้นแล้วบอกตามตรง
+              ว่าอันไหนมั่นใจ อันไหนแค่ให้รับรู้ ดีกว่าปนกันแล้วไม่บอกอะไรเลย */}
+          {mySubs.length > 0 && (
+            <span className="text-xs font-bold text-sbac-red flex items-center gap-1">
+              <AlertCircle size={16} />
+              คาบสอนแทนของคุณวันนี้ ({mySubs.length} คาบ)
+            </span>
+          )}
+
+          {mySubs.map(sub => (
             <div 
               key={sub.id} 
               className={`border rounded-2xl p-4 flex gap-4 items-start shadow-sm transition-colors duration-300 ${
@@ -429,6 +454,37 @@ export default function TeacherHome() {
               </div>
             </div>
           ))}
+
+          {/* ของห้องอื่น — ให้รับรู้ไว้ ไม่ใช่เรื่องที่ต้องลงมือทำ
+              จึงเป็นโทนเงียบและพับไว้ ไม่ใช่กล่องแดงเหมือนของตัวเอง */}
+          {otherSubs.length > 0 && (
+            <details className={`rounded-2xl border transition-colors duration-300 ${
+              isDark ? 'bg-white/[0.03] border-white/10' : 'bg-slate-50 border-slate-100'
+            }`}>
+              <summary className={`px-4 py-3 text-xs font-bold cursor-pointer select-none ${
+                isDark ? 'text-content-secondary' : 'text-ink-secondary'
+              }`}>
+                สอนแทนของห้องอื่นวันนี้ ({otherSubs.length} คาบ)
+              </summary>
+              <ul className="px-4 pb-3 space-y-2">
+                {otherSubs.map(sub => (
+                  <li
+                    key={sub.id}
+                    className={`text-[12px] font-semibold leading-relaxed ${
+                      isDark ? 'text-content-secondary' : 'text-ink-secondary'
+                    }`}
+                  >
+                    <span className="font-bold">คาบ {sub.period}</span> ·{' '}
+                    {classLabel(sub.class_id)} · {sub.subject || 'ไม่ระบุวิชา'}
+                    <br />
+                    สอนแทนโดย {sub.substitute_teacher || 'ยังไม่ระบุ'}
+                    {sub.original_teacher && ` (แทน ${sub.original_teacher})`}
+                    {sub.substitute_room && ` · ย้ายไปห้อง ${sub.substitute_room}`}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </div>
       )}
 

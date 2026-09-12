@@ -25,9 +25,19 @@ export function notEnabledMessage(featureLabel, contact = CONTACT.admin) {
   return `ระบบ${featureLabel}ยังไม่ถูกเปิดใช้งาน กรุณาแจ้ง${contact}`;
 }
 
+/* ฟีเจอร์ที่เตือนไปแล้วในรอบนี้ของหน้าเว็บ
+   useRealtimeTable จะสลับไป polling ทุก 8 วินาทีเมื่อต่อ realtime ไม่ติด
+   ซึ่งเป็นสิ่งที่เกิดขึ้นพอดีตอนที่ยังไม่ได้รัน migration ถ้าเตือนทุกรอบ
+   console จะเต็มไปด้วยบรรทัดเดียวกันจนกลบ error จริงที่ควรเห็น */
+const warned = new Set();
+
 /** รายละเอียดทางเทคนิคสำหรับคนที่แก้ได้ — ลงที่ console ไม่ใช่บนหน้าจอผู้ใช้
- *  เรียกตอนจับ error ได้ คู่กับ notEnabledMessage ที่ส่งให้หน้าจอ */
+ *  เรียกตอนจับ error ได้ คู่กับ notEnabledMessage ที่ส่งให้หน้าจอ
+ *  เตือนครั้งเดียวต่อฟีเจอร์ เพราะข้อความซ้ำไม่ได้ให้ข้อมูลเพิ่ม */
 export function logSetupHint(featureLabel, migrationFile) {
+  if (warned.has(featureLabel)) return;
+  warned.add(featureLabel);
+
   console.error(
     `[setup] ${featureLabel} ยังใช้ไม่ได้ — ยังไม่ได้รัน supabase/migrations/${migrationFile} บนฐานข้อมูล`
   );

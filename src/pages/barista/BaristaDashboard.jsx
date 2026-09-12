@@ -607,9 +607,18 @@ export default function BaristaDashboard() {
                     </span>
                   )}
                 </span>
+                {/* "ยอดขาย" ไม่ใช่ "ยอดรวมทั้งหมด" — ของเดิมรวมบิลที่ยกเลิกเข้าไปด้วย
+                    ทำให้ตัวเลขที่ใช้กระทบยอดปลายวันสูงกว่าเงินในลิ้นชักจริง
+                    ตอนนี้ DB นับเฉพาะใบที่ทำเสร็จ (49_pos_archive_totals.sql)
+                    ส่วนใบที่ยกเลิกยังค้นเจอได้เหมือนเดิม แค่บอกจำนวนแยกไว้ */}
                 <span className="text-accent-amber">
-                  ยอดรวมทั้งหมด {formatBaht(archiveSummary.total_satang)} ฿
+                  ยอดขาย {formatBaht(archiveSummary.total_satang)} ฿
                 </span>
+                {archiveSummary.cancelled_count > 0 && (
+                  <span className="text-accent-rose font-semibold">
+                    ยกเลิก {archiveSummary.cancelled_count} ใบ (ไม่นับในยอดขาย)
+                  </span>
+                )}
               </div>
             ) : null}
           </div>
