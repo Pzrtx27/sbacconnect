@@ -24,17 +24,36 @@ import {
    เครื่องในห้องคอมเป็นเครื่องใช้ร่วม ถ้าเก็บรหัสไว้ด้วยคนถัดไปล็อกอินเป็นคนก่อนหน้าได้เลย */
 const REMEMBER_KEY = 'sbac_remembered_username';
 
+/* จำหยาบ ๆ ว่าชื่อผู้ใช้ที่จำไว้ข้างบนเป็นบัญชี "บุคลากร" หรือ "นักเรียน"
+   ใช้ตัดสินอย่างเดียวว่าจะโชว์ทางเดินขอรหัสใหม่ของนักเรียนไหม ไม่ใช่สิทธิ์อะไรทั้งสิ้น
+   แก้ค่านี้ใน devtools แล้วไม่ได้อะไรเพิ่ม นอกจากทำให้ตัวเองไม่เห็นข้อความช่วยเหลือ
+
+   ต้องใช้วิธีจำแบบนี้เพราะหน้าล็อกอินแยก role ตอนกดปุ่มไม่ได้จริง ๆ
+   ยังไม่ได้ล็อกอิน + policy roles_self_select ใน 03_rls.sql เปิดให้อ่าน user_roles
+   เฉพาะคนที่ล็อกอินแล้ว และห้ามเปิดช่องเช็ค role จากชื่อผู้ใช้ก่อนล็อกอินเด็ดขาด
+   ไม่งั้นใครพิมพ์ชื่อผู้ใช้ก็รู้ได้ว่าบัญชีไหนเป็นแอดมิน */
+const REMEMBER_KIND_KEY = 'sbac_remembered_kind';
+
+/** บุคลากร = ทุกบทบาทที่ไม่ใช่นักเรียน (ครู ฝ่ายวิชาการ แอดมิน ร้านค้า การเงิน)
+ *  ดู roles ทั้งอาร์เรย์ ไม่ใช่ role เดี่ยว เพราะคนหนึ่งมีได้หลายบทบาท */
+function isStaffUser(user) {
+  const roles = user?.roles?.length ? user.roles : [user?.role];
+  return roles.some((r) => r && r !== 'student');
+}
+
 export default function LoginPage() {
   const [userId, setUserId] = useState('');
   const [nationalId, setNationalId] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
-  /* กล่องบอกวิธีขอรหัสใหม่ — เปิดเองเมื่อล็อกอินไม่ผ่าน หรือกดปุ่ม "ลืมรหัสผ่าน?"
+  /* กล่องบอกวิธีขอรหัสใหม่ — ขึ้นเฉพาะตอนกดปุ่ม "ลืมรหัสผ่าน?" เท่านั้น
      ของเดิมข้อความนี้เป็น toast ซึ่งหายไปเองใน 3 วินาที
      คนที่กำลังจดว่าต้องไปตึกไหนชั้นไหนอ่านไม่ทัน แล้วไม่มีทางเรียกกลับมาดูซ้ำ
-     นอกจากกดปุ่มใหม่ให้มันเด้งอีกรอบ */
+     นอกจากกดปุ่มใหม่ให้มันเด้งอีกรอบ — จึงเปลี่ยนมาเป็นกล่องที่ค้างจนกว่าจะกดปิด */
   const [showHelp, setShowHelp] = useState(false);
+  /* ชื่อผู้ใช้ของบัญชีบุคลากรที่เครื่องนี้จำไว้ (ตัวพิมพ์เล็ก) — ว่างแปลว่าไม่มี */
+  const [staffUsername, setStaffUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [lang, setLang] = useState('TH');
   const passwordRef = useRef(null);
@@ -48,6 +67,11 @@ export default function LoginPage() {
       const saved = localStorage.getItem(REMEMBER_KEY);
       if (saved) setUserId(saved);
       else setRememberMe(false);
+      /* ผูกกับชื่อผู้ใช้ที่จำไว้เสมอ ไม่ใช่ผูกกับ "เครื่อง"
+         ถ้านักเรียนมายืมโน้ตบุ๊กครูแล้วพิมพ์ชื่อตัวเอง ต้องได้ข้อความช่วยเหลือกลับมา */
+      if (saved && localStorage.getItem(REMEMBER_KIND_KEY) === 'staff') {
+        setStaffUsername(saved.trim().toLowerCase());
+      }
     } catch {
       /* ignore */
     }
@@ -67,8 +91,15 @@ export default function LoginPage() {
     setIsLoading(false);
     if (result.success) {
       try {
-        if (rememberMe) localStorage.setItem(REMEMBER_KEY, userId.trim());
-        else localStorage.removeItem(REMEMBER_KEY);
+        if (rememberMe) {
+          localStorage.setItem(REMEMBER_KEY, userId.trim());
+          /* เขียนทับทุกครั้งที่ล็อกอินสำเร็จ ไม่ใช่เขียนเฉพาะตอนเป็นบุคลากร
+             ไม่งั้นเครื่องที่ครูเคยใช้จะค้างสถานะ staff ไว้ให้นักเรียนคนถัดไป */
+          localStorage.setItem(REMEMBER_KIND_KEY, isStaffUser(result.user) ? 'staff' : 'student');
+        } else {
+          localStorage.removeItem(REMEMBER_KEY);
+          localStorage.removeItem(REMEMBER_KIND_KEY);
+        }
       } catch {
         /* ignore */
       }
@@ -85,10 +116,13 @@ export default function LoginPage() {
     } else {
       setError(result.error);
       showToast(result.error, 'error');
-      /* ล็อกอินไม่ผ่านคือจังหวะเดียวที่คนอยากรู้ว่า "แล้วต้องไปเอารหัสใหม่ที่ไหน"
-         ของเดิมข้อความนี้ซ่อนอยู่หลังปุ่ม "ลืมรหัสผ่าน?" ที่ต้องรู้ก่อนว่าต้องกด
-         ตอนนี้ขึ้นเองพร้อมกับข้อความแจ้งเตือน ไม่ว่าจะเป็นบัญชีนักเรียนหรือของฝ่ายวิชาการ */
-      setShowHelp(true);
+      /* ห้ามเปิดกล่อง "ไปฝ่ายทะเบียน อาคาร 1 ชั้น 1" เองตรงนี้
+
+         ของเดิมเปิดให้อัตโนมัติทุกครั้งที่ล็อกอินไม่ผ่าน ด้วยเหตุผลว่าเป็นจังหวะที่คน
+         อยากรู้พอดี แต่ ณ จุดนี้ยังไม่รู้ว่าคนที่พิมพ์ผิดเป็นนักเรียนหรือบุคลากร
+         ครูที่พิมพ์รหัสตกไปตัวเดียวจึงโดนสั่งให้เดินไปฝ่ายทะเบียนทันทีโดยไม่ได้ขอ
+
+         ปล่อยให้คนกดปุ่ม "ลืมรหัสผ่าน?" เอง = คนที่เห็นข้อความคือคนที่ตั้งใจถามหามันจริง ๆ */
     }
   };
 
@@ -131,6 +165,14 @@ export default function LoginPage() {
 
   const isDark = theme === 'dark';
 
+  /* บัญชีบุคลากรไม่ต้องเห็นทางเดินขอรหัสใหม่ของนักเรียน — ซ่อนทั้งปุ่มและกล่อง
+     เทียบกับชื่อผู้ใช้ที่พิมพ์อยู่ตอนนี้ ไม่ใช่เทียบกับ "เครื่องนี้เคยเป็นของครู"
+     พอลบชื่อครูออกแล้วพิมพ์ชื่อนักเรียน ปุ่มกลับมาเองทันที
+
+     ครอบคลุมเฉพาะเครื่องที่บุคลากรเคยล็อกอินสำเร็จและติ๊กจดจำบัญชีไว้
+     เครื่องที่ไม่เคยล็อกอินยังได้ข้อความกลางเหมือนเดิม เพราะไม่มีทางรู้ว่าใครกด */
+  const hideResetHelp = staffUsername !== '' && userId.trim().toLowerCase() === staffUsername;
+
   // Translations
   const t = {
     title: 'SBAC CONNECT',
@@ -148,15 +190,16 @@ export default function LoginPage() {
     secTitle: lang === 'TH' ? 'ระบบเชื่อมต่อปลอดภัย' : 'Secured Connection',
     secDesc: lang === 'TH' ? 'ข้อมูลถูกเข้ารหัสเพื่อความปลอดภัย' : 'Your data is encrypted for security',
     helpTitle: lang === 'TH' ? 'เข้าสู่ระบบไม่ได้ใช่ไหม' : 'Trouble signing in?',
-    /* ข้อความเดียวใช้กับทุกบทบาท — ฝ่ายทะเบียนเป็นจุดรับเรื่องจุดเดียวของทั้งวิทยาลัย
-       (ตามที่ผู้ดูแลระบบกำหนด) ไม่ว่าคนกดจะเป็นนักเรียน ครู ฝ่ายวิชาการ หรือร้านค้า
+    /* ข้อความกลางสำหรับ "คนที่ยังไม่รู้ว่าเป็นใคร" — ณ จังหวะที่กดปุ่มนี้ยังไม่ได้ล็อกอิน
+       จึงไม่มี role ให้เลือกข้อความ (ดู hideResetHelp ข้างบนสำหรับเคสที่พอรู้ได้)
 
        ห้ามเขียนเป็นขั้นตอนของนักเรียนโดยเฉพาะอีก — ของเดิมสั่งให้ "นำบัตรประจำตัวนักเรียน"
        มาด้วย ครู/ฝ่ายวิชาการที่กดปุ่มนี้จึงถูกสั่งให้หยิบบัตรที่ตัวเองไม่มี
        ข้อความนี้จึงพูดถึงแค่ "ไปที่ไหน" ซึ่งเป็นข้อมูลที่ใช้ได้กับทุกคนเหมือนกัน
 
-       หน้านี้ใช้ร่วมกันทุกบทบาท และ ณ จังหวะที่กดปุ่มนี้ยังไม่มีทางรู้ว่าคนกดเป็นใคร
-       — ยังไม่ได้ล็อกอิน หรือล็อกอินไม่ผ่าน จึงไม่มี role ให้เลือกข้อความอยู่ดี
+       ฝั่งผู้ช่วย AI (case 'password' ใน utils/assistant.js) แยกตาม role แล้ว
+       เพราะตรงนั้นล็อกอินผ่านแล้วจึงรู้ว่าคุยกับใครอยู่ — สองที่นี้ไม่ต้องเหมือนกันคำต่อคำ
+       แต่ทางเดินของ "นักเรียน" ต้องตรงกันเสมอ ถ้าจะย้ายจุดรับเรื่อง ต้องแก้ทั้งสองที่
 
        ห้ามใส่เวลาทำการหรือเบอร์ติดต่อลงในข้อความนี้ถ้ายังไม่ได้ยืนยันกับฝ่ายทะเบียน
        ข้อความบนหน้าล็อกอินคือสิ่งที่คนเชื่อแล้วเดินไปตามนั้นจริง */
@@ -372,15 +415,17 @@ export default function LoginPage() {
                   {t.remember}
                 </span>
               </label>
-              <button 
-                type="button" 
-                onClick={() => setShowHelp((v) => !v)}
-                aria-expanded={showHelp}
-                aria-controls="login-help"
-                className="text-xs font-bold text-brand hover:underline transition-colors min-h-[44px] px-1 -mr-1 inline-flex items-center"
-              >
-                {t.forgot}
-              </button>
+              {!hideResetHelp && (
+                <button
+                  type="button"
+                  onClick={() => setShowHelp((v) => !v)}
+                  aria-expanded={showHelp}
+                  aria-controls="login-help"
+                  className="text-xs font-bold text-brand hover:underline transition-colors min-h-[44px] px-1 -mr-1 inline-flex items-center"
+                >
+                  {t.forgot}
+                </button>
+              )}
             </div>
 
             {/* Error Message */}
@@ -399,8 +444,9 @@ export default function LoginPage() {
               </motion.div>
             )}
 
-            {/* วิธีขอรหัสใหม่ — ค้างอยู่จนกว่าจะกดปิด อ่านทันแน่นอน */}
-            {showHelp && (
+            {/* วิธีขอรหัสใหม่ — ค้างอยู่จนกว่าจะกดปิด อ่านทันแน่นอน
+                hideResetHelp กันเคสที่เปิดกล่องค้างไว้ แล้วเพิ่งมาพิมพ์ชื่อผู้ใช้ของบุคลากร */}
+            {showHelp && !hideResetHelp && (
               <motion.div
                 id="login-help"
                 initial={{ opacity: 0, y: -5 }}
