@@ -88,7 +88,11 @@ Deno.serve(async (req) => {
   // ---------- 3) อ่านและตรวจข้อมูลที่ส่งมา ----------
   let body: Record<string, unknown>;
   try {
-    body = await req.json();
+    const parsed: unknown = await req.json();
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return json({ ok: false, error: 'BAD_REQUEST' }, 400);
+    }
+    body = parsed as Record<string, unknown>;
   } catch {
     return json({ ok: false, error: 'BAD_REQUEST' }, 400);
   }

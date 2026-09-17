@@ -47,7 +47,7 @@ declare
   v_id   uuid;
 begin
   -- ---------- ตรวจข้อมูลก่อนแตะตารางใด ๆ ----------
-  if p_role not in ('student', 'teacher') then
+  if p_role is null or p_role not in ('student', 'teacher') then
     return jsonb_build_object('ok', false, 'error', 'INVALID_ROLE');
   end if;
 
@@ -86,6 +86,14 @@ begin
   end if;
 
   if p_role = 'teacher' and exists (select 1 from public.teacher_profiles where teacher_code = v_code) then
+    return jsonb_build_object('ok', false, 'error', 'DUPLICATE_CODE');
+  end if;
+
+  -- รหัส POS อาจถูกผูกไว้แล้วแม้ไม่มี student_profile ที่ใช้รหัสนี้
+  if p_role = 'student' and exists (
+    select 1 from public.user_credentials
+    where kind = 'code' and value = v_code and is_active
+  ) then
     return jsonb_build_object('ok', false, 'error', 'DUPLICATE_CODE');
   end if;
 
@@ -149,11 +157,14 @@ select 'ฟังก์ชัน admin_create_account_rows' as รายกา�
             and proname = 'admin_create_account_rows'
        ) then 'ติดตั้งแล้ว' else 'ยังไม่มี — ตรวจ error ด้านบน' end as ผล
 union all
-select 'สิทธิ์เรียก (ต้องมีแต่ service_role)',
-       coalesce(string_agg(grantee, ', ' order by grantee), 'ไม่มีใครเรียกได้')
-  from information_schema.role_routine_grants
- where specific_schema = 'public'
-   and routine_name = 'admin_create_account_rows'
+select 'สิทธิ์เรียกผ่าน API (ต้องมีแต่ service_role; เจ้าของฟังก์ชันยังเรียกได้)',
+       coalesce(string_agg(role_name, ', ' order by role_name), 'ไม่มีใครเรียกได้')
+  from (values ('anon'), ('authenticated'), ('service_role')) as api_roles(role_name)
+ where has_function_privilege(
+   role_name,
+   'public.admin_create_account_rows(uuid,text,text,text,text,bigint,text,uuid)',
+   'EXECUTE'
+ )
 union all
 select 'ห้องเรียนที่เลือกได้ตอนเพิ่มนักเรียน',
        to_char(count(*), 'FM999999') || ' ห้อง'
