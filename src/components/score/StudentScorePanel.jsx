@@ -3,9 +3,8 @@ import { motion } from 'framer-motion';
 import { ChevronRight, AlertCircle } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import LoadingSpinner from '../ui/LoadingSpinner';
-import ScoreGauge from './ScoreGauge';
 import SubjectScoreDetail from './SubjectScoreDetail';
-import { fmtScore, getScoreTier, scorePercent, scoreErrorMessage, sumScores } from '../../utils/score';
+import { fmtScore, getScoreTier, scorePercent, scoreErrorMessage } from '../../utils/score';
 
 /* เนื้อหาของโมดัล "คะแนนระหว่างภาค" ฝั่งนักเรียน
 
@@ -61,24 +60,12 @@ export default function StudentScorePanel({ subjects, term, loading, error }) {
     );
   }
 
-  const totals = sumScores(subjects);
-  const overallPct = scorePercent(totals.score, totals.max);
-  const overallTier = getScoreTier(overallPct);
-
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <p className={`text-xs font-bold ${textMuted}`}>ภาคเรียน {term || '-'}</p>
-        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${overallTier.chip} ${overallTier.text}`}>
-          {overallTier.emoji} {overallTier.label}
-        </span>
-      </div>
-
-      <ScoreGauge
-        score={totals.score}
-        maxScore={totals.max}
-        caption={`คะแนนเก็บรวม ${subjects.length} รายวิชา`}
-      />
+      {/* ไม่มีแถบสรุปคะแนนรวมข้ามวิชาแล้ว — คนดูจะดูทีละวิชา
+          ยอดรวมทั้งภาคเรียนไม่ได้ถูกใช้ตัดสินใจอะไร และทำให้เข้าใจผิดได้
+          ตอนที่บางวิชายังประกาศคะแนนไม่ครบ (ตัวหารโตแต่ตัวตั้งยังไม่มา) */}
+      <p className={`text-xs font-bold ${textMuted}`}>ภาคเรียน {term || '-'}</p>
 
       <div className="space-y-2">
         <p className={`text-[11px] font-bold ${textMuted}`}>แตะที่รายวิชาเพื่อดูคะแนนรายหัวข้อ T1-T5</p>

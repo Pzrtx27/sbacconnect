@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { notEnabledMessage, logSetupHint, CONTACT } from '../../utils/setupNotice';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../config/supabase';
 import { showToast } from '../../components/ui/Toast';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import {
-  LogOut, Clock, Check, CheckCheck, RefreshCw, X, Archive, Lock, Inbox, Search, Undo2, Receipt,
+  LogOut, Clock, Check, CheckCheck, RefreshCw, X, Archive, Lock, Inbox, Search, Undo2,
 } from 'lucide-react';
 import CoffeeCup from '../../components/ui/icons/CoffeeCup';
 import { formatBaht } from '../../utils/identity';
@@ -21,13 +20,6 @@ import { playChime, unlockAudio } from '../../utils/sound';
 
 export default function BaristaDashboard() {
   const { logout, user } = useAuth();
-  const navigate = useNavigate();
-
-  /* ต้องเทียบกับ roles ทั้งอาร์เรย์ ไม่ใช่ user.role เดียวที่ AuthContext เลือกมา
-     ใช้กติกาเดียวกับ FinanceRoute ใน App.jsx และ app_can_manage_fees() ฝั่ง DB */
-  const canManageFees = (Array.isArray(user?.roles) ? user.roles : []).some(
-    (r) => r === 'cashier' || r === 'sysadmin'
-  );
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -409,21 +401,6 @@ export default function BaristaDashboard() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* ทางเข้าหน้าการเงิน — เปลือกเต็มจอนี้ไม่มี BottomNav/SideNav เลย
-              App.jsx ผูก route /finance ไว้ในเปลือกนี้แล้วพร้อมคอมเมนต์ว่า
-              "จึงต้องมีทางเข้าหน้าการเงินจากในเปลือกเต็มจอนี้" แต่ปุ่มไม่เคยถูกใส่
-              ลิงก์เดียวที่มีอยู่ไปกองที่ /development ซึ่ง role barista เข้าไม่ได้
-              ผลคือคอนโซลการเงินทั้งหน้าเข้าถึงได้ด้วยการพิมพ์ URL อย่างเดียว */}
-          {canManageFees && (
-            <button
-              onClick={() => navigate('/finance')}
-              className="flex items-center gap-1.5 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-accent-emerald rounded-xl text-xs font-bold transition-all"
-              title="ค่าเทอมและค่าธรรมเนียม"
-            >
-              <Receipt size={16} aria-hidden="true" />
-              ฝ่ายการเงิน
-            </button>
-          )}
           <button
             onClick={logout}
             className="p-2 bg-neutral-800 hover:bg-neutral-700 text-accent-rose rounded-xl transition-all"

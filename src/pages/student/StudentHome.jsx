@@ -17,6 +17,12 @@ import { supabase } from '../../config/supabase';
 import { formatBaht } from '../../utils/identity';
 import { timetableTitle } from '../../utils/timetable';
 import { LEAVE_TYPE_LABELS } from '../../utils/leave';
+import {
+  LEAVE_ATTACHMENT_AFTER_DAYS,
+  attachmentHint,
+  needsAttachment,
+  validateAttachment,
+} from '../../utils/leavePolicy';
 import { useLeaveRequests } from '../../hooks/useLeaveRequests';
 import LeaveRequestList from '../../components/leave/LeaveRequestList';
 import WalletHistory from '../../components/wallet/WalletHistory';
@@ -27,7 +33,7 @@ import { useIsDesktop } from '../../hooks/useMediaQuery';
 import { useMyClassInfo } from '../../hooks/useMyClassInfo';
 import { useMyScoreSummary } from '../../hooks/useGradebook';
 import StudentScorePanel from '../../components/score/StudentScorePanel';
-import { calcGpa, fmtScore, getScoreTier, isAnnounced, scorePercent, sumScores, toGrade } from '../../utils/score';
+import { calcGpa, fmtScore, isAnnounced, toGrade } from '../../utils/score';
 import {
   Clock,
   Award,
@@ -172,6 +178,11 @@ export default function StudentHome() {
   const [leaveStartDate, setLeaveStartDate] = useState('');
   const [leaveEndDate, setLeaveEndDate] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
+  /* ไฟล์แนบของรุ่นสาธิต — เก็บไว้ในหน่วยความจำของแท็บนี้เท่านั้น
+     ไม่ได้อัปโหลดขึ้น Storage และไม่ได้ส่งไปกับ submit_leave_request
+     ปิดแท็บแล้วหาย ผู้อนุมัติจึงยังไม่เห็นไฟล์นี้ (ดูข้อความกำกับใต้ช่องเลือกไฟล์) */
+  const [leaveFile, setLeaveFile] = useState(null);
+  const [leaveFileError, setLeaveFileError] = useState('');
   const [submittingLeave, setSubmittingLeave] = useState(false);
 
   /* เรื่องเงินในบัตร ฝั่ง DB ปิดทางไว้หมดตั้งแต่ย้ายมา Supabase:
@@ -201,6 +212,16 @@ export default function StudentHome() {
       showToast('กรุณาระบุเหตุผลการลา', 'error');
       return;
     }
+    if (leaveFileError) {
+      showToast(leaveFileError, 'error');
+      return;
+    }
+    /* เกิน 5 วันต้องมีเอกสารประกอบ — ตรวจตรงนี้ที่เดียวหลังรู้ช่วงวันที่ครบแล้ว
+       ยังเป็นการตรวจฝั่งหน้าเว็บล้วน ๆ เพราะรุ่นสาธิตยังไม่ส่งไฟล์ไปฝั่งเซิร์ฟเวอร์ */
+    if (needsAttachment(leaveStartDate, leaveEndDate) && !leaveFile) {
+      showToast(`ลาเกิน ${LEAVE_ATTACHMENT_AFTER_DAYS} วัน ต้องแนบเอกสารประกอบ`, 'error');
+      return;
+    }
 
     setSubmittingLeave(true);
     const id = await submitLeaveRequest({
@@ -222,6 +243,8 @@ export default function StudentHome() {
     setLeaveStartDate('');
     setLeaveEndDate('');
     setLeaveReason('');
+    setLeaveFile(null);
+    setLeaveFileError('');
   };
 
   // Dark mode aware colors
@@ -230,7 +253,7 @@ export default function StudentHome() {
   const textMuted = isDark ? 'text-content-secondary' : 'text-ink-muted';
   const bgInput = isDark ? 'bg-neutral-900 border-white/20 text-white placeholder:text-content-muted focus:border-sbac-blue-light' : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue';
 
-  /* สรุปคะแนนเก็บ — ใช้ทั้งการ์ดหน้าแรก โมดัล "คะแนนระหว่างภาค" และโมดัล "ผลการเรียน"
+  /* คะแนนเก็บรายวิชา — ใช้ในโมดัล "คะแนนระหว่างภาค" และคิดเกรดในโมดัล "ผลการเรียน"
      ของเดิมเป็นตัวเลขที่เขียนตายไว้ในไฟล์นี้ (ตัวแปร SCORE_ITEMS) นักเรียนทุกคนจึงเห็น
      42/50 วิชาเกม กับ GPA 3.45 เหมือนกันหมดทั้งวิทยาลัย ไม่ว่าจะเรียนห้องไหน
      ตอนนี้มาจาก my_score_summary() ซึ่งคิดจากคะแนนที่อาจารย์กรอกจริง (40_gradebook.sql) */
@@ -241,9 +264,6 @@ export default function StudentHome() {
     error: scoreError,
   } = useMyScoreSummary();
 
-  const scoreTotals = sumScores(scoreSubjects);
-  const scoreAvgPct = scorePercent(scoreTotals.score, scoreTotals.max);
-  const scoreTier = getScoreTier(scoreAvgPct);
   const gpa = calcGpa(scoreSubjects);
 
   return (
@@ -410,8 +430,9 @@ export default function StudentHome() {
           </div>
         </GlassCard>
 
-        {/* Score — ตัวเลขบนการ์ดเป็นของจริงจาก my_score_summary()
-            ของเดิมเขียนแค่ "ดูข้อมูล" ซึ่งไม่ได้ตอบอะไรเลยทั้งที่มีที่ว่างพอจะตอบ */}
+        {/* Score — ไม่โชว์คะแนนรวมข้ามวิชาบนการ์ด
+            ตัวเลขรวมทั้งภาคเรียนไม่ใช่ตัวที่คนดูจริง เวลาเช็คจะดูเป็นรายวิชา
+            ยอดรวมจึงถูกถอดออกทั้งที่การ์ดนี้และในโมดัล เหลือคะแนนรายวิชาอย่างเดียว */}
         <GlassCard onClick={() => setActiveModal('score')}>
           <div className="flex flex-col h-full justify-between min-h-[110px]">
             <div>
@@ -419,15 +440,9 @@ export default function StudentHome() {
               <div className={`text-sm font-extrabold ${textPrimary}`}>คะแนนระหว่างภาค</div>
               <div className={`text-[11px] mt-1 leading-snug ${textMuted}`}>คะแนนเก็บรายหัวข้อ T1-T5</div>
             </div>
-            {scoreLoading || scoreError || scoreSubjects.length === 0 ? (
-              <div className="flex items-center text-xs font-bold text-brand mt-2">
-                ดูข้อมูล <ArrowRight size={14} className="ml-1" />
-              </div>
-            ) : (
-              <span className={`inline-block self-start text-xs font-bold px-3 py-1 rounded-full mt-2 ${scoreTier.chip} ${scoreTier.text}`}>
-                {fmtScore(scoreTotals.score)} / {fmtScore(scoreTotals.max)}
-              </span>
-            )}
+            <div className="flex items-center text-xs font-bold text-brand mt-2">
+              ดูข้อมูล <ArrowRight size={14} className="ml-1" />
+            </div>
           </div>
         </GlassCard>
 
@@ -705,6 +720,41 @@ export default function StudentHome() {
                   className={`w-full border rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none resize-none ${bgInput}`}
                   placeholder="ระบุเหตุผลการลา เช่น ไม่สบาย มีไข้สูง"
                 />
+              </div>
+
+              {/* เอกสารประกอบ — บังคับเมื่อลาเกิน 5 วัน
+                  รุ่นสาธิตนี้ "แนบได้แต่ไม่ส่งไปไหน" ตามที่ตกลงไว้:
+                  ไฟล์อยู่ในหน่วยความจำของแท็บอย่างเดียว ไม่ขึ้น Storage ไม่เข้าฐานข้อมูล
+                  ข้อความใต้ช่องบอกเรื่องนี้ตรง ๆ เพื่อไม่ให้นักเรียนเข้าใจว่าครูเห็นไฟล์แล้ว */}
+              <div>
+                <label htmlFor="leave-attachment" className={`text-xs font-bold block mb-1 ${textPrimary}`}>
+                  เอกสารประกอบ {needsAttachment(leaveStartDate, leaveEndDate) && <span className="text-accent-rose">*</span>}
+                </label>
+                <p className={`text-[11px] mb-2 ${needsAttachment(leaveStartDate, leaveEndDate) ? 'text-accent-amber font-bold' : textMuted}`}>
+                  {attachmentHint(leaveStartDate, leaveEndDate)}
+                </p>
+                <input
+                  id="leave-attachment"
+                  type="file"
+                  accept="application/pdf,image/jpeg,image/png,image/webp"
+                  onChange={e => {
+                    const picked = e.target.files?.[0] || null;
+                    const problem = validateAttachment(picked);
+                    setLeaveFileError(problem);
+                    setLeaveFile(problem ? null : picked);
+                  }}
+                  className={`w-full border rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-sbac-blue file:text-white hover:file:bg-sbac-navy ${bgInput}`}
+                />
+                {leaveFileError ? (
+                  <p role="alert" className="text-[11px] font-bold text-accent-rose mt-1.5">{leaveFileError}</p>
+                ) : leaveFile ? (
+                  <p className={`text-[11px] mt-1.5 ${textMuted}`}>
+                    เลือกแล้ว: <span className={`font-bold ${textSecondary}`}>{leaveFile.name}</span>
+                  </p>
+                ) : null}
+                <p className={`text-[10px] mt-1.5 leading-relaxed ${textMuted}`}>
+                  รุ่นตัวอย่าง: ไฟล์ที่เลือกยังอยู่แค่ในเครื่องคุณ ไม่ถูกส่งให้ผู้อนุมัติ
+                </p>
               </div>
 
               {/* Student Info */}
