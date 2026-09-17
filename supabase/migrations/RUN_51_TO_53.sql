@@ -14,6 +14,10 @@
 --
 -- ทุกส่วนเขียนแบบ idempotent รันซ้ำได้ไม่พัง
 --
+-- ⚠️ ข้อควรระวังตอนต่อไฟล์ — คำสั่งตรวจผลท้ายไฟล์ห้ามเรียกฟังก์ชันที่เช็คสิทธิ์
+--    SQL Editor รันโดยไม่มี auth.uid() ฟังก์ชันพวกนั้นจะ raise exception
+--    แล้วสคริปต์หยุดทั้งไฟล์ ไฟล์ที่ต่อท้ายอยู่จะไม่ถูกรันเลยโดยไม่มีอะไรเตือน
+--
 -- วิธีรัน: Supabase Dashboard > SQL Editor > วางทั้งไฟล์ > Run
 -- SQL Editor แสดงผลเฉพาะคำสั่งสุดท้าย จึงจะเห็นตารางตรวจผลของไฟล์ 53
 -- ถ้าอยากดูผลตรวจของ 51 กับ 52 ให้รันทีละไฟล์แทน
@@ -427,10 +431,26 @@ select 'list_teachers มีเช็คสิทธิ์',
                    and pronamespace = 'public'::regnamespace) like '%app_is_staff%'
             then 'ปิดช่องแล้ว' else 'ยังเปิดอยู่ — ตรวจ error ด้านบน' end
 union all
-select 'ครูที่เลือกได้วันนี้ คาบ 1',
-       to_char(jsonb_array_length(
-         public.available_substitute_teachers((now() at time zone 'Asia/Bangkok')::date, 1)
-       ), 'FM999999') || ' คน';
+/* ห้ามเรียก available_substitute_teachers() ตรงนี้
+
+   ฟังก์ชันนั้นมี app_is_academic_staff() เป็นด่านแรกและ raise exception ถ้าไม่ผ่าน
+   ส่วน SQL Editor รันโดยไม่มี auth.uid() ด่านจึงไม่ผ่านเสมอ แล้ว exception
+   จะทำให้สคริปต์หยุดทั้งไฟล์ ไฟล์ถัดไปที่ต่อท้ายอยู่จะไม่ถูกรันเลย
+   (เคยพังแบบนี้มาแล้วตอนรวมไฟล์ 51-53 — ไฟล์ 53 ไม่ถูกรันเพราะบรรทัดนี้)
+
+   ตรวจว่า "ติดตั้งแล้วหรือยัง" จาก pg_proc แทน ซึ่งไม่ต้องเรียกตัวฟังก์ชัน */
+select 'ฟังก์ชัน available_substitute_teachers',
+       case when exists (
+         select 1 from pg_proc
+          where pronamespace = 'public'::regnamespace
+            and proname = 'available_substitute_teachers'
+       ) then 'ติดตั้งแล้ว' else 'ยังไม่มี — ตรวจ error ด้านบน' end
+union all
+select 'ครูที่ยังใช้งานอยู่',
+       to_char(count(*), 'FM999999') || ' คน'
+  from public.users u
+  join public.user_roles ur on ur.user_id = u.id and ur.role = 'teacher'
+ where u.is_active;
 
 
 -- ###########################################################################
