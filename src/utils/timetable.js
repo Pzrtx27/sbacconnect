@@ -340,7 +340,7 @@ export function describeDate(dateISO) {
    ============================================================ */
 
 const SUB_COLUMNS =
-  'id, class_id, sub_date, period, subject, original_teacher, substitute_teacher, substitute_room, note, updated_at';
+  'id, class_id, sub_date, period, subject, original_teacher, substitute_teacher, substitute_teacher_id, substitute_room, note, updated_at';
 
 /** สอนแทนของห้องหนึ่ง ในช่วงวันที่ [from, to] (ไม่ส่ง to = วันเดียว)
  *  คืน [] เมื่อมีปัญหา — ตารางต้องแสดงได้แม้ต่อ Supabase ไม่ติด */
@@ -392,9 +392,12 @@ export async function fetchSubstitutionsForDate(dateISO) {
  *  และค่าที่ DB อ่านจาก JWT เองก็เชื่อถือได้กว่าค่าที่เบราว์เซอร์ส่งมาอยู่แล้ว */
 export async function saveSubstitution({
   classId, date, period,
-  subject = '', originalTeacher = '', substituteTeacher = '',
+  subject = '', originalTeacher = '', substituteTeacher = '', substituteTeacherId = null,
   substituteRoom = '', note = '',
 }) {
+  /* เขียนสองช่องเสมอ — id สำหรับให้ระบบจับคู่ได้แน่นอน และชื่อสำหรับให้คนอ่าน
+     ชื่อที่คัดลอกเก็บไว้ทำให้ประวัติสอนแทนเก่ายังอ่านรู้เรื่อง
+     แม้ครูคนนั้นจะถูกลบบัญชีไปแล้ว (คอลัมน์ id เป็น on delete set null) */
   const { error } = await supabase.from('substitutions').upsert(
     {
       class_id: classId,
@@ -403,6 +406,7 @@ export async function saveSubstitution({
       subject,
       original_teacher: originalTeacher,
       substitute_teacher: substituteTeacher,
+      substitute_teacher_id: substituteTeacherId || null,
       substitute_room: substituteRoom,
       note,
     },

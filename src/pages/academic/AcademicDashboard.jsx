@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../../config/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import PageHeader from '../../components/layout/PageHeader';
@@ -34,6 +35,7 @@ import { sha256, encryptAES } from '../../utils/crypto';
 import EventManager from './EventManager';
 import BehaviorDeductionWizard from './BehaviorDeductionWizard';
 import HomeroomAssignmentPanel from './HomeroomAssignmentPanel';
+import TeacherAbsencePanel from './TeacherAbsencePanel';
 import TeacherGradebookPanel from '../../components/score/TeacherGradebookPanel';
 import TabNav from '../../components/layout/TabNav';
 import {
@@ -82,7 +84,12 @@ export default function AcademicDashboard() {
      ชื่อวันจึงคำนวณจากวันที่ (weekdayKeyOf) ไม่ให้ผู้ใช้เลือกเอง จะได้ขัดกันไม่ได้ */
   const [subDate, setSubDate] = useState(todayISO());
   const [period, setPeriod] = useState(3);
+  /* เก็บ "id บัญชีครู" ไม่ใช่ชื่อ — ชื่อถูกดึงจากรายการตอนบันทึกอีกที
+     ของเดิมเป็นช่องพิมพ์อิสระ พิมพ์ผิดตัวเดียวแล้วครูที่ถูกสั่งไม่เห็นคาบของตัวเอง */
   const [subTeacher, setSubTeacher] = useState('');
+  const [teacherChoices, setTeacherChoices] = useState([]);
+  const [teacherChoicesError, setTeacherChoicesError] = useState('');
+  const [teacherChoicesLoading, setTeacherChoicesLoading] = useState(false);
   const [roomMode, setRoomMode] = useState('same'); // 'same' or 'new'
   const [room, setRoom] = useState('');
 
@@ -397,7 +404,7 @@ export default function AcademicDashboard() {
      ต้องเคลียร์ทุกครั้งที่เปลี่ยนคาบ ไม่งั้นชื่อครูจากคาบก่อนหน้าจะค้างในช่อง
      แล้วกดบันทึกทีเดียวกลายเป็นสั่งสอนแทนคาบที่ไม่ได้ตั้งใจ */
   useEffect(() => {
-    setSubTeacher(currentSub?.substitute_teacher || '');
+    setSubTeacher(currentSub?.substitute_teacher_id || '');
     if (currentSub?.substitute_room) {
       setRoomMode('new');
       setRoom(currentSub.substitute_room);
@@ -406,6 +413,35 @@ export default function AcademicDashboard() {
       setRoom('');
     }
   }, [currentSub, subDate, period, selectedClassId]);
+
+  /* รายชื่อครูที่เลือกได้ของ "วันที่ + คาบ" ที่กำลังดูอยู่
+     ต้องยิงใหม่ทุกครั้งที่เปลี่ยนวันหรือคาบ เพราะช่วงลาของครูผูกกับวันและคาบ
+     ธง active กันผลลัพธ์ของคำขอเก่ามาทับของใหม่ ตอนคนกดเปลี่ยนคาบรัว ๆ */
+  useEffect(() => {
+    let active = true;
+    setTeacherChoicesLoading(true);
+    setTeacherChoicesError('');
+
+    supabase
+      .rpc('available_substitute_teachers', { p_date: subDate, p_period: Number(period) })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          console.error('[academic] โหลดรายชื่อครูสอนแทนไม่สำเร็จ:', error);
+          setTeacherChoices([]);
+          setTeacherChoicesError(
+            error.code === '42883'
+              ? 'ยังไม่ได้ติดตั้งรายการครูสอนแทน — รัน 52_substitute_picker.sql ก่อน'
+              : 'โหลดรายชื่อครูไม่สำเร็จ กรุณาลองใหม่'
+          );
+        } else {
+          setTeacherChoices(Array.isArray(data) ? data : []);
+        }
+        setTeacherChoicesLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [subDate, period]);
 
   /* หมวดของหน้านี้ เรียงตามความถี่ที่ฝ่ายวิชาการต้องใช้จริง ไม่ใช่ตามลำดับที่โค้ดเคยเขียนไว้
      "รอดำเนินการ" มาก่อนเพราะเป็นคำถามแรกของทุกเช้าว่ามีอะไรค้างรออยู่บ้าง
@@ -423,8 +459,11 @@ export default function AcademicDashboard() {
      ปุ่มนี้ทำได้อย่างเดียวคือสอนแทน ไม่มีทางแก้ตารางประจำเทอมโดยไม่ตั้งใจ
      (ของเดิมปุ่มเดียวทำสองอย่าง เว้นช่องครูสอนแทนว่าง = เขียนทับตารางถาวร) */
   const handleSaveSubstitution = async () => {
-    if (!subTeacher.trim()) {
-      showToast('กรุณาระบุชื่อครูสอนแทน', 'error');
+    /* ต้องเป็นคนที่อยู่ในรายการรอบนี้จริง ๆ เท่านั้น
+       กันกรณีเลือกไว้แล้วเปลี่ยนคาบ จนคนที่เลือกไว้กลายเป็นคนที่ลาในคาบใหม่ */
+    const picked = teacherChoices.find((t) => t.user_id === subTeacher);
+    if (!picked) {
+      showToast('กรุณาเลือกครูสอนแทนจากรายการ', 'error');
       return;
     }
     if (roomMode === 'new' && !room.trim()) {
@@ -442,7 +481,8 @@ export default function AcademicDashboard() {
         // แม้ชีตจะถูกแก้ทีหลัง
         subject: baseSlot?.subject || '',
         originalTeacher: baseSlot?.teacher || '',
-        substituteTeacher: subTeacher.trim(),
+        substituteTeacher: picked.full_name,
+        substituteTeacherId: picked.user_id,
         // โหมด 'same' ส่งค่าว่าง = ใช้ห้องเดิมตามตาราง ไม่ได้แปลว่าไม่มีห้อง
         substituteRoom: roomMode === 'new' ? room.trim() : '',
       });
@@ -625,6 +665,12 @@ export default function AcademicDashboard() {
           )}
         </div>
 
+        {/* ช่วงลาของครู — ต้นทางข้อมูลของตัวคัดกรองในฟอร์มด้านล่าง
+            วางไว้ก่อนฟอร์มเพราะต้องบันทึกช่วงลาให้ครบก่อน รายการครูถึงจะกรองได้ตรง */}
+        <div className="max-w-xs">
+          <TeacherAbsencePanel />
+        </div>
+
         {/* Timetable modification form */}
         <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
           }`}>
@@ -766,17 +812,42 @@ export default function AcademicDashboard() {
               >
                 ครูสอนแทน
               </label>
-              <input
+              <select
                 id="sub-teacher"
-                type="text"
                 value={subTeacher}
+                disabled={teacherChoicesLoading || !!teacherChoicesError || savingSlot}
                 onChange={e => setSubTeacher(e.target.value)}
-                className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 ${isDark
-                  ? 'bg-slate-900 border-white/10 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50 focus:bg-slate-900'
-                  : 'bg-slate-50 border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue focus:bg-surface-card'
+                className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-all duration-200 disabled:opacity-60 ${isDark
+                  ? 'bg-slate-900 border-white/10 text-white focus:border-sbac-blue-light/50'
+                  : 'bg-slate-50 border-slate-200 text-ink focus:border-sbac-blue'
                   }`}
-                placeholder="ระบุชื่อครูสอนแทน"
-              />
+              >
+                <option value="">
+                  {teacherChoicesLoading ? 'กำลังโหลดรายชื่อครู...' : 'เลือกครูสอนแทน'}
+                </option>
+                {teacherChoices.map((t) => (
+                  <option key={t.user_id} value={t.user_id}>
+                    {[t.full_name, t.teacher_code, t.department].filter(Boolean).join(' · ')}
+                  </option>
+                ))}
+              </select>
+
+              {/* บอกตามจริงว่ากรองอะไรให้แล้วและยังไม่ได้กรองอะไร
+                  ถ้าเขียนแค่ "เลือกครูที่ว่าง" คนใช้จะเข้าใจว่าระบบเช็คให้ครบแล้ว
+                  แล้ววันหนึ่งจะจัดครูที่ติดสอนห้องอื่นไปทับโดยไม่มีใครเอะใจ */}
+              {teacherChoicesError ? (
+                <p role="alert" className="text-[11px] font-bold text-accent-rose mt-1.5">
+                  {teacherChoicesError}
+                </p>
+              ) : !teacherChoicesLoading && teacherChoices.length === 0 ? (
+                <p className={`text-[11px] mt-1.5 ${isDark ? 'text-content-muted' : 'text-ink-muted'}`}>
+                  ไม่มีครูที่เลือกได้ในคาบนี้ — ตรวจช่วงลาครู หรือยังไม่มีบัญชีครูในระบบ
+                </p>
+              ) : (
+                <p className={`text-[11px] mt-1.5 leading-relaxed ${isDark ? 'text-content-muted' : 'text-ink-muted'}`}>
+                  คัดครูที่บันทึกวันลาไว้ออกแล้ว · <strong>ยังไม่ได้เช็ค</strong>ว่าติดสอนห้องอื่นในคาบนี้หรือไม่
+                </p>
+              )}
             </div>
 
             <div>
