@@ -16,13 +16,6 @@ import {
   Settings,
   RefreshCw,
   Undo,
-  FileSpreadsheet,
-  Upload,
-  Download,
-  Key,
-  ShieldAlert,
-  Eye,
-  EyeOff,
   Award,
   BookOpen,
   ListChecks,
@@ -31,7 +24,6 @@ import {
   Users,
   Trash2
 } from 'lucide-react';
-import { sha256, encryptAES } from '../../utils/crypto';
 import EventManager from './EventManager';
 import BehaviorDeductionWizard from './BehaviorDeductionWizard';
 import HomeroomAssignmentPanel from './HomeroomAssignmentPanel';
@@ -121,14 +113,6 @@ export default function AcademicDashboard() {
 
   const { confirm: confirmClearSub, confirmDialog: clearSubConfirmDialog } = useConfirm();
 
-  // Excel Sync and Encryption States
-  const [encryptionMode, setEncryptionMode] = useState('sha256'); // 'sha256' | 'aes256' | 'none'
-  const [secretKey, setSecretKey] = useState('');
-  const [showSecretKey, setShowSecretKey] = useState(false);
-  const [parsedStudents, setParsedStudents] = useState([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-
   // จัดการรายการตัด/เพิ่มคะแนนพฤติกรรมทั้งหมด (ทุกครู) — role academic เป็น overseer
   // ตาม list_behavior_logs() ใน 21_behavior_crud_and_academic.sql จึงแก้ไข/ลบได้ทุกรายการ
   const { logs: allBehaviorLogs, loading: allBehaviorLogsLoading, updateLog: updateBehaviorLog, deleteLog: deleteBehaviorLog } = useBehaviorLogs();
@@ -148,224 +132,6 @@ export default function AcademicDashboard() {
 
   // อนุมัติใบลาขั้นที่ 2 (ขั้นสุดท้าย) — เห็นเฉพาะที่ครูประจำชั้นอนุมัติผ่านมาแล้ว (22_leave_requests.sql)
   const { requests: pendingAcademicLeaves, loading: pendingAcademicLeavesLoading, academicDecide } = useLeaveRequests('pending_academic');
-
-  // Dynamic Loader for SheetJS (xlsx) from CDN
-  const loadXLSX = () => {
-    return new Promise((resolve, reject) => {
-      if (window.XLSX) {
-        resolve(window.XLSX);
-        return;
-      }
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-      script.onload = () => resolve(window.XLSX);
-      script.onerror = (err) => reject(err);
-      document.body.appendChild(script);
-    });
-  };
-
-  // Robust Native CSV Parser
-  const parseCSVData = (text) => {
-    const lines = text.split(/\r?\n/);
-    if (lines.length === 0) return [];
-
-    // Headers are in the first line
-    const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
-    const list = [];
-
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      const values = [];
-      let current = '';
-      let inQuotes = false;
-      for (let c = 0; c < line.length; c++) {
-        const char = line[c];
-        if (char === '"' || char === "'") {
-          inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          values.push(current.trim().replace(/^["']|["']$/g, ''));
-          current = '';
-        } else {
-          current += char;
-        }
-      }
-      values.push(current.trim().replace(/^["']|["']$/g, ''));
-
-      const row = {};
-      headers.forEach((header, index) => {
-        row[header] = values[index] || '';
-      });
-      list.push(row);
-    }
-    return list;
-  };
-
-  // Normalizer for uploaded columns
-  const normalizeStudent = (row) => {
-    const getVal = (keys) => {
-      for (const key of keys) {
-        if (row[key] !== undefined) return String(row[key]).trim();
-      }
-      return '';
-    };
-
-    const student_id = getVal(['student_id', 'id', 'รหัสนักเรียน', 'รหัสประจำตัว']);
-    const full_name = getVal(['full_name', 'name', 'ชื่อ-นามสกุล', 'ชื่อ', 'ชื่อเต็ม']);
-    const national_id = getVal(['national_id', 'citizen_id', 'เลขบัตรประชาชน', 'บัตรประชาชน']);
-    const email = getVal(['email', 'อีเมล']);
-    const branch = getVal(['branch', 'สาขา', 'สาขาวิชา']) || 'เทคโนโลยีสารสนเทศ';
-    const year = getVal(['year', 'ชั้นปี', 'ปี']) || '3';
-    const room = getVal(['room', 'ห้อง', 'ชั้น']) || '6';
-    const session = getVal(['session', 'ภาคเรียน', 'รอบ']) || 'เช้า';
-    const class_id = getVal(['class_id', 'class', 'รหัสห้องเรียน']) || `m${year}_${room}`;
-
-    return { student_id, full_name, national_id, email, branch, year, room, session, class_id };
-  };
-
-  // File loading router
-  const handleExcelFile = async (file) => {
-    setIsProcessing(true);
-    try {
-      const reader = new FileReader();
-      if (file.name.endsWith('.csv')) {
-        reader.onload = (e) => {
-          const text = e.target.result;
-          const rows = parseCSVData(text);
-          setParsedStudents(rows);
-          showToast(`โหลดไฟล์สำเร็จ: พบนักเรียน ${rows.length} คน`, 'success');
-          setIsProcessing(false);
-        };
-        reader.readAsText(file, 'UTF-8');
-      } else {
-        const XLSX = await loadXLSX();
-        reader.onload = (e) => {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const json = XLSX.utils.sheet_to_json(worksheet);
-          setParsedStudents(json);
-          showToast(`โหลดไฟล์สำเร็จ: พบนักเรียน ${json.length} คน`, 'success');
-          setIsProcessing(false);
-        };
-        reader.readAsArrayBuffer(file);
-      }
-    } catch (err) {
-      console.error(err);
-      showToast('ล้มเหลวในการอ่านไฟล์', 'error');
-      setIsProcessing(false);
-    }
-  };
-
-  // Excel template generator
-  const downloadTemplate = () => {
-    const headers = 'student_id,full_name,national_id,email,branch,year,room,session,class_id\n';
-    // ข้อมูลสมมติล้วน — ห้ามใส่ชื่อ/เลขบัตรจริงของนักเรียน เพราะ repo นี้เป็น public
-    const sample1 = '66001,นายสมชาย ใจดี,1100100001000,student66001@example.com,เทคโนโลยีสารสนเทศ,3,6,เช้า,m3_6\n';
-    const sample2 = '66002,นางสาวสมหญิง เรียนดี,1234567890123,student66002@example.com,เทคโนโลยีสารสนเทศ,3,6,เช้า,m3_6\n';
-
-    const blob = new Blob([headers + sample1 + sample2], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'sbac_student_template.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('ดาวน์โหลดไฟล์เทมเพลตเรียบร้อย', 'info');
-  };
-
-  /* ดาวน์โหลดไฟล์ที่เข้ารหัสแล้ว เพื่อเอาไปเข้าระบบผ่าน import-tool/
-   *
-   * ของเดิมปุ่มนี้เขียนตรงเข้า Firestore collection 'students' และ 'users'
-   * ซึ่งนอกจากจะ throw ทันที (config ถูกปิด) ยังเป็นการเอาชื่อจริงและเลขบัตรประชาชน
-   * ของนักเรียนไปวางบนโปรเจกต์ที่เปิดให้ใครก็อ่านได้
-   *
-   * งานส่วนที่มีค่าจริงคือ อ่านไฟล์ + แปลงชื่อคอลัมน์ + hash/เข้ารหัส ซึ่งทำในเบราว์เซอร์
-   * ล้วน ๆ ไม่ต้องพึ่ง backend เลย จึงเก็บไว้ทั้งหมด แล้วเปลี่ยนปลายทางเป็นไฟล์
-   * ให้เจ้าหน้าที่เอาเข้าฐานข้อมูลด้วย import-tool ที่ถือ service_role ถูกที่ถูกทาง
-   *
-   * เลขบัตรตัวจริงไม่ถูกเขียนลงไฟล์ ยกเว้นผู้ใช้เลือกโหมด "ไม่เข้ารหัส" เอง */
-  const exportEncrypted = async () => {
-    if (parsedStudents.length === 0) {
-      showToast('ยังไม่ได้เลือกไฟล์รายชื่อ', 'error');
-      return;
-    }
-    if (encryptionMode === 'aes256' && !secretKey) {
-      showToast('กรุณากรอกคีย์หลักสำหรับการเข้ารหัส AES', 'error');
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const rows = [];
-      let skipped = 0;
-
-      for (const raw of parsedStudents) {
-        const norm = normalizeStudent(raw);
-        // ไม่มีรหัสนักเรียนหรือเลขบัตร = ผูกกับใครไม่ได้ ข้ามไปแล้วรายงานตอนท้าย
-        if (!norm.student_id || !norm.national_id) {
-          skipped++;
-          continue;
-        }
-
-        let secret;
-        if (encryptionMode === 'aes256') {
-          secret = await encryptAES(norm.national_id, secretKey);
-        } else if (encryptionMode === 'none') {
-          secret = norm.national_id;
-        } else {
-          secret = await sha256(norm.national_id);
-        }
-
-        rows.push([
-          norm.student_id, norm.full_name, secret, norm.email,
-          norm.branch, norm.year, norm.room, norm.session, norm.class_id,
-        ]);
-      }
-
-      if (rows.length === 0) {
-        showToast('ไม่มีแถวไหนมีทั้งรหัสนักเรียนและเลขบัตร', 'warning');
-        return;
-      }
-
-      // ชื่อคอลัมน์บอกตรง ๆ ว่าค่าข้างในถูกแปลงมาแบบไหน คนเปิดไฟล์ทีหลังจะได้ไม่ต้องเดา
-      const secretHeader =
-        encryptionMode === 'aes256' ? 'national_id_encrypted'
-        : encryptionMode === 'none' ? 'national_id'
-        : 'national_id_hash';
-
-      const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-      const csv =
-        `student_id,full_name,${secretHeader},email,branch,year,room,session,class_id\n` +
-        rows.map((r) => r.map(esc).join(',')).join('\n');
-
-      // นำหน้าด้วย BOM (U+FEFF) ให้ Excel เปิดภาษาไทยไม่เป็นตัวยึกยือ
-      const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `sbac_students_${encryptionMode}_${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      showToast(
-        skipped > 0
-          ? `ดาวน์โหลด ${rows.length} รายชื่อแล้ว (ข้าม ${skipped} แถวที่ข้อมูลไม่ครบ)`
-          : `ดาวน์โหลด ${rows.length} รายชื่อเรียบร้อย`,
-        'success'
-      );
-    } catch (err) {
-      console.error('[academic] เข้ารหัสและส่งออกไม่สำเร็จ:', err);
-      showToast('เข้ารหัสไม่สำเร็จ ตรวจสอบคีย์แล้วลองใหม่อีกครั้ง', 'error');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   /* ตารางประจำเทอมอ่านสดจาก Google Sheet — ชีตคือต้นฉบับ ที่นี่อ่านอย่างเดียว
      ฝ่ายวิชาการจะเปลี่ยนวิชา/ครู/ห้องถาวร ต้องไปแก้ในชีต ไม่ใช่ในหน้านี้
@@ -452,7 +218,6 @@ export default function AcademicDashboard() {
     { id: 'scores', label: 'คะแนน', icon: BookOpen },
     { id: 'students', label: 'นักเรียน', icon: Users },
     { id: 'events', label: 'กิจกรรม', icon: CalendarDays },
-    { id: 'import', label: 'นำเข้าข้อมูล', icon: FileSpreadsheet },
   ];
 
   /* สั่งสอนแทน 1 คาบ ของ 1 วัน
@@ -540,7 +305,7 @@ export default function AcademicDashboard() {
 
           ป้ายห้องโผล่เฉพาะแท็บตารางสอน เพราะการเลือกห้องมีผลแค่กับแท็บนั้น
           ถ้าค้างอยู่บนหัวตลอดจะอ่านเหมือนว่าทั้งหน้าถูกกรองด้วยห้องนี้
-          ทั้งที่แท็บนักเรียน/กิจกรรม/นำเข้าข้อมูลไม่ได้กรองอะไรเลย */}
+          ทั้งที่แท็บนักเรียน/กิจกรรมไม่ได้กรองอะไรเลย */}
       <PageHeader icon={Settings} title="ฝ่ายวิชาการ">
         {/* ทางเข้าหน้าการเงินย้ายไปอยู่หน้าฝ่ายพัฒนาแล้ว (/development)
             หน้านี้เป็นงานวิชาการล้วน ไม่ควรมีปุ่มของอีกฝ่ายมาปน */}
@@ -554,7 +319,7 @@ export default function AcademicDashboard() {
 
       {/* แท็บ — เดิมเป็นหน้าเดียวยาว 7 หมวดรวด บนมือถือกว่าจะเลื่อนถึงใบลาที่รออนุมัติ
           ต้องผ่านฟอร์มตารางสอน ตัวอัปโหลด Excel และตารางพรีวิวรายชื่อทั้งหมดก่อน */}
-      <TabNav tabs={TABS} active={activeTab} onChange={setActiveTab} />
+      <TabNav tabs={TABS} active={activeTab} onChange={setActiveTab} equalWidth />
 
       {activeTab === 'inbox' && (
         <div
@@ -1075,263 +840,6 @@ export default function AcademicDashboard() {
         >
           {/* ปฏิทินกิจกรรม เขียนลงตาราง events ใน Supabase ตัวเดียวกับที่นักเรียนอ่าน */}
           <EventManager />
-        </div>
-      )}
-
-      {activeTab === 'import' && (
-        <div
-          role="tabpanel"
-          id="panel-import"
-          aria-labelledby="tab-import"
-          tabIndex={-1}
-          className="space-y-6"
-        >
-        {/* Excel sync panel — เต็มความกว้างเสมอ เพราะมีตารางพรีวิวรายชื่อนักเรียนอยู่ข้างใน */}
-        <div className={`rounded-3xl border p-5 shadow-sm space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
-          }`}>
-          <h3 className={`text-sm font-extrabold flex items-center gap-2 transition-colors duration-300 ${isDark ? 'text-white' : 'text-sbac-navy'
-            }`}>
-            <FileSpreadsheet size={18} className="text-brand" />
-            นำเข้าข้อมูลด้วย Excel / CSV + เข้ารหัสข้อมูล
-          </h3>
-
-          <WorkflowNotice isDark={isDark} title="ทำงานเป็นสองขั้น">
-            หน้านี้อ่านไฟล์และเข้ารหัสเลขบัตรให้ในเบราว์เซอร์ แล้วได้ไฟล์ที่เข้ารหัสแล้วออกมา
-            จากนั้นนำไฟล์นั้นเข้าฐานข้อมูลด้วย <code className="font-mono">import-tool/</code>
-            <span className="block mt-1 opacity-80">
-              ที่ต้องแยกสองขั้นเพราะการสร้างบัญชีนักเรียนต้องใช้ service_role key ซึ่งห้ามอยู่ในหน้าเว็บ
-              ใครเปิด devtools ก็อ่านได้ และคีย์นั้นข้าม RLS ได้ทุกข้อ
-            </span>
-          </WorkflowNotice>
-
-          <p className={`text-xs leading-relaxed transition-colors duration-300 ${isDark ? 'text-content-muted' : 'text-content-muted'
-            }`}>
-            เชื่อมต่อข้อมูลรายชื่อนักเรียนจากระบบทะเบียน Excel พร้อมตัวเลือกเข้ารหัสเลขบัตรประชาชน (National ID) ด้วย SHA-256 Hashing หรือ AES-256
-          </p>
-
-          {/* เดิมห่อปุ่มเดียวไว้ใน flex ที่มี gap แล้วให้ปุ่มเป็น flex-1
-              เหลือปุ่มเดียวมานานแล้ว (ปุ่ม export ถูกถอดออก) — ตัดกล่องทิ้งไปเลย */}
-          <button
-            onClick={downloadTemplate}
-            className={`w-full border font-bold py-3 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 ${isDark
-              ? 'border-white/10 text-content-secondary hover:bg-white/5'
-              : 'border-slate-200 text-ink-secondary hover:bg-slate-50'
-              }`}
-          >
-            <Download size={14} aria-hidden="true" />
-            ดาวน์โหลดเทมเพลต CSV
-          </button>
-
-          {/* Encryption Settings */}
-          <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-950/40 border-white/10' : 'bg-slate-50 border-slate-100'
-            } space-y-3`}>
-            <div className="flex items-center gap-1.5">
-              <Key size={14} className="text-brand" />
-              <span className={`text-xs font-bold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
-                การตั้งค่าความปลอดภัยและการเข้ารหัส
-              </span>
-            </div>
-
-            {/* สามคอลัมน์ตายตัวบนจอ 375px = ปุ่มกว้างราว 100px ต่ออัน
-                คำอธิบายไทยที่ 9px ในนั้นเละจนอ่านไม่ออก (สระบน/ล่างทับกัน)
-                มือถือเรียงลงเป็นแถวเดียว จอกว้างค่อยแบ่งสามคอลัมน์
-                และคำอธิบายขึ้นมาที่ 11px ซึ่งเป็นขั้นต่ำที่ตัวไทยยังอ่านออก */}
-            <div
-              role="radiogroup"
-              aria-label="วิธีเข้ารหัสเลขบัตรประชาชน"
-              className="grid grid-cols-1 sm:grid-cols-3 gap-2"
-            >
-              {[
-                { id: 'sha256', label: 'SHA-256 Hash', desc: 'ปลอดภัยที่สุด (ถอดกลับไม่ได้)' },
-                { id: 'aes256', label: 'AES-256 GCM', desc: 'สองทาง (ถอดรหัสคืนได้)' },
-                { id: 'none', label: 'ไม่เข้ารหัส', desc: 'เก็บแบบธรรมดา (ไม่แนะนำ)' }
-              ].map((mode) => (
-                <button
-                  key={mode.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={encryptionMode === mode.id}
-                  onClick={() => setEncryptionMode(mode.id)}
-                  className={`px-3 py-3 rounded-xl border text-left transition-colors ${encryptionMode === mode.id
-                    ? 'bg-sbac-blue/10 border-sbac-blue text-brand ring-2 ring-sbac-blue/20'
-                    : isDark
-                      ? 'bg-neutral-900 border-white/10 hover:bg-neutral-800 text-content-secondary'
-                      : 'bg-surface-card border-slate-200 hover:bg-slate-50 text-ink-secondary'
-                    }`}
-                >
-                  <div className="text-xs font-bold">{mode.label}</div>
-                  <div className="text-[11px] opacity-80 mt-0.5 leading-snug">{mode.desc}</div>
-                </button>
-              ))}
-            </div>
-
-            {/* Key Passphrase input for AES mode */}
-            {encryptionMode === 'aes256' && (
-              <div className="space-y-1 animate-slide-down">
-                <label className={`text-[11px] font-bold block ${isDark ? 'text-slate-200' : 'text-slate-600'}`}>
-                  คีย์หลักความปลอดภัย (Encryption Passphrase) <span className="text-accent-rose">*จำเป็นในการถอดรหัส</span>
-                </label>
-                <div className="relative">
-                  {/* ช่องนี้เคยตั้งแต่ "สีเส้นขอบ" (border-white/15) โดยไม่ได้ใส่คลาส border
-                      Tailwind preflight ตั้ง border-width: 0 ให้ทุก element อยู่แล้ว
-                      สีที่ตั้งไว้จึงไม่ถูกวาดออกมาเลย — ช่องกรอกไม่มีขอบทั้งสองธีม
-                      และ focus:border-* ที่เขียนไว้ก็ไม่มีผลตามไปด้วย */}
-                  <input
-                    type={showSecretKey ? 'text' : 'password'}
-                    value={secretKey}
-                    onChange={(e) => setSecretKey(e.target.value)}
-                    className={`w-full rounded-xl border pl-4 pr-12 py-3 text-xs font-semibold focus:outline-none transition-colors duration-200 ${isDark
-                      ? 'bg-neutral-900 border-white/15 text-white placeholder:text-content-muted focus:border-sbac-blue-light/50'
-                      : 'bg-surface-card border-slate-200 text-ink placeholder:text-ink-light focus:border-sbac-blue'
-                      }`}
-                    placeholder="ป้อนรหัสผ่านคีย์ส่วนตัวของคุณ..."
-                  />
-                  {/* ปุ่มไอคอนล้วนต้องมี aria-label ไม่งั้น screen reader อ่านว่า "ปุ่ม" เฉย ๆ
-                      และ p-1 กับไอคอน 14px ได้พื้นที่กดราว 22px ครึ่งเดียวของขั้นต่ำ 44px
-                      ขยายพื้นที่กดโดยไม่ขยายไอคอน หน้าตาจึงเหมือนเดิม */}
-                  <button
-                    type="button"
-                    onClick={() => setShowSecretKey(!showSecretKey)}
-                    aria-label={showSecretKey ? 'ซ่อนคีย์' : 'แสดงคีย์'}
-                    aria-pressed={showSecretKey}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-xl text-content-muted hover:text-ink-secondary transition-colors"
-                  >
-                    {/* ทิศทางเดียวกับปุ่มในหน้าล็อกอิน: ไอคอนบอกสถานะปัจจุบัน
-                        ตาเปิด = คีย์ถูกแสดงอยู่ / ตาขีดฆ่า = ถูกซ่อนอยู่ */}
-                    {showSecretKey ? <Eye size={15} aria-hidden="true" /> : <EyeOff size={15} aria-hidden="true" />}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {encryptionMode === 'none' && (
-              <div className="text-[11px] text-accent-amber font-bold bg-amber-500/10 p-3 rounded-xl border border-amber-500/20 flex items-start gap-1.5 animate-slide-down">
-                <ShieldAlert size={14} className="shrink-0 mt-0.5" />
-                <span>
-                  คำเตือน: การไม่เข้ารหัสข้อมูลส่วนบุคคล (National ID) ขัดต่อพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล (PDPA) และลดระดับความปลอดภัยของวิทยาลัย
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Drag & Drop File Zone */}
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragOver(false);
-              const file = e.dataTransfer.files[0];
-              if (file) handleExcelFile(file);
-            }}
-            className={`border-2 border-dashed rounded-3xl p-6 text-center cursor-pointer transition-all duration-200 ${dragOver
-              ? 'bg-sbac-blue/5 border-sbac-blue scale-[1.01]'
-              : isDark
-                ? 'border-white/15 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/30'
-                : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/50 hover:border-slate-400'
-              }`}
-            onClick={() => document.getElementById('excelFileInput').click()}
-          >
-            <input
-              id="excelFileInput"
-              type="file"
-              accept=".csv, .xlsx, .xls"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files[0];
-                if (file) handleExcelFile(file);
-              }}
-            />
-            <Upload size={32} className={`mx-auto mb-2.5 transition-colors ${dragOver ? 'text-brand' : 'text-content-muted'
-              }`} />
-            <div className="text-xs font-bold text-ink-secondary dark:text-slate-200">
-              ลากและวางไฟล์ หรือคลิกเพื่ออัปโหลด
-            </div>
-            <div className="text-[11px] text-content-muted mt-1">
-              รองรับไฟล์ Excel (.xlsx, .xls) และ CSV (.csv)
-            </div>
-          </div>
-
-          {/* Parsed List Preview */}
-          {parsedStudents.length > 0 && (
-            <div className="space-y-3 pt-2">
-              <div className="flex justify-between items-center px-1">
-                <span className={`text-xs font-bold ${isDark ? 'text-content-secondary' : 'text-ink-secondary'}`}>
-                  ตัวอย่างผลลัพธ์การเข้ารหัส ({parsedStudents.length} รายชื่อ)
-                </span>
-                <button
-                  onClick={() => setParsedStudents([])}
-                  className="text-[11px] font-bold text-accent-rose hover:underline"
-                >
-                  ล้างข้อมูล
-                </button>
-              </div>
-
-              <div className={`rounded-2xl border max-h-48 overflow-y-auto divide-y ${isDark ? 'bg-slate-950/40 border-white/10 divide-white/5' : 'bg-slate-50 border-slate-100 divide-slate-100'
-                }`}>
-                {parsedStudents.slice(0, 5).map((row, idx) => {
-                  const norm = normalizeStudent(row);
-                  const maskedId = norm.national_id
-                    ? `${norm.national_id.substring(0, 5)}******${norm.national_id.substring(norm.national_id.length - 2)}`
-                    : 'ไม่มีข้อมูล';
-
-                  return (
-                    <div key={idx} className="p-3 text-[11px] flex items-center justify-between gap-4">
-                      <div className="space-y-0.5 min-w-0">
-                        <div className="font-extrabold text-ink-secondary dark:text-slate-200 truncate flex items-center gap-1.5">
-                          <span className="bg-sbac-blue/10 dark:bg-sbac-blue/20 text-brand px-1.5 py-0.5 rounded font-mono font-medium">
-                            {norm.student_id || 'N/A'}
-                          </span>
-                          <span>{norm.full_name || 'ไม่ระบุชื่อ'}</span>
-                        </div>
-                        <div className="text-content-muted flex items-center gap-1 truncate font-mono text-[9px]">
-                          <span>เลขบัตร: {maskedId}</span>
-                          <span className="opacity-40">|</span>
-                          <span>ห้อง: {norm.class_id}</span>
-                        </div>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${encryptionMode === 'sha256'
-                          ? 'bg-emerald-500/10 border-emerald-500/20 text-accent-emerald'
-                          : encryptionMode === 'aes256'
-                            ? 'bg-sky-500/10 border-sky-500/20 text-accent-cyan'
-                            : 'bg-amber-500/10 border-amber-500/20 text-accent-amber'
-                          }`}>
-                          {encryptionMode === 'sha256' ? 'SHA-256 Hashed' : encryptionMode === 'aes256' ? 'AES Encrypted' : 'Plain Text'}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-                {parsedStudents.length > 5 && (
-                  <div className="p-2 text-center text-[9px] text-content-muted font-semibold bg-slate-900/10 dark:bg-white/[0.03]">
-                    และนักเรียนคนอื่น ๆ อีก {parsedStudents.length - 5} รายการ
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={exportEncrypted}
-                disabled={isProcessing}
-                className={`w-full text-white font-bold py-3.5 rounded-xl text-xs transition-all shadow-button flex items-center justify-center gap-2 select-none bg-gradient-to-r from-sbac-blue to-sbac-navy hover:to-sbac-blue disabled:opacity-40 disabled:cursor-not-allowed ${isProcessing ? 'cursor-wait' : 'cursor-pointer'
-                  }`}
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>กำลังเข้ารหัส...</span>
-                  </>
-                ) : (
-                  <>
-                    <Download size={16} />
-                    <span>ดาวน์โหลดไฟล์ที่เข้ารหัสแล้ว ({parsedStudents.length} รายชื่อ)</span>
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-        </div>
         </div>
       )}
 

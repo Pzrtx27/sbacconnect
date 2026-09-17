@@ -5,6 +5,9 @@ import { useNavigate } from 'react-router-dom';
 import { showToast } from '../../components/ui/Toast';
 import Modal from '../../components/ui/Modal';
 import LiveClock from '../../components/ui/LiveClock';
+import AcademicCalendar from '../../components/ui/AcademicCalendar';
+import UpcomingEvents from '../../components/ui/UpcomingEvents';
+import { useIsDesktop } from '../../hooks/useMediaQuery';
 import GlassCard from '../../components/layout/GlassCard';
 import ProfileBanner from '../../components/layout/ProfileBanner';
 import { READING_WIDTH } from '../../utils/layout';
@@ -26,6 +29,8 @@ import { fetchSubstitutionsForDate, todayISO, classLabel, PERIOD_TIMES, looksLik
 import { buildBehaviorEntries, sumBehaviorPoints } from '../../utils/behavior';
 import {
   Calendar,
+  CalendarDays,
+  ChevronDown,
   AlertCircle,
   BookOpen,
   Clock,
@@ -68,6 +73,8 @@ export default function TeacherHome() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const navigate = useNavigate();
+  const isDesktop = useIsDesktop();
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   /* รายการสอนแทน "ของวันนี้" จากตาราง substitutions จริง (31_substitutions.sql)
 
@@ -630,6 +637,35 @@ export default function TeacherHome() {
           </GlassCard>
         </div>
       </div>
+
+      {/* ใช้ปฏิทินชุดเดียวกับนักเรียน เพื่อให้ประกาศฝ่ายวิชาการอัปเดตถึงครูด้วย */}
+      <section aria-label="กิจกรรมและปฏิทินการศึกษา" className="grid gap-6 xl:grid-cols-2 items-start">
+        <UpcomingEvents />
+        <div className="min-w-0 space-y-3">
+          {!isDesktop && (
+            <button
+              type="button"
+              onClick={() => setCalendarOpen((open) => !open)}
+              aria-expanded={calendarOpen}
+              aria-controls="teacher-calendar"
+              className={`w-full min-h-[48px] px-4 py-3 rounded-lg border flex items-center justify-between gap-2 text-sm font-extrabold ${
+                isDark
+                  ? 'bg-white/[0.06] border-white/10 text-white hover:bg-white/10'
+                  : 'bg-surface-card border-slate-100 text-ink hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <CalendarDays size={17} className="text-brand shrink-0" aria-hidden="true" />
+                ปฏิทินการศึกษา
+              </span>
+              <ChevronDown size={17} aria-hidden="true" className={`shrink-0 transition-transform ${calendarOpen ? 'rotate-180' : ''}`} />
+            </button>
+          )}
+          <div id="teacher-calendar" hidden={!isDesktop && !calendarOpen}>
+            {(isDesktop || calendarOpen) && <AcademicCalendar />}
+          </div>
+        </div>
+      </section>
 
       {/* Classroom Status Summary Panel */}
       <div className={`rounded-3xl border p-5 space-y-4 transition-colors duration-300 ${bgSubtle} ${borderSubtle}`}>

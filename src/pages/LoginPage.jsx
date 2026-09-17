@@ -16,8 +16,7 @@ import {
   Globe,
   ShieldCheck,
   IdCard,
-  AlertTriangle,
-  Info
+  AlertTriangle
 } from 'lucide-react';
 
 /* จำเฉพาะ "ชื่อผู้ใช้" เท่านั้น ไม่เก็บรหัสประจำตัวลงเครื่องเด็ดขาด
@@ -139,27 +138,7 @@ export default function LoginPage() {
     btnLoading: lang === 'TH' ? 'กำลังตรวจสอบ...' : 'Authenticating...',
     secTitle: lang === 'TH' ? 'ระบบเชื่อมต่อปลอดภัย' : 'Secured Connection',
     secDesc: lang === 'TH' ? 'ข้อมูลถูกเข้ารหัสเพื่อความปลอดภัย' : 'Your data is encrypted for security',
-    helpTitle: lang === 'TH' ? 'เข้าสู่ระบบไม่ได้ใช่ไหม' : 'Trouble signing in?',
-    /* ระบบไม่มีฟังก์ชัน "ลืมรหัสผ่าน" อีกต่อไป — ไม่มีปุ่ม ไม่มีลิงก์ ไม่มีการตั้งรหัสใหม่เอง
-       เพราะรหัสผ่านอ้างอิงจากเลขบัตรประจำตัวประชาชน/รหัสประจำตัวนักเรียนโดยตรง
-       จึงไม่ใช่ความลับที่ "ลืมแล้วต้องรีเซ็ต" แต่เป็นเลขที่เจ้าตัวหาได้จากบัตรของตัวเอง
 
-       บอกก่อนว่ารหัสผ่านคืออะไร แล้วค่อยบอกว่าถ้ายังไม่ได้ต้องไปหาใคร
-       เคสส่วนใหญ่จบที่บรรทัดแรกโดยไม่ต้องเดินไปไหน
-
-       ข้อความเดียวใช้กับทุกบทบาท — หน้านี้ใช้ร่วมกันทั้งนักเรียน ครู ฝ่ายวิชาการ
-       และร้านค้า และ ณ จังหวะที่อ่านข้อความนี้ยังไม่มีทางรู้ว่าคนอ่านเป็นใคร
-       (ยังไม่ได้ล็อกอิน หรือล็อกอินไม่ผ่าน) จึงไม่มี role ให้เลือกข้อความอยู่ดี
-
-       ห้ามใส่อาคาร ชั้น เวลาทำการ หรือเบอร์ติดต่อลงในข้อความนี้ถ้ายังไม่ได้ยืนยัน
-       กับฝ่ายวิชาการ — ข้อความบนหน้าล็อกอินคือสิ่งที่คนเชื่อแล้วเดินไปตามนั้นจริง
-       ของเดิมเคยระบุ "ฝ่ายทะเบียน อาคาร 1 ชั้น 1" ไว้ ซึ่งเป็นคนละแผนกกับที่ใช้ตอนนี้ */
-    helpPass: lang === 'TH'
-      ? 'รหัสผ่านของคุณคือเลขบัตรประจำตัวประชาชนหรือรหัสประจำตัวนักเรียน ระบบไม่เปิดให้ตั้งรหัสใหม่เอง'
-      : 'Your password is your national ID or student code. The system does not offer self-service password resets.',
-    helpBody: lang === 'TH'
-      ? 'หากยังเข้าสู่ระบบไม่ได้ กรุณาติดต่อฝ่ายวิชาการโดยตรง'
-      : 'If you still cannot sign in, please contact the Academic Affairs Office directly.',
   };
 
   return (
@@ -387,25 +366,6 @@ export default function LoginPage() {
                 <span>{error}</span>
               </motion.div>
             )}
-
-            {/* วิธีขอความช่วยเหลือ — ขึ้นถาวร ไม่มีปุ่มเปิด ไม่มีปุ่มปิด
-                ของเดิมซ่อนอยู่หลังปุ่ม "ลืมรหัสผ่าน?" ที่ต้องรู้ก่อนว่าต้องกด
-                ตอนนี้เป็นข้อมูลนิ่ง ๆ ที่อ่านได้ตลอดโดยไม่ต้องล็อกอินไม่ผ่านก่อน */}
-            <div
-              id="login-help"
-              className={`text-xs rounded-xl px-4 py-3 border flex items-start gap-2.5 ${
-                isDark
-                  ? 'bg-sbac-blue/10 border-sbac-blue/25 text-slate-200'
-                  : 'bg-sbac-blue-50 border-sbac-blue/20 text-ink-secondary'
-              }`}
-            >
-              <Info size={16} className="text-brand shrink-0 mt-0.5" aria-hidden="true" />
-              <div className="space-y-1.5 min-w-0">
-                <p className="font-extrabold text-brand">{t.helpTitle}</p>
-                <p className="font-semibold leading-relaxed">{t.helpPass}</p>
-                <p className="font-semibold leading-relaxed">{t.helpBody}</p>
-              </div>
-            </div>
 
             {/* Submit Button with shadow */}
             <motion.button

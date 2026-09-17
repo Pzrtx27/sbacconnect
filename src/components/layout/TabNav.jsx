@@ -18,7 +18,7 @@ import { useTheme } from '../../contexts/ThemeContext';
    Home/End ไปหัว-ท้าย และมีแค่แท็บที่เลือกอยู่ที่ tabIndex=0 (roving tabindex)
    คนกด Tab จึงข้ามทั้งแถบไปที่เนื้อหาเลย ไม่ต้องกดผ่านทุกแท็บก่อน
 */
-export default function TabNav({ tabs, active, onChange, ariaLabel = 'หมวดการจัดการ' }) {
+export default function TabNav({ tabs, active, onChange, ariaLabel = 'หมวดการจัดการ', equalWidth = false }) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const refs = useRef({});
@@ -58,7 +58,9 @@ export default function TabNav({ tabs, active, onChange, ariaLabel = 'หมว�
         aria-label={ariaLabel}
         aria-orientation="horizontal"
         onKeyDown={onKeyDown}
-        className="flex flex-wrap gap-1.5"
+        className={equalWidth
+          ? 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-none xl:grid-flow-col xl:auto-cols-fr gap-1.5'
+          : 'flex flex-wrap gap-1.5'}
       >
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -85,7 +87,7 @@ export default function TabNav({ tabs, active, onChange, ariaLabel = 'หมว�
                  min-w กันแท็บสั้น ๆ อย่าง "นักเรียน" ถูกบีบจนตัวหนังสือขึ้นสองบรรทัด
                  บนจอกว้าง (xl) ทั้งห้าแท็บอยู่บรรทัดเดียวอยู่แล้ว จึงคืนเป็นกว้างตามข้อความ
                  ไม่งั้นแท็บจะถูกยืดออกไปกว้างอันละ 200px+ ซึ่งดูโล่งเกินไป */
-              className={`relative flex-1 min-w-[6.5rem] xl:flex-none flex items-center justify-center gap-1.5 px-3.5 min-h-[44px] rounded-2xl
+              className={`relative ${equalWidth ? 'min-w-0 px-2 py-2 rounded-lg' : 'flex-1 min-w-[6.5rem] xl:flex-none px-3.5 rounded-2xl'} flex items-center justify-center gap-1.5 min-h-[44px]
                           text-xs font-bold transition-colors duration-200 ${
                 isActive
                   ? 'text-white'
@@ -99,20 +101,20 @@ export default function TabNav({ tabs, active, onChange, ariaLabel = 'หมว�
               {isActive && (
                 <motion.span
                   layoutId="tabnav-active"
-                  className="absolute inset-0 rounded-2xl bg-sbac-blue shadow-button"
+                  className={`absolute inset-0 ${equalWidth ? 'rounded-lg' : 'rounded-2xl'} bg-sbac-blue shadow-button`}
                   transition={{ type: 'spring', stiffness: 520, damping: 38 }}
                 />
               )}
 
-              <span className="relative flex items-center gap-1.5 whitespace-nowrap">
-                <Icon size={15} strokeWidth={isActive ? 2.5 : 2} aria-hidden="true" />
-                {tab.label}
+              <span className={`relative flex items-center justify-center gap-1.5 ${equalWidth ? 'min-w-0' : 'whitespace-nowrap'}`}>
+                <Icon size={15} className="shrink-0" strokeWidth={isActive ? 2.5 : 2} aria-hidden="true" />
+                <span className="min-w-0 break-words">{tab.label}</span>
 
                 {/* ตัวเลขงานค้าง — เหตุผลหลักที่ทำแท็บ คือให้เห็นจำนวนโดยไม่ต้องเข้าไปดู
                     ซ่อนตอนเป็น 0 เพราะป้ายว่างเปล่ารกกว่าไม่มีป้าย */}
                 {tab.badge > 0 && (
                   <span
-                    className={`ml-0.5 min-w-[18px] px-1 h-[18px] rounded-full text-[11px] font-bold
+                    className={`ml-0.5 shrink-0 min-w-[18px] px-1 h-[18px] rounded-full text-[11px] font-bold
                                 inline-flex items-center justify-center ${
                       isActive ? 'bg-white/25 text-white' : 'bg-accent-rose/15 text-accent-rose'
                     }`}
