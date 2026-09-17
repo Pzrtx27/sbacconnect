@@ -20,6 +20,7 @@ import {
 } from '../../utils/orders';
 import { requestNotifyPermission } from '../../utils/notify';
 import { unlockAudio } from '../../utils/sound';
+import { mergeCoffeeSizes } from '../../utils/coffeeSizes';
 
 /* หน้าสั่งเครื่องดื่ม SBAC COFFEE
 
@@ -116,7 +117,7 @@ export default function CoffeePage() {
       // โหลดซ้ำแล้วพลาด ให้คงเมนูเดิมไว้ ดีกว่าล้างจอเป็นหน้าว่างทั้งที่ของเก่ายังใช้ได้
       if (!loadedOnceRef.current) setProducts([]);
     } else {
-      setProducts(data?.products || []);
+      setProducts((data?.products || []).map(mergeCoffeeSizes));
       loadedOnceRef.current = true;
     }
 
