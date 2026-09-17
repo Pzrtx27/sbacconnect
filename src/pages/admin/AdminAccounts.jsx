@@ -5,7 +5,8 @@ import { supabase } from '../../config/supabase';
 import { showToast } from '../../components/ui/Toast';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import Modal from '../../components/ui/Modal';
-import { Search, UserCog, RefreshCw } from 'lucide-react';
+import { Search, UserCog, RefreshCw, UserPlus } from 'lucide-react';
+import { EMAIL_DOMAIN, toEmail } from '../../utils/identity';
 
 /* จัดการบัญชีครูและนักเรียน
 
@@ -24,8 +25,10 @@ import { Search, UserCog, RefreshCw } from 'lucide-react';
       การลบบัญชีเข้าสู่ระบบจริง (auth.users) ต้องใช้ service_role key
       ซึ่งห้ามอยู่ในโค้ดฝั่งเบราว์เซอร์ — ดูหมายเหตุหัวไฟล์ 53_admin_console.sql
 
-   4) สร้างบัญชีใหม่ยังทำจากหน้านี้ไม่ได้ ด้วยเหตุผลเดียวกับข้อ 3
-      ตอนนี้สร้างผ่าน import-tool หรือ Supabase Dashboard */
+   4) สร้างบัญชีใหม่ทำได้แล้ว แต่ไม่ได้ทำจากหน้านี้ตรง ๆ
+      หน้านี้เรียก Edge Function `admin-users` ซึ่งถือ service_role ไว้ฝั่งเซิร์ฟเวอร์
+      แล้วตรวจซ้ำเองว่าคนเรียกเป็น sysadmin จริงก่อนลงมือ
+      ถ้ายังไม่ได้ deploy function นั้น ปุ่มจะขึ้นข้อความบอกวิธีติดตั้ง */
 
 const ROLE_LABELS = {
   student: 'นักเรียน',
@@ -35,6 +38,33 @@ const ROLE_LABELS = {
   cashier: 'การเงิน',
   pos: 'หน้าร้าน',
 };
+
+const CREATE_ERRORS = {
+  FORBIDDEN: 'บัญชีนี้ไม่มีสิทธิ์เพิ่มบัญชีผู้ใช้',
+  INVALID_ROLE: 'เลือกประเภทบัญชีไม่ถูกต้อง',
+  INVALID_NAME: 'ชื่อต้องยาว 1–150 ตัวอักษร',
+  INVALID_CODE: 'รหัสประจำตัวใช้ได้เฉพาะตัวอักษร ตัวเลข . _ - ยาว 3–60 ตัว',
+  INVALID_EMAIL: 'ชื่อผู้ใช้ไม่ถูกต้อง',
+  INVALID_CLASSROOM: 'กรุณาเลือกห้องเรียนของนักเรียน',
+  WEAK_PASSWORD: 'รหัสผ่านต้องยาวอย่างน้อย 8 ตัวอักษร',
+  DUPLICATE_EMAIL: 'ชื่อผู้ใช้นี้ถูกใช้ไปแล้ว',
+  DUPLICATE_CODE: 'รหัสประจำตัวนี้ถูกใช้ไปแล้ว',
+  DUPLICATE: 'มีบัญชีที่ข้อมูลซ้ำกันอยู่แล้ว',
+  AUTH_CREATE_FAILED: 'สร้างบัญชีเข้าสู่ระบบไม่สำเร็จ',
+  DB_INSERT_FAILED: 'บันทึกข้อมูลบัญชีไม่สำเร็จ',
+  ORPHAN_AUTH_USER: 'สร้างค้างกลางทาง — แจ้งผู้ดูแล Supabase ให้ตรวจบัญชีที่ค้างใน auth',
+  FUNCTION_NOT_CONFIGURED: 'Edge Function ยังตั้งค่าไม่ครบ',
+};
+
+const blankNewAccount = () => ({
+  role: 'student',
+  username: '',
+  full_name: '',
+  code: '',
+  password: '',
+  class_room_id: '',
+  department: '',
+});
 
 const ERROR_MESSAGES = {
   FORBIDDEN: 'บัญชีนี้ไม่มีสิทธิ์จัดการบัญชีผู้ใช้',
@@ -60,6 +90,7 @@ export default function AdminAccounts() {
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState(null);
+  const [creating, setCreating] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -138,6 +169,53 @@ export default function AdminAccounts() {
     load();
   };
 
+  /* เรียก Edge Function ไม่ใช่ rpc ตรง ๆ
+     เพราะการสร้างบัญชีใน auth.users ต้องใช้ service_role key
+     ซึ่งห้ามอยู่ในโค้ดหน้าเว็บเด็ดขาด (ดูคอมเมนต์หัวไฟล์ admin-users/index.ts) */
+  const handleCreate = async (e) => {
+    e.preventDefault();
+
+    if (creating.role === 'student' && !creating.class_room_id) {
+      showToast('กรุณาเลือกห้องเรียนของนักเรียน', 'error');
+      return;
+    }
+
+    setBusy(true);
+    const { data, error } = await supabase.functions.invoke('admin-users', {
+      body: {
+        role: creating.role,
+        username: creating.username.trim(),
+        full_name: creating.full_name.trim(),
+        code: creating.code.trim(),
+        password: creating.password,
+        class_room: creating.role === 'student' ? Number(creating.class_room_id) : null,
+        department: creating.role === 'teacher' ? creating.department.trim() : null,
+      },
+    });
+    setBusy(false);
+
+    if (error || !data?.ok) {
+      /* functions.invoke ห่อ error ไว้ใน error.context ซึ่งเป็น Response ตัวเต็ม
+         ต้องแกะ json ออกมาเองถึงจะได้รหัสที่ฟังก์ชันตั้งใจส่งกลับมา
+         ถ้าไม่แกะ ผู้ใช้จะได้แค่ "Edge Function returned a non-2xx status code" */
+      let code = data?.error;
+      if (!code && error?.context) {
+        try { code = (await error.context.json())?.error; } catch { /* อ่านไม่ได้ก็ปล่อย */ }
+      }
+      showToast(
+        CREATE_ERRORS[code] ||
+          (error ? 'ติดต่อบริการเพิ่มบัญชีไม่ได้ — ตรวจว่า deploy Edge Function admin-users แล้วหรือยัง'
+                 : 'เพิ่มบัญชีไม่สำเร็จ กรุณาลองใหม่'),
+        'error'
+      );
+      return;
+    }
+
+    showToast(`เพิ่มบัญชีแล้ว — เข้าระบบด้วยชื่อผู้ใช้ ${creating.username.trim()}`, 'success');
+    setCreating(null);
+    load();
+  };
+
   const saveEdit = async (e) => {
     e.preventDefault();
     setBusy(true);
@@ -186,17 +264,28 @@ export default function AdminAccounts() {
             className={`${fieldCls} pl-9`}
           />
         </div>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading || busy}
-          className={`${btnCls} flex items-center gap-1.5 ${
-            isDark ? 'bg-white/10 text-content-secondary hover:bg-white/15' : 'bg-slate-100 text-ink-secondary hover:bg-slate-200'
-          }`}
-        >
-          <RefreshCw size={13} className={loading ? 'animate-spin' : undefined} aria-hidden="true" />
-          โหลดใหม่
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setCreating(blankNewAccount())}
+            disabled={loading || busy}
+            className={`${btnCls} flex items-center gap-1.5 bg-sbac-blue text-white hover:bg-sbac-navy`}
+          >
+            <UserPlus size={13} aria-hidden="true" />
+            เพิ่มบัญชี
+          </button>
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading || busy}
+            className={`${btnCls} flex items-center gap-1.5 ${
+              isDark ? 'bg-white/10 text-content-secondary hover:bg-white/15' : 'bg-slate-100 text-ink-secondary hover:bg-slate-200'
+            }`}
+          >
+            <RefreshCw size={13} className={loading ? 'animate-spin' : undefined} aria-hidden="true" />
+            โหลดใหม่
+          </button>
+        </div>
       </div>
 
       <p className={`text-[11px] leading-relaxed ${textMuted}`}>
@@ -277,6 +366,149 @@ export default function AdminAccounts() {
           ))}
         </ul>
       )}
+
+      <Modal
+        isOpen={!!creating}
+        onClose={() => { if (!busy) setCreating(null); }}
+        title="เพิ่มบัญชีครู / นักเรียน"
+        icon={UserPlus}
+      >
+        {creating && (
+          <form onSubmit={handleCreate} className="space-y-4">
+            <fieldset disabled={busy} className="space-y-4">
+              <div>
+                <label htmlFor="new-role" className={`text-xs font-bold block mb-1 ${textMuted}`}>ประเภทบัญชี</label>
+                <select
+                  id="new-role"
+                  value={creating.role}
+                  onChange={(e) => setCreating({ ...creating, role: e.target.value })}
+                  className={fieldCls}
+                >
+                  <option value="student">นักเรียน</option>
+                  <option value="teacher">ครู</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="new-username" className={`text-xs font-bold block mb-1 ${textMuted}`}>ชื่อผู้ใช้สำหรับเข้าระบบ</label>
+                <input
+                  id="new-username"
+                  type="text"
+                  required
+                  maxLength={60}
+                  autoComplete="off"
+                  value={creating.username}
+                  onChange={(e) => setCreating({ ...creating, username: e.target.value })}
+                  className={fieldCls}
+                  placeholder="เช่น somchaijaid"
+                />
+                {/* โชว์อีเมลที่จะถูกสร้างจริง เพราะหน้าล็อกอินรับแค่ชื่อผู้ใช้
+                    แล้วต่อโดเมนให้เอง ถ้าไม่บอกตรงนี้ Admin จะไม่รู้ว่าระบบเก็บเป็นอะไร */}
+                <p className={`text-[11px] mt-1.5 ${textMuted}`}>
+                  ระบบจะสร้างเป็น{' '}
+                  <span className="font-bold break-all">
+                    {creating.username.trim() ? toEmail(creating.username.trim()) : `ชื่อผู้ใช้@${EMAIL_DOMAIN}`}
+                  </span>
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="new-name" className={`text-xs font-bold block mb-1 ${textMuted}`}>ชื่อ–นามสกุล</label>
+                <input
+                  id="new-name"
+                  type="text"
+                  required
+                  maxLength={150}
+                  value={creating.full_name}
+                  onChange={(e) => setCreating({ ...creating, full_name: e.target.value })}
+                  className={fieldCls}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="new-code" className={`text-xs font-bold block mb-1 ${textMuted}`}>
+                  {creating.role === 'student' ? 'รหัสนักเรียน' : 'รหัสครู'}
+                </label>
+                <input
+                  id="new-code"
+                  type="text"
+                  required
+                  maxLength={60}
+                  pattern="[A-Za-z0-9._\-]{3,60}"
+                  value={creating.code}
+                  onChange={(e) => setCreating({ ...creating, code: e.target.value })}
+                  className={fieldCls}
+                  placeholder={creating.role === 'student' ? 'เช่น 66001' : 'เช่น T0001'}
+                />
+                {creating.role === 'student' && (
+                  <p className={`text-[11px] mt-1.5 ${textMuted}`}>
+                    ใช้เป็นรหัสแตะบัตรที่ร้านกาแฟด้วย
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="new-password" className={`text-xs font-bold block mb-1 ${textMuted}`}>รหัสผ่านเริ่มต้น</label>
+                <input
+                  id="new-password"
+                  type="password"
+                  required
+                  minLength={8}
+                  maxLength={128}
+                  autoComplete="new-password"
+                  value={creating.password}
+                  onChange={(e) => setCreating({ ...creating, password: e.target.value })}
+                  className={fieldCls}
+                />
+                {/* เตือนเรื่องเลขบัตรประชาชนไว้ตรงนี้ เพราะไฟล์นำเข้าชุดเก่า
+                    (import-tool/students.example.csv) ใช้เลข 13 หลักเป็นรหัสผ่าน
+                    ถ้าไม่เขียนไว้ คนจะทำตามแบบเดิมโดยไม่รู้ว่าเลิกใช้แล้ว */}
+                <p className={`text-[11px] mt-1.5 leading-relaxed ${textMuted}`}>
+                  อย่างน้อย 8 ตัวอักษร · <strong>ห้ามใช้เลขบัตรประชาชนหรือวันเกิด</strong> ·
+                  ระบบเก็บเป็นค่าแฮช อ่านกลับไม่ได้ ถ้าลืมต้องตั้งใหม่
+                </p>
+              </div>
+
+              {creating.role === 'student' ? (
+                <div>
+                  <label htmlFor="new-room" className={`text-xs font-bold block mb-1 ${textMuted}`}>ห้องเรียน</label>
+                  <select
+                    id="new-room"
+                    required
+                    value={creating.class_room_id}
+                    onChange={(e) => setCreating({ ...creating, class_room_id: e.target.value })}
+                    className={fieldCls}
+                  >
+                    <option value="">— เลือกห้องเรียน —</option>
+                    {classrooms.map((c) => (
+                      <option key={c.id} value={c.id}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label htmlFor="new-dept" className={`text-xs font-bold block mb-1 ${textMuted}`}>แผนก (ไม่บังคับ)</label>
+                  <input
+                    id="new-dept"
+                    type="text"
+                    maxLength={150}
+                    value={creating.department}
+                    onChange={(e) => setCreating({ ...creating, department: e.target.value })}
+                    className={fieldCls}
+                  />
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full bg-sbac-blue hover:bg-sbac-navy disabled:opacity-50 text-white font-extrabold py-3 rounded-xl text-xs transition-all"
+              >
+                {busy ? 'กำลังสร้างบัญชี...' : 'สร้างบัญชี'}
+              </button>
+            </fieldset>
+          </form>
+        )}
+      </Modal>
 
       <Modal
         isOpen={!!editing}
