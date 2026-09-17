@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import PageHeader from '../../components/layout/PageHeader';
 import { useMyClassInfo } from '../../hooks/useMyClassInfo';
-import { Calendar, AlertCircle, CalendarClock, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { Calendar, AlertCircle, CalendarClock, CalendarDays } from 'lucide-react';
 import {
   fetchBaseTimetable,
   fetchTeacherTimetable,
@@ -16,7 +16,6 @@ import {
   timetableTitle,
   todayISO,
   addDaysISO,
-  nextSchoolDay,
   isSchoolDay,
   weekdayKeyOf,
   describeDate,
@@ -119,11 +118,11 @@ export default function StudentTimetable() {
   const [lastUpdated, setLastUpdated] = useState('');
   const [today, setToday] = useState(todayISO());
   const [subs, setSubs] = useState([]);
-  /* วันที่ที่กำลังดูอยู่ — ค่าเริ่มต้นคือวันนี้ หน้านี้จึงเปิดมาเหมือนเดิมทุกประการ
-     ที่ต้องมีตัวนี้: ตารางเป็นแม่แบบรายสัปดาห์ที่มีแต่ชื่อวัน คนเปิดดูจึงเห็นได้แค่
-     "วันพุธเรียนอะไร" แต่ไม่มีทางดูว่า "พุธที่ 17 มีสอนแทนไหม" เพราะสอนแทนผูกกับวันที่จริง
-     ของเดิมวางทับให้เฉพาะวันนี้วันเดียว วันอื่นต้องรอให้ถึงวันนั้นถึงจะเห็น */
-  const [selectedDate, setSelectedDate] = useState(todayISO());
+  /* หน้านี้แสดง "วันนี้" อย่างเดียว ตัวเลือกวันที่ถูกถอดออกแล้ว
+     ยังเก็บเป็นตัวแปรชื่อ selectedDate ไว้เพราะมีที่ใช้อยู่หลายจุด
+     (ตัวกรองสอนแทน แถบไฮไลต์ในตาราง และข้อความหมายเหตุท้ายหน้า)
+     ผูกกับ today ตรง ๆ จึงเลื่อนตามวันให้เองเมื่อข้ามเที่ยงคืน */
+  const selectedDate = today;
 
   const stamp = () =>
     setLastUpdated(new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }));
@@ -132,8 +131,9 @@ export default function StudentTimetable() {
        ตารางประจำเทอม  เปลี่ยนตาม "ห้อง" อย่างเดียว (ปีละสองครั้ง)
        สอนแทนรายวัน    เปลี่ยนตาม "ห้อง + ช่วงวันที่ที่กำลังดู" และเร่งด่วนกว่ามาก
 
-     ถ้ารวมไว้ก้อนเดียว การกดเปลี่ยนวันที่ในปฏิทินจะลากให้ไปโหลด CSV ของชีตใหม่ทุกครั้ง
-     สถานะเด้งกลับเป็น "กำลังโหลด..." และตารางว่างแวบหนึ่งทั้งที่ตารางเทอมไม่ได้เปลี่ยนเลย */
+     ถ้ารวมไว้ก้อนเดียว การที่วันเปลี่ยน (ข้ามเที่ยงคืน หรือมีสอนแทนเข้ามาใหม่)
+     จะลากให้ไปโหลด CSV ของชีตใหม่ทุกครั้ง สถานะเด้งกลับเป็น "กำลังโหลด..."
+     และตารางว่างแวบหนึ่งทั้งที่ตารางประจำเทอมไม่ได้เปลี่ยนเลย */
   const loadBase = useCallback(async () => {
     /* คำนวณ "วันนี้" ใหม่ทุกรอบ ไม่ใช่ครั้งเดียวตอน mount
        ถ้าใครเปิดแอปค้างข้ามเที่ยงคืน ตารางต้องเลื่อนตามวันจริง ไม่ค้างที่เมื่อวาน */
@@ -200,20 +200,16 @@ export default function StudentTimetable() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAcademic]);
 
-  /* วางสอนแทนของ "วันที่ที่เลือก" ทับตารางฐาน — แถววันอื่นไม่ถูกแตะ
+  /* วางสอนแทนของวันนี้ทับตารางฐาน — แถววันอื่นไม่ถูกแตะ
 
-     ของเดิมผูกกับวันนี้ตายตัว ด้วยเหตุผลว่าตารางเป็นแม่แบบรายสัปดาห์
-     ถ้าทาสีช่องพุธไว้ล่วงหน้าจะแยกไม่ออกว่าพุธไหน — ซึ่งจริงตอนที่ยังไม่มีปฏิทิน
-     พอมีตัวเลือกวันที่แล้ว หน้าเว็บบอกได้ตรง ๆ ว่ากำลังดูวันไหนอยู่ (ดูแถบวันที่และป้ายในแถว)
-     เงื่อนไขที่เคยกันไว้จึงหมดไป และกลายเป็นความสามารถที่คนขอมาแทน
-
-     ค่าเริ่มต้น selectedDate = วันนี้ ทุกอย่างจึงเหมือนเดิมถ้าไม่ไปแตะปฏิทิน */
+     ตารางเป็นแม่แบบรายสัปดาห์ที่มีแต่ชื่อวัน ส่วนสอนแทนผูกกับวันที่จริง
+     ถ้าทาสีช่องพุธไว้ล่วงหน้าจะแยกไม่ออกว่าพุธไหน จึงวางทับเฉพาะแถวของวันนี้
+     ซึ่งเป็นแถวเดียวที่ตอบได้แน่นอนว่าเป็นวันที่ไหน */
   const selectedSubs = subs.filter((s) => s.sub_date === selectedDate);
   const upcomingSubs = subs.filter((s) => s.sub_date > today);
   const timetable = applySubstitutions(baseTimetable, selectedSubs, selectedDate);
   const todayKey = weekdayKeyOf(today);
   const selectedKey = weekdayKeyOf(selectedDate);
-  const isToday = selectedDate === today;
 
   /* คาบของวันที่เลือก เรียงตามลำดับคาบ — ใช้ในการ์ดสรุปด้านบนตาราง
      บนมือถือตารางทั้งผืนต้องเลื่อนแนวนอนกว่าจะเห็นคาบท้าย ๆ (ดูภาพที่ผู้ใช้ส่งมา)
@@ -416,81 +412,20 @@ export default function StudentTimetable() {
         </div>
       )}
 
-      {/* เลือกวันที่ + คาบของวันนั้น
-          ใช้ input type="date" ของเบราว์เซอร์ตรง ๆ ไม่เขียนปฏิทินเอง
-          เพราะของเบราว์เซอร์รองรับทั้งแป้นพิมพ์ screen reader และปฏิทินบนมือถือมาแล้ว
-          ปุ่มลูกศรเป็นทางลัดสำหรับ "วันถัดไป/ก่อนหน้า" ซึ่งเป็นการกดที่เจอบ่อยสุด */}
+      {/* คาบของวันนี้ — ตัวเลือกวันที่ถูกถอดออกตามที่ผู้ใช้ขอ
+          หน้านี้จึงตอบคำถามเดียวคือ "วันนี้เรียนอะไรบ้าง" ซึ่งเป็นสิ่งที่คนเปิดดูจริง ๆ
+          การดูสอนแทนของวันข้างหน้ายังมีอยู่ในกล่อง "สอนแทนที่จะถึง" ด้านบน */}
       <div className={`rounded-3xl border p-4 space-y-4 transition-colors duration-300 ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-surface-card border-slate-100'
         }`}>
         <div className="flex flex-wrap items-center gap-2">
-          <label
-            htmlFor="timetable-date"
-            className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-sbac-navy'}`}
-          >
-            <CalendarDays size={16} className="text-brand" />
-            ดูตารางวันที่
-          </label>
-
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setSelectedDate(nextSchoolDay(selectedDate, -1))}
-              aria-label="วันเรียนก่อนหน้า"
-              className={`w-11 h-11 flex items-center justify-center rounded-xl border transition-colors active:scale-95 ${isDark
-                ? 'bg-white/5 text-content-secondary border-white/10 hover:bg-white/10'
-                : 'bg-slate-50 text-ink-secondary border-slate-200 hover:bg-slate-100'
-                }`}
-            >
-              <ChevronLeft size={18} aria-hidden="true" />
-            </button>
-
-            {/* [color-scheme:dark] ทำให้ปฏิทินของเบราว์เซอร์เป็นธีมมืดตาม
-                ไม่งั้นกดแล้วได้ป๊อปอัปสีขาวจ้าทับหน้าจอมืด */}
-            <input
-              id="timetable-date"
-              type="date"
-              value={selectedDate}
-              onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
-              className={`min-h-[44px] px-3 rounded-xl border text-sm font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-sbac-blue/30 ${isDark
-                ? 'bg-black border-neutral-800 text-white [color-scheme:dark]'
-                : 'bg-slate-50 border-slate-200 text-slate-800'
-                }`}
-            />
-
-            <button
-              type="button"
-              onClick={() => setSelectedDate(nextSchoolDay(selectedDate, 1))}
-              aria-label="วันเรียนถัดไป"
-              className={`w-11 h-11 flex items-center justify-center rounded-xl border transition-colors active:scale-95 ${isDark
-                ? 'bg-white/5 text-content-secondary border-white/10 hover:bg-white/10'
-                : 'bg-slate-50 text-ink-secondary border-slate-200 hover:bg-slate-100'
-                }`}
-            >
-              <ChevronRight size={18} aria-hidden="true" />
-            </button>
-          </div>
-
-          {/* ปุ่มกลับวันนี้โผล่เฉพาะตอนที่ไม่ได้อยู่ที่วันนี้ — ปุ่มที่กดแล้วไม่เกิดอะไรไม่ควรมี */}
-          {!isToday && (
-            <button
-              type="button"
-              onClick={() => setSelectedDate(today)}
-              className="min-h-[44px] px-3 rounded-xl text-xs font-extrabold text-brand hover:underline"
-            >
-              กลับไปวันนี้
-            </button>
-          )}
-
-          {/* บอกวันที่ที่กำลังดูเป็นตัวหนังสือ ไม่ใช่ให้ไปอ่านเอาเองจากช่อง input
-              aria-live ให้ screen reader ประกาศตอนกดลูกศรเปลี่ยนวัน */}
+          <h3 className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-sbac-navy'}`}>
+            <CalendarDays size={16} className="text-brand" aria-hidden="true" />
+            ตารางวันนี้
+          </h3>
           <span
-            aria-live="polite"
-            className={`text-xs font-extrabold px-3 py-1 rounded-full ${isToday
-              ? (isDark ? 'bg-sbac-blue/20 text-brand' : 'bg-sbac-blue-50 text-brand')
-              : (isDark ? 'bg-white/10 text-content-secondary' : 'bg-slate-100 text-ink-secondary')
-              }`}
+            className={`text-xs font-extrabold px-3 py-1 rounded-full ${isDark ? 'bg-sbac-blue/20 text-brand' : 'bg-sbac-blue-50 text-brand'}`}
           >
-            {describeDate(selectedDate)}
+            {formatThaiDate(selectedDate)}
           </span>
         </div>
 
@@ -604,8 +539,8 @@ export default function StudentTimetable() {
               }`}>
               {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => {
                 const periods = (timetable && typeof timetable === 'object' && timetable[day]) || {};
-                /* แถวของวันที่เลือกคือแถวเดียวที่มีสอนแทนวางทับอยู่ ต้องดูออกว่าเป็นแถวไหน
-                   ไม่งั้นคนเลือกวันพุธที่ 17 แล้วเห็นช่องแดงโผล่ในแถวพุธ จะนึกว่าพุธไหนก็ได้ */
+                /* แถวของวันนี้คือแถวเดียวที่มีสอนแทนวางทับอยู่ ต้องดูออกว่าเป็นแถวไหน
+                   ไม่งั้นเห็นช่องแดงโผล่ในแถวพุธ แล้วนึกว่าพุธไหนก็เป็นแบบนี้ */
                 const isSelectedRow = day === selectedKey;
                 return (
                   <tr
@@ -618,15 +553,10 @@ export default function StudentTimetable() {
                     <td className={`p-3 text-xs font-bold transition-colors duration-300 ${isDark ? 'text-white bg-white/10' : 'text-sbac-navy bg-slate-50/30'
                       }`}>
                       {DAYS_TH[day] || day}
-                      {/* ป้ายบอก "วันที่ที่กำลังดู" มาก่อน ส่วน "วันนี้" ขึ้นเฉพาะตอนที่เป็นคนละแถวกัน
-                          จะได้ไม่มีสองป้ายซ้อนกันในช่องกว้าง 64px ตอนที่ทั้งสองอย่างเป็นแถวเดียวกัน */}
+                      {/* เหลือป้ายเดียว — ตั้งแต่ถอดตัวเลือกวันที่ออก แถวที่กำลังดู
+                          กับแถว "วันนี้" เป็นแถวเดียวกันเสมอ ป้ายสองอันจึงซ้อนกันเปล่า ๆ */}
                       {isSelectedRow && (
                         <span className="block text-[8px] font-bold text-brand mt-0.5 leading-tight">
-                          {isToday ? 'วันนี้' : formatThaiDate(selectedDate)}
-                        </span>
-                      )}
-                      {day === todayKey && !isSelectedRow && (
-                        <span className={`block text-[8px] font-bold mt-0.5 ${isDark ? 'text-content-muted' : 'text-ink-muted'}`}>
                           วันนี้
                         </span>
                       )}
@@ -742,10 +672,8 @@ export default function StudentTimetable() {
           <strong>หมายเหตุ:</strong> ช่องที่มีป้าย <span className="font-extrabold text-accent-rose">สอนแทน</span> และกรอบสีแดง
           คือคาบที่ฝ่ายวิชาการสั่งครูสอนแทนหรือย้ายห้องไว้ ในช่องบอกทั้งครูที่มาสอนแทนและครูเดิม
           ถ้าย้ายห้องจะขึ้นเป็น ห้องเดิม → ห้องใหม่
-          {/* ต้องเป็นวันที่ที่เลือก ไม่ใช่วันนี้ — ตั้งแต่มีปฏิทิน ช่องแดงในตารางคือของวันที่เลือกไว้
-              ถ้ายังเขียนว่า "วันนี้" ค้างไว้ คนเลือกดูวันอื่นจะอ่านแล้วเข้าใจผิดทันที */}
-          <strong> เฉพาะวันที่ {formatThaiDate(selectedDate)} ที่เลือกไว้ด้านบนเท่านั้น</strong> — วันอื่นในตารางยังเป็นตารางปกติ
-          เปลี่ยนวันที่แล้วช่องสอนแทนจะเปลี่ยนตามวันนั้นให้เอง
+          <strong> เฉพาะวันนี้ ({formatThaiDate(selectedDate)}) เท่านั้น</strong> — วันอื่นในตารางยังเป็นตารางปกติ
+          สอนแทนของวันข้างหน้าดูได้ที่กล่อง สอนแทนที่จะถึง ด้านบน
           สั่งสอนแทนเมื่อไหร่หน้านี้เปลี่ยนตามทันทีโดยไม่ต้องรีเฟรช ส่วนตารางประจำเทอมอ่านจาก Google Sheet
         </p>
         )}
