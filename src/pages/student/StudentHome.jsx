@@ -17,12 +17,8 @@ import { supabase } from '../../config/supabase';
 import { formatBaht } from '../../utils/identity';
 import { timetableTitle } from '../../utils/timetable';
 import { LEAVE_TYPE_LABELS } from '../../utils/leave';
-import {
-  LEAVE_ATTACHMENT_AFTER_DAYS,
-  attachmentHint,
-  needsAttachment,
-  validateAttachment,
-} from '../../utils/leavePolicy';
+import { attachmentHint, needsAttachment, validateAttachment } from '../../utils/leavePolicy';
+import { useSchoolSettings } from '../../hooks/useSchoolSettings';
 import { useLeaveRequests } from '../../hooks/useLeaveRequests';
 import LeaveRequestList from '../../components/leave/LeaveRequestList';
 import WalletHistory from '../../components/wallet/WalletHistory';
@@ -183,6 +179,14 @@ export default function StudentHome() {
      ปิดแท็บแล้วหาย ผู้อนุมัติจึงยังไม่เห็นไฟล์นี้ (ดูข้อความกำกับใต้ช่องเลือกไฟล์) */
   const [leaveFile, setLeaveFile] = useState(null);
   const [leaveFileError, setLeaveFileError] = useState('');
+
+  /* กติกาการแนบเอกสารมาจากหน้า Admin ไม่ได้ฝังไว้ในไฟล์นี้
+     ผูกค่าไว้ตรงนี้ทีเดียว ที่เหลือในหน้าเรียกสองตัวนี้พอ จะได้ไม่มีจุดไหนหลุดไปใช้ค่าอื่น */
+  const schoolSettings = useSchoolSettings();
+  const leaveNeedsFile = () =>
+    needsAttachment(leaveStartDate, leaveEndDate, schoolSettings.attachmentAfterDays, schoolSettings.countWeekends);
+  const leaveFileHint = () =>
+    attachmentHint(leaveStartDate, leaveEndDate, schoolSettings.attachmentAfterDays, schoolSettings.countWeekends);
   const [submittingLeave, setSubmittingLeave] = useState(false);
 
   /* เรื่องเงินในบัตร ฝั่ง DB ปิดทางไว้หมดตั้งแต่ย้ายมา Supabase:
@@ -218,8 +222,8 @@ export default function StudentHome() {
     }
     /* เกิน 5 วันต้องมีเอกสารประกอบ — ตรวจตรงนี้ที่เดียวหลังรู้ช่วงวันที่ครบแล้ว
        ยังเป็นการตรวจฝั่งหน้าเว็บล้วน ๆ เพราะรุ่นสาธิตยังไม่ส่งไฟล์ไปฝั่งเซิร์ฟเวอร์ */
-    if (needsAttachment(leaveStartDate, leaveEndDate) && !leaveFile) {
-      showToast(`ลาเกิน ${LEAVE_ATTACHMENT_AFTER_DAYS} วัน ต้องแนบเอกสารประกอบ`, 'error');
+    if (leaveNeedsFile() && !leaveFile) {
+      showToast(`ลาเกิน ${schoolSettings.attachmentAfterDays} วัน ต้องแนบเอกสารประกอบ`, 'error');
       return;
     }
 
@@ -728,10 +732,10 @@ export default function StudentHome() {
                   ข้อความใต้ช่องบอกเรื่องนี้ตรง ๆ เพื่อไม่ให้นักเรียนเข้าใจว่าครูเห็นไฟล์แล้ว */}
               <div>
                 <label htmlFor="leave-attachment" className={`text-xs font-bold block mb-1 ${textPrimary}`}>
-                  เอกสารประกอบ {needsAttachment(leaveStartDate, leaveEndDate) && <span className="text-accent-rose">*</span>}
+                  เอกสารประกอบ {leaveNeedsFile() && <span className="text-accent-rose">*</span>}
                 </label>
-                <p className={`text-[11px] mb-2 ${needsAttachment(leaveStartDate, leaveEndDate) ? 'text-accent-amber font-bold' : textMuted}`}>
-                  {attachmentHint(leaveStartDate, leaveEndDate)}
+                <p className={`text-[11px] mb-2 ${leaveNeedsFile() ? 'text-accent-amber font-bold' : textMuted}`}>
+                  {leaveFileHint()}
                 </p>
                 <input
                   id="leave-attachment"

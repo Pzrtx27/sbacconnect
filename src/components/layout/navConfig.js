@@ -1,4 +1,4 @@
-import { Home, Calendar, ShoppingCart, HeartHandshake, Receipt } from 'lucide-react';
+import { Home, Calendar, ShieldCheck, ShoppingCart, HeartHandshake, Receipt } from 'lucide-react';
 import CoffeeCup from '../ui/icons/CoffeeCup';
 import { timetableTitle } from '../../utils/timetable';
 
@@ -41,6 +41,7 @@ const navConfigs = {
      กดแล้วโดน ProtectedRoute เด้งกลับ /academic ทันที */
   sysadmin: [
     { id: 'home', path: '/academic', icon: Home, label: 'หน้าหลัก' },
+    { id: 'admin', path: '/admin', icon: ShieldCheck, label: 'ผู้ดูแลระบบ' },
     { id: 'development', path: '/development', icon: HeartHandshake, label: 'ฝ่ายพัฒนา' },
     { id: 'timetable', path: '/timetable', icon: Calendar, label: timetableTitle('academic') },
   ],

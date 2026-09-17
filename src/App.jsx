@@ -10,6 +10,7 @@ import MyOrdersPage from './pages/student/MyOrdersPage';
 import OrderHistoryPage from './pages/student/OrderHistoryPage';
 import TeacherHome from './pages/teacher/TeacherHome';
 import AcademicDashboard from './pages/academic/AcademicDashboard';
+import AdminDashboard from './pages/admin/AdminDashboard';
 import BaristaDashboard from './pages/barista/BaristaDashboard';
 import FinanceDashboard from './pages/finance/FinanceDashboard';
 import DevelopmentDashboard from './pages/development/DevelopmentDashboard';
@@ -286,6 +287,15 @@ function MainLayout() {
               element={
                 <ProtectedRoute allowedRoles={['teacher']}>
                   <PageWrapper><TeacherHome /></PageWrapper>
+                </ProtectedRoute>
+              }
+            />
+            {/* หน้าผู้ดูแลระบบ — งานตั้งค่าที่กระทบทั้งวิทยาลัย แยกจากงานประจำวันของวิชาการ */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute allowedRoles={['sysadmin']}>
+                  <PageWrapper><AdminDashboard /></PageWrapper>
                 </ProtectedRoute>
               }
             />

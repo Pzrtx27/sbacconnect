@@ -3,8 +3,9 @@
    ข้อกำหนดจากวิทยาลัย: ลา "เกิน" 5 วัน ต้องแนบใบรับรอง/ใบลาเป็นไฟล์หรือรูป
    คำว่าเกินคือมากกว่า ไม่ใช่ตั้งแต่ — ลา 5 วันพอดียังไม่ต้องแนบ ลา 6 วันถึงต้อง
 
-   ตัวเลข 5 อยู่ที่เดียวในไฟล์นี้ และทุกฟังก์ชันรับค่ามาแทนได้
-   เพื่อให้หน้า Admin เปลี่ยนเป็น 3 หรือ 7 วันได้ในอนาคตโดยไม่ต้องไล่แก้หลายที่ */
+   ตัวเลข 5 ในไฟล์นี้เป็นเพียง "ค่าสำรอง" ที่ใช้ตอนอ่านค่าจากฐานข้อมูลไม่ได้
+   ค่าจริงมาจากตาราง school_settings ซึ่งหน้า Admin แก้ได้ (ดู useSchoolSettings)
+   ทุกฟังก์ชันจึงรับ afterDays และ countWeekends เข้ามาแทนค่าเริ่มต้นได้หมด */
 
 export const LEAVE_ATTACHMENT_AFTER_DAYS = 5;
 
@@ -23,7 +24,7 @@ const ONE_DAY_MS = 86400000;
  *
  *  คิดด้วย UTC ล้วน ไม่แตะ timezone ของเครื่อง — ถ้าใช้ new Date('2569-01-01')
  *  เครื่องที่ตั้งโซนอื่นจะได้วันเคลื่อนไปหนึ่งวัน แล้วกติกาแนบไฟล์จะเพี้ยนตาม */
-export function leaveDays(startDate, endDate) {
+export function leaveDays(startDate, endDate, countWeekends = true) {
   const start = String(startDate || '');
   const end = String(endDate || '') || start;
 
@@ -35,12 +36,22 @@ export function leaveDays(startDate, endDate) {
   if (!Number.isFinite(first) || !Number.isFinite(last)) return 0;
   if (last < first) return 0;
 
-  return Math.round((last - first) / ONE_DAY_MS) + 1;
+  // เพดานกันช่วงวันที่ยาวผิดปกติ (พิมพ์ปีผิดเป็น 2669) ไม่ให้วนลูปค้างหน้าจอ
+  if (last - first > 365 * ONE_DAY_MS) return 0;
+
+  if (countWeekends) return Math.round((last - first) / ONE_DAY_MS) + 1;
+
+  let days = 0;
+  for (let time = first; time <= last; time += ONE_DAY_MS) {
+    const weekday = new Date(time).getUTCDay();
+    if (weekday !== 0 && weekday !== 6) days += 1;
+  }
+  return days;
 }
 
 /** ใบลาช่วงนี้ต้องแนบเอกสารไหม */
-export function needsAttachment(startDate, endDate, afterDays = LEAVE_ATTACHMENT_AFTER_DAYS) {
-  return leaveDays(startDate, endDate) > Number(afterDays);
+export function needsAttachment(startDate, endDate, afterDays = LEAVE_ATTACHMENT_AFTER_DAYS, countWeekends = true) {
+  return leaveDays(startDate, endDate, countWeekends) > Number(afterDays);
 }
 
 /** ตรวจไฟล์ที่ผู้ใช้เลือก — คืนข้อความผิดพลาด หรือ '' ถ้าผ่าน
@@ -57,8 +68,8 @@ export function validateAttachment(file) {
 }
 
 /** ข้อความบอกสถานะการแนบไฟล์ใต้ฟอร์ม — ให้นักเรียนรู้ล่วงหน้าว่าต้องแนบหรือยัง */
-export function attachmentHint(startDate, endDate, afterDays = LEAVE_ATTACHMENT_AFTER_DAYS) {
-  const days = leaveDays(startDate, endDate);
+export function attachmentHint(startDate, endDate, afterDays = LEAVE_ATTACHMENT_AFTER_DAYS, countWeekends = true) {
+  const days = leaveDays(startDate, endDate, countWeekends);
   if (days === 0) return `ลาเกิน ${afterDays} วันต้องแนบเอกสารประกอบ`;
   if (days > Number(afterDays)) return `ลา ${days} วัน — เกิน ${afterDays} วัน ต้องแนบเอกสารประกอบ`;
   return `ลา ${days} วัน — ไม่เกิน ${afterDays} วัน จะแนบเอกสารหรือไม่ก็ได้`;
